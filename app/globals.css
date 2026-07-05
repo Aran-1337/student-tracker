@@ -880,3 +880,25 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 0 12px 0 rgba(139, 92, 246, 0.15) !important;
 }
 
+/* Custom Toggle Buttons in Admin Panel */
+.toggle-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.toggle-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.toggle-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

@@ -493,22 +493,22 @@ export default function AdminPanel() {
                       {/* Bills Feature Toggle */}
                       <td>
                         <button
-                          className="btn-icon"
+                          className="toggle-button"
                           onClick={() => handleToggleBills(teacher.id, teacher.has_bills_feature)}
                           disabled={isUpdating}
-                          style={{ background: "none", border: "none", color: teacher.has_bills_feature ? "var(--color-teal)" : "var(--text-muted)", cursor: "pointer" }}
+                          style={{ color: teacher.has_bills_feature ? "var(--color-teal)" : "var(--text-muted)" }}
                           title={teacher.has_bills_feature ? "تعطيل ميزة الفواتير" : "تفعيل ميزة الفواتير"}
                         >
                           {teacher.has_bills_feature ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                              <ToggleRight size={32} />
-                              <span style={{ fontSize: "0.8rem" }}>مفعلة</span>
-                            </div>
+                            <>
+                              <ToggleRight size={38} />
+                              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>مفعلة</span>
+                            </>
                           ) : (
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                              <ToggleLeft size={32} />
-                              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>معطلة</span>
-                            </div>
+                            <>
+                              <ToggleLeft size={38} />
+                              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>معطلة</span>
+                            </>
                           )}
                         </button>
                       </td>
@@ -516,28 +516,24 @@ export default function AdminPanel() {
                       {/* Subscription Status Toggle */}
                       <td>
                         <button
+                          className="toggle-button"
                           onClick={() => handleToggleActive(teacher.id, teacher.is_active)}
                           disabled={isUpdating}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            color: (teacher.is_active && !isExpired) ? "#10b981" : "#ef4444",
-                            cursor: "pointer"
-                          }}
+                          style={{ color: (teacher.is_active && !isExpired) ? "#10b981" : "#ef4444" }}
                           title={teacher.is_active ? "تعطيل الاشتراك" : "تفعيل الاشتراك"}
                         >
                           {teacher.is_active && !isExpired ? (
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                              <ToggleRight size={32} />
-                              <span style={{ fontSize: "0.8rem" }}>نشط</span>
-                            </div>
+                            <>
+                              <ToggleRight size={38} />
+                              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>نشط</span>
+                            </>
                           ) : (
-                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                              <ToggleLeft size={32} />
-                              <span style={{ fontSize: "0.8rem", color: "#ef4444" }}>
+                            <>
+                              <ToggleLeft size={38} />
+                              <span style={{ fontSize: "0.85rem", color: "#ef4444", fontWeight: 600 }}>
                                 {isExpired ? "منتهي" : "معطل"}
                               </span>
-                            </div>
+                            </>
                           )}
                         </button>
                       </td>
