@@ -131,18 +131,31 @@ export default function AdminPanel() {
           .select("*")
           .order("created_at", { ascending: false });
 
-        // Fetch plans
-        const { data: plansData } = await supabase
-          .from("plans")
-          .select("id, name, price, duration_months, has_bills, has_attendance, color")
-          .eq("is_active", true)
-          .order("price");
+        // Load plans from localStorage
+        const savedPlans = localStorage.getItem("saas_plans");
+        let parsedPlans = [];
+        if (savedPlans) {
+          parsedPlans = JSON.parse(savedPlans);
+        } else {
+          parsedPlans = [
+            { id: "plan-1", name: "باقة الحضور والغياب", price: 150, duration_months: 1, has_bills: false, has_attendance: true, color: "#14b8a6", is_active: true },
+            { id: "plan-2", name: "الباقة الشاملة", price: 250, duration_months: 1, has_bills: true, has_attendance: true, color: "#8b5cf6", is_active: true }
+          ];
+          localStorage.setItem("saas_plans", JSON.stringify(parsedPlans));
+        }
 
-        setTeachers(teachersData || []);
+        // Load plan mappings
+        const localMapping = JSON.parse(localStorage.getItem("teacher_plans_mapping") || "{}");
+        const mappedTeachers = (teachersData || []).map(t => ({
+          ...t,
+          plan_id: localMapping[t.id] || null
+        }));
+
+        setTeachers(mappedTeachers);
         setStudents(studentsData || []);
         setGroups(groupsData || []);
         setAdminEmails(adminsData || []);
-        setPlans(plansData || []);
+        setPlans(parsedPlans.filter((p: any) => p.is_active));
 
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل البيانات الإدارية.", "error");
@@ -288,27 +301,30 @@ export default function AdminPanel() {
   const handleAssignPlan = async (teacher: Teacher, planId: string) => {
     setUpdatingId(teacher.id);
     try {
+      // Manage local plan mapping to bypass missing column in DB
+      const localMapping = JSON.parse(localStorage.getItem("teacher_plans_mapping") || "{}");
+
       if (planId === "") {
         // Remove plan
-        const { error } = await supabase
-          .from("teachers")
-          .update({ plan_id: null })
-          .eq("id", teacher.id);
-        if (error) throw error;
+        // We only update existing features in DB, we don't send plan_id
+        // No DB update needed just to remove a plan tag if we don't revert features
+        delete localMapping[teacher.id];
+        localStorage.setItem("teacher_plans_mapping", JSON.stringify(localMapping));
+
         setTeachers(teachers.map(t => t.id === teacher.id ? { ...t, plan_id: null } : t));
         showToast("تم إلغاء تعيين الباقة.");
         return;
       }
-      const plan = plans.find(p => p.id === planId);
+      const plan = plans.find((p: any) => p.id === planId);
       if (!plan) return;
       // Calculate new expiry
       const newExpiry = new Date();
       newExpiry.setMonth(newExpiry.getMonth() + plan.duration_months);
+      
       // Apply plan features to teacher
       const { error } = await supabase
         .from("teachers")
         .update({
-          plan_id: plan.id,
           has_bills_feature: plan.has_bills,
           has_attendance_feature: plan.has_attendance,
           is_active: true,
@@ -316,6 +332,10 @@ export default function AdminPanel() {
         })
         .eq("id", teacher.id);
       if (error) throw error;
+
+      localMapping[teacher.id] = plan.id;
+      localStorage.setItem("teacher_plans_mapping", JSON.stringify(localMapping));
+
       setTeachers(teachers.map(t => t.id === teacher.id ? {
         ...t,
         plan_id: plan.id,

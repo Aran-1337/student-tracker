@@ -86,13 +86,17 @@ export default function PlansPage() {
       if (!session) { router.replace("/login"); return; }
       const { data: teacher } = await supabase.from("teachers").select("is_admin").eq("id", session.user.id).single();
       if (!teacher?.is_admin) { router.replace("/dashboard"); return; }
-      const { data } = await supabase.from("plans").select("*").order("price");
-      if (!data || data.length === 0) {
-        // Try to insert default plans if none exist
+      
+      // Load plans from localStorage instead of DB to bypass missing table
+      const savedPlans = localStorage.getItem("saas_plans");
+      if (savedPlans) {
+        setPlans(JSON.parse(savedPlans));
+      } else {
         const defaultPlans = [
           {
+            id: "plan-1",
             name: "باقة الحضور والغياب",
-            description: "إدارة كاملة لحضور وغياب الطلاب مع دعم QR Code",
+            description: JSON.stringify({ summary: "إدارة كاملة لحضور وغياب الطلاب مع دعم QR Code", customFeatures: [] }),
             price: 150,
             duration_months: 1,
             has_bills: false,
@@ -101,8 +105,9 @@ export default function PlansPage() {
             is_active: true
           },
           {
+            id: "plan-2",
             name: "الباقة الشاملة",
-            description: "إدارة الحضور والغياب بالإضافة إلى إدارة المصروفات والفواتير",
+            description: JSON.stringify({ summary: "إدارة الحضور والغياب بالإضافة إلى إدارة المصروفات والفواتير", customFeatures: [] }),
             price: 250,
             duration_months: 1,
             has_bills: true,
@@ -111,17 +116,8 @@ export default function PlansPage() {
             is_active: true
           }
         ];
-        
-        const { data: newPlans, error: insertError } = await supabase.from("plans").insert(defaultPlans).select();
-        
-        if (!insertError && newPlans) {
-          setPlans(newPlans);
-        } else {
-          // If insert fails (maybe due to RLS), just show them locally
-          setPlans(defaultPlans as any);
-        }
-      } else {
-        setPlans(data);
+        localStorage.setItem("saas_plans", JSON.stringify(defaultPlans));
+        setPlans(defaultPlans as any);
       }
       setLoading(false);
     }
@@ -131,6 +127,7 @@ export default function PlansPage() {
   const openCreate = () => {
     setEditingPlan(null);
     setForm(defaultForm);
+    setNewFeature("");
     setShowForm(true);
   };
 
@@ -165,29 +162,18 @@ export default function PlansPage() {
       customFeatures: form.customFeatures
     });
     
-    const dbPayload = {
-      name: form.name,
-      description: payloadDesc,
-      price: form.price,
-      duration_months: form.duration_months,
-      has_bills: form.has_bills,
-      has_attendance: form.has_attendance,
-      color: form.color,
-      is_active: form.is_active
-    };
-
     try {
+      let updatedPlans = [...plans];
       if (editingPlan) {
-        const { data, error } = await supabase.from("plans").update(dbPayload).eq("id", editingPlan.id).select().single();
-        if (error) throw error;
-        setPlans(plans.map(p => p.id === editingPlan.id ? data : p));
+        updatedPlans = plans.map(p => p.id === editingPlan.id ? { ...p, ...form, description: payloadDesc } : p);
         showToast("✓ تم تحديث الباقة بنجاح");
       } else {
-        const { data, error } = await supabase.from("plans").insert([dbPayload]).select().single();
-        if (error) throw error;
-        setPlans([...plans, data]);
+        const newPlan = { id: `plan-${Date.now()}`, ...form, description: payloadDesc, created_at: new Date().toISOString() };
+        updatedPlans = [...plans, newPlan];
         showToast("✓ تم إنشاء الباقة بنجاح");
       }
+      localStorage.setItem("saas_plans", JSON.stringify(updatedPlans));
+      setPlans(updatedPlans as any);
       setShowForm(false);
     } catch (err: any) {
       showToast(err.message || "فشل حفظ الباقة", "error");
@@ -197,10 +183,10 @@ export default function PlansPage() {
   };
 
   const handleDelete = async (plan: Plan) => {
-    if (!confirm(`هل تريد حذف باقة "${plan.name}"؟ المعلمون المرتبطون بها لن يتأثروا (الحذف لن يغير مميزاتهم الحالية).`)) return;
-    const { error } = await supabase.from("plans").delete().eq("id", plan.id);
-    if (error) { showToast(error.message, "error"); return; }
-    setPlans(plans.filter(p => p.id !== plan.id));
+    if (!confirm(`هل تريد حذف باقة "${plan.name}"؟ المعلمون المرتبطون بها لن يتأثروا.`)) return;
+    const updatedPlans = plans.filter(p => p.id !== plan.id);
+    localStorage.setItem("saas_plans", JSON.stringify(updatedPlans));
+    setPlans(updatedPlans);
     showToast("✓ تم حذف الباقة");
   };
 
