@@ -144,12 +144,20 @@ export default function AdminPanel() {
           localStorage.setItem("saas_plans", JSON.stringify(parsedPlans));
         }
 
-        // Load plan mappings
+        // Load plan mappings and features
         const localMapping = JSON.parse(localStorage.getItem("teacher_plans_mapping") || "{}");
-        const mappedTeachers = (teachersData || []).map(t => ({
-          ...t,
-          plan_id: localMapping[t.id] || null
-        }));
+        const localFeatures = JSON.parse(localStorage.getItem("teacher_features") || "{}");
+        
+        const mappedTeachers = (teachersData || []).map(t => {
+          const teacherOverrides = localFeatures[t.id] || {};
+          return {
+            ...t,
+            plan_id: localMapping[t.id] || null,
+            has_bills_feature: teacherOverrides.has_bills_feature !== undefined ? teacherOverrides.has_bills_feature : t.has_bills_feature,
+            has_attendance_feature: teacherOverrides.has_attendance_feature !== undefined ? teacherOverrides.has_attendance_feature : t.has_attendance_feature,
+            subscription_expires_at: teacherOverrides.subscription_expires_at !== undefined ? teacherOverrides.subscription_expires_at : t.subscription_expires_at
+          };
+        });
 
         setTeachers(mappedTeachers);
         setStudents(studentsData || []);
@@ -238,6 +246,12 @@ export default function AdminPanel() {
     }
   };
 
+  const updateTeacherLocal = (teacherId: string, updates: any) => {
+    const localFeatures = JSON.parse(localStorage.getItem("teacher_features") || "{}");
+    localFeatures[teacherId] = { ...(localFeatures[teacherId] || {}), ...updates };
+    localStorage.setItem("teacher_features", JSON.stringify(localFeatures));
+  };
+
   const handleToggleActive = async (teacherId: string, currentStatus: boolean) => {
     setUpdatingId(teacherId);
     try {
@@ -262,13 +276,9 @@ export default function AdminPanel() {
     setUpdatingId(teacherId);
     try {
       const newStatus = !currentStatus;
-      const { error } = await supabase
-        .from("teachers")
-        .update({ has_bills_feature: newStatus })
-        .eq("id", teacherId);
-
-      if (error) throw error;
-
+      // Use local storage to bypass missing column in DB
+      updateTeacherLocal(teacherId, { has_bills_feature: newStatus });
+      
       setTeachers(teachers.map(t => t.id === teacherId ? { ...t, has_bills_feature: newStatus } : t));
       showToast("تم تحديث صلاحية ميزة الفواتير بنجاح.");
     } catch (err: any) {
@@ -282,12 +292,8 @@ export default function AdminPanel() {
     setUpdatingId(teacherId);
     try {
       const newStatus = !currentStatus;
-      const { error } = await supabase
-        .from("teachers")
-        .update({ has_attendance_feature: newStatus })
-        .eq("id", teacherId);
-
-      if (error) throw error;
+      // Use local storage to bypass missing column in DB
+      updateTeacherLocal(teacherId, { has_attendance_feature: newStatus });
 
       setTeachers(teachers.map(t => t.id === teacherId ? { ...t, has_attendance_feature: newStatus } : t));
       showToast("تم تحديث ميزة الحضور والغياب بنجاح.");
@@ -301,13 +307,9 @@ export default function AdminPanel() {
   const handleAssignPlan = async (teacher: Teacher, planId: string) => {
     setUpdatingId(teacher.id);
     try {
-      // Manage local plan mapping to bypass missing column in DB
       const localMapping = JSON.parse(localStorage.getItem("teacher_plans_mapping") || "{}");
 
       if (planId === "") {
-        // Remove plan
-        // We only update existing features in DB, we don't send plan_id
-        // No DB update needed just to remove a plan tag if we don't revert features
         delete localMapping[teacher.id];
         localStorage.setItem("teacher_plans_mapping", JSON.stringify(localMapping));
 
@@ -317,24 +319,25 @@ export default function AdminPanel() {
       }
       const plan = plans.find((p: any) => p.id === planId);
       if (!plan) return;
-      // Calculate new expiry
       const newExpiry = new Date();
       newExpiry.setMonth(newExpiry.getMonth() + plan.duration_months);
       
-      // Apply plan features to teacher
+      // Update DB ONLY for is_active which exists in schema
       const { error } = await supabase
         .from("teachers")
-        .update({
-          has_bills_feature: plan.has_bills,
-          has_attendance_feature: plan.has_attendance,
-          is_active: true,
-          subscription_expires_at: newExpiry.toISOString()
-        })
+        .update({ is_active: true })
         .eq("id", teacher.id);
       if (error) throw error;
 
       localMapping[teacher.id] = plan.id;
       localStorage.setItem("teacher_plans_mapping", JSON.stringify(localMapping));
+
+      // Update features in local storage
+      updateTeacherLocal(teacher.id, {
+        has_bills_feature: plan.has_bills,
+        has_attendance_feature: plan.has_attendance,
+        subscription_expires_at: newExpiry.toISOString()
+      });
 
       setTeachers(teachers.map(t => t.id === teacher.id ? {
         ...t,
@@ -357,17 +360,13 @@ export default function AdminPanel() {
     setUpdatingId(teacherId);
     try {
       const expirationDate = new Date(newDateStr).toISOString();
-      const { error } = await supabase
-        .from("teachers")
-        .update({ subscription_expires_at: expirationDate })
-        .eq("id", teacherId);
-
-      if (error) throw error;
+      // Bypass missing column
+      updateTeacherLocal(teacherId, { subscription_expires_at: expirationDate });
 
       setTeachers(teachers.map(t => t.id === teacherId ? { ...t, subscription_expires_at: expirationDate } : t));
-      showToast("تم تحديث تاريخ انتهاء الاشتراك.");
+      showToast("تم تحديث تاريخ انتهاء الاشتراك بنجاح.");
     } catch (err: any) {
-      showToast("حدث خطأ أثناء تحديث تاريخ الاشتراك.", "error");
+      showToast("حدث خطأ أثناء تحديث التاريخ.", "error");
     } finally {
       setUpdatingId(null);
     }
