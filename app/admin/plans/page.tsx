@@ -75,7 +75,42 @@ export default function PlansPage() {
       const { data: teacher } = await supabase.from("teachers").select("is_admin").eq("id", session.user.id).single();
       if (!teacher?.is_admin) { router.replace("/dashboard"); return; }
       const { data } = await supabase.from("plans").select("*").order("price");
-      setPlans(data || []);
+      if (!data || data.length === 0) {
+        // Try to insert default plans if none exist
+        const defaultPlans = [
+          {
+            name: "باقة الحضور والغياب",
+            description: "إدارة كاملة لحضور وغياب الطلاب مع دعم QR Code",
+            price: 150,
+            duration_months: 1,
+            has_bills: false,
+            has_attendance: true,
+            color: "#14b8a6",
+            is_active: true
+          },
+          {
+            name: "الباقة الشاملة",
+            description: "إدارة الحضور والغياب بالإضافة إلى إدارة المصروفات والفواتير",
+            price: 250,
+            duration_months: 1,
+            has_bills: true,
+            has_attendance: true,
+            color: "#8b5cf6",
+            is_active: true
+          }
+        ];
+        
+        const { data: newPlans, error: insertError } = await supabase.from("plans").insert(defaultPlans).select();
+        
+        if (!insertError && newPlans) {
+          setPlans(newPlans);
+        } else {
+          // If insert fails (maybe due to RLS), just show them locally
+          setPlans(defaultPlans as any);
+        }
+      } else {
+        setPlans(data);
+      }
       setLoading(false);
     }
     load();
@@ -137,7 +172,7 @@ export default function PlansPage() {
   if (loading) return <div className="loading-wrapper"><div className="spinner" /></div>;
 
   return (
-    <div>
+    <div style={{ padding: "2rem", minHeight: "100vh", background: "var(--bg-primary)" }}>
       {/* Header */}
       <div style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
         <div>
