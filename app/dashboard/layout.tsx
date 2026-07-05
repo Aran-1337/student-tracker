@@ -153,8 +153,8 @@ export default function DashboardLayout({
   const menuItems = [
     { name: "الرئيسية والمجموعات", path: "/dashboard", icon: LayoutDashboard },
     { name: "إدارة الطلاب", path: "/dashboard/students", icon: Users },
-    ...(hasBills ? [{ name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt }] : []),
     ...(hasAttendance ? [{ name: "الحضور والغياب", path: "/dashboard/attendance", icon: ClipboardCheck }] : []),
+    ...(hasBills ? [{ name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt }] : []),
     { name: "التقارير المالية", path: "/dashboard/reports", icon: TrendingUp },
     { name: "الإعدادات", path: "/dashboard/settings", icon: Settings },
     ...(isAdmin ? [{ name: "لوحة المدير العام", path: "/admin", icon: Shield }] : [])
