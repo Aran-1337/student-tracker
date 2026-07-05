@@ -902,3 +902,16 @@ h1, h2, h3, h4, h5, h6 {
   cursor: not-allowed;
 }
 
+/* Floating bulk action bar animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+

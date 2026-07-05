@@ -9,7 +9,9 @@ import {
   Trash2, 
   AlertCircle,
   X,
-  UserPlus
+  UserPlus,
+  CheckSquare,
+  Square
 } from "lucide-react";
 
 interface Group {
@@ -59,14 +61,17 @@ export default function StudentsManagement() {
   const [studentName, setStudentName] = useState("");
   const [studentGroupId, setStudentGroupId] = useState("");
 
+  // Bulk selection state
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
+
   // Filters state
-  const [activeFilter, setActiveFilter] = useState<string>("all"); // 'all', 'none', or group_id
+  const [activeFilter, setActiveFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   };
 
   useEffect(() => {
@@ -76,14 +81,12 @@ export default function StudentsManagement() {
         if (!session) return;
         setUserId(session.user.id);
 
-        // Fetch groups
         const { data: groupsData } = await supabase
           .from("groups")
           .select("*")
           .order("created_at", { ascending: false });
         setGroups(groupsData || []);
 
-        // Fetch students
         const { data: studentsData } = await supabase
           .from("students")
           .select("*")
@@ -145,9 +148,7 @@ export default function StudentsManagement() {
   };
 
   const handleDeleteStudent = async (studentId: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا الطالب نهائياً؟")) {
-      return;
-    }
+    if (!confirm("هل أنت متأكد من حذف هذا الطالب نهائياً؟")) return;
 
     try {
       const { error } = await supabase
@@ -158,9 +159,36 @@ export default function StudentsManagement() {
       if (error) throw error;
 
       setStudents(students.filter(s => s.id !== studentId));
+      setSelectedStudentIds(prev => { const n = new Set(prev); n.delete(studentId); return n; });
       showToast("تم حذف الطالب بنجاح.");
     } catch (err: any) {
       showToast(err.message || "فشل حذف الطالب.", "error");
+    }
+  };
+
+  // Bulk delete handler
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedStudentIds);
+    if (ids.length === 0) return;
+
+    if (!confirm(`هل أنت متأكد من حذف ${ids.length} طالب؟ هذا الإجراء لا يمكن التراجع عنه.`)) return;
+
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("students")
+        .delete()
+        .in("id", ids);
+
+      if (error) throw error;
+
+      setStudents(students.filter(s => !selectedStudentIds.has(s.id)));
+      setSelectedStudentIds(new Set());
+      showToast(`✓ تم حذف ${ids.length} طالب بنجاح.`);
+    } catch (err: any) {
+      showToast(err.message || "فشل الحذف الجماعي.", "error");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -168,7 +196,6 @@ export default function StudentsManagement() {
     const updatedMonths = [...student.months];
     updatedMonths[monthIdx] = !updatedMonths[monthIdx];
 
-    // Optimistic Update
     const prevStudents = [...students];
     setStudents(students.map(s => s.id === student.id ? { ...s, months: updatedMonths } : s));
 
@@ -188,7 +215,6 @@ export default function StudentsManagement() {
   const handleToggleBook = async (student: Student, bookKey: "book_1" | "book_2") => {
     const updatedVal = !student[bookKey];
 
-    // Optimistic Update
     const prevStudents = [...students];
     setStudents(students.map(s => s.id === student.id ? { ...s, [bookKey]: updatedVal } : s));
 
@@ -205,6 +231,23 @@ export default function StudentsManagement() {
     }
   };
 
+  // Selection helpers
+  const toggleSelectStudent = (id: string) => {
+    setSelectedStudentIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedStudentIds.size === filteredStudents.length) {
+      setSelectedStudentIds(new Set());
+    } else {
+      setSelectedStudentIds(new Set(filteredStudents.map(s => s.id)));
+    }
+  };
+
   // Filter students
   const filteredStudents = students.filter(student => {
     const matchesGroup = activeFilter === "all" 
@@ -212,10 +255,12 @@ export default function StudentsManagement() {
       : activeFilter === "none" 
         ? student.group_id === null 
         : student.group_id === activeFilter;
-        
     const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesGroup && matchesSearch;
   });
+
+  const allSelected = filteredStudents.length > 0 && selectedStudentIds.size === filteredStudents.length;
+  const someSelected = selectedStudentIds.size > 0;
 
   if (loading) {
     return (
@@ -286,22 +331,24 @@ export default function StudentsManagement() {
 
         {/* Left Side: Students List */}
         <section className="glass-panel panel-content">
-          <h2 className="panel-title">
-            <Users size={18} style={{ color: "var(--color-info)" }} />
-            <span>قائمة الطلاب ({filteredStudents.length})</span>
-          </h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+            <h2 className="panel-title" style={{ margin: 0 }}>
+              <Users size={18} style={{ color: "var(--color-info)" }} />
+              <span>قائمة الطلاب ({filteredStudents.length})</span>
+            </h2>
+          </div>
 
           {/* Group Filter Chips */}
           <div className="chips-container">
             <button 
               className={`chip ${activeFilter === "all" ? "active" : ""}`}
-              onClick={() => setActiveFilter("all")}
+              onClick={() => { setActiveFilter("all"); setSelectedStudentIds(new Set()); }}
             >
               كل الطلاب
             </button>
             <button 
               className={`chip ${activeFilter === "none" ? "active" : ""}`}
-              onClick={() => setActiveFilter("none")}
+              onClick={() => { setActiveFilter("none"); setSelectedStudentIds(new Set()); }}
             >
               بدون مجموعة
             </button>
@@ -309,7 +356,7 @@ export default function StudentsManagement() {
               <button 
                 key={group.id}
                 className={`chip ${group.is_private ? "private" : ""} ${activeFilter === group.id ? "active" : ""}`}
-                onClick={() => setActiveFilter(group.id)}
+                onClick={() => { setActiveFilter(group.id); setSelectedStudentIds(new Set()); }}
               >
                 <span>{group.name} {group.is_private ? "★ " : ""}({group.day_of_week} {formatTimeTo12H(group.time)})</span>
               </button>
@@ -341,6 +388,16 @@ export default function StudentsManagement() {
               <table className="students-table">
                 <thead>
                   <tr>
+                    {/* Select All Checkbox */}
+                    <th style={{ width: "40px", textAlign: "center" }}>
+                      <button
+                        onClick={toggleSelectAll}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: allSelected ? "var(--color-teal)" : "var(--text-muted)", display: "flex", alignItems: "center", margin: "0 auto" }}
+                        title={allSelected ? "إلغاء تحديد الكل" : "تحديد الكل"}
+                      >
+                        {allSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                      </button>
+                    </th>
                     <th>اسم الطالب</th>
                     <th>الشهور المدفوعة (١ - ١٢)</th>
                     <th>الكتب المستلمة</th>
@@ -350,8 +407,25 @@ export default function StudentsManagement() {
                 <tbody>
                   {filteredStudents.map(student => {
                     const studentGroup = groups.find(g => g.id === student.group_id);
+                    const isSelected = selectedStudentIds.has(student.id);
                     return (
-                      <tr key={student.id}>
+                      <tr 
+                        key={student.id}
+                        style={{
+                          background: isSelected ? "rgba(20, 184, 166, 0.06)" : undefined,
+                          outline: isSelected ? "1px solid rgba(20, 184, 166, 0.2)" : undefined,
+                          transition: "background 0.15s ease"
+                        }}
+                      >
+                        {/* Row Checkbox */}
+                        <td style={{ textAlign: "center" }}>
+                          <button
+                            onClick={() => toggleSelectStudent(student.id)}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: isSelected ? "var(--color-teal)" : "var(--text-muted)", display: "flex", alignItems: "center", margin: "0 auto" }}
+                          >
+                            {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                          </button>
+                        </td>
                         <td>
                           <div className="student-name-cell">
                             <span className="student-name">{student.name}</span>
@@ -412,10 +486,55 @@ export default function StudentsManagement() {
         </section>
       </div>
 
+      {/* Floating Bulk Action Bar */}
+      {someSelected && (
+        <div style={{
+          position: "fixed",
+          bottom: "2rem",
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "rgba(15, 23, 42, 0.97)",
+          backdropFilter: "blur(16px)",
+          border: "1px solid rgba(20, 184, 166, 0.3)",
+          borderRadius: "14px",
+          padding: "0.85rem 1.75rem",
+          display: "flex",
+          alignItems: "center",
+          gap: "1.25rem",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(20,184,166,0.1)",
+          zIndex: 100,
+          animation: "fadeInUp 0.2s ease"
+        }}>
+          <span style={{ fontWeight: 600, color: "var(--color-teal)", fontSize: "0.95rem" }}>
+            <CheckSquare size={16} style={{ display: "inline", marginLeft: "6px", verticalAlign: "middle" }} />
+            تم تحديد {selectedStudentIds.size} طالب
+          </span>
+
+          <button
+            className="btn btn-danger"
+            onClick={handleBulkDelete}
+            disabled={actionLoading}
+            style={{ padding: "0.5rem 1.25rem", fontSize: "0.9rem" }}
+          >
+            <Trash2 size={16} />
+            <span>{actionLoading ? "جاري الحذف..." : "حذف المحدد"}</span>
+          </button>
+
+          <button
+            className="btn btn-secondary"
+            onClick={() => setSelectedStudentIds(new Set())}
+            style={{ padding: "0.5rem 1rem", fontSize: "0.9rem" }}
+          >
+            <X size={16} />
+            <span>إلغاء التحديد</span>
+          </button>
+        </div>
+      )}
+
       {/* Toast Alert */}
       {toast && (
         <div className={`alert-toast ${toast.type === "success" ? "alert-success" : "alert-error"}`}>
-          {toast.type === "error" && <AlertCircle size={18} />}
+          {toast.type === "error" ? <AlertCircle size={18} /> : <CheckSquare size={18} />}
           <span>{toast.message}</span>
         </div>
       )}

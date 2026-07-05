@@ -12,7 +12,8 @@ import {
   RefreshCw,
   Repeat,
   Zap,
-  Check
+  Check,
+  X
 } from "lucide-react";
 
 interface Bill {
@@ -45,6 +46,9 @@ export default function BillsManagement() {
 
   // App data state
   const [bills, setBills] = useState<Bill[]>([]);
+
+  // Bulk selection state
+  const [selectedBillIds, setSelectedBillIds] = useState<Set<string>>(new Set());
 
   // Form states
   const [title, setTitle] = useState("");
@@ -142,9 +146,42 @@ export default function BillsManagement() {
       if (error) throw error;
 
       setBills(bills.filter(b => b.id !== billId));
+      setSelectedBillIds(prev => {
+        const next = new Set(prev);
+        next.delete(billId);
+        return next;
+      });
       showToast("تم حذف الفاتورة بنجاح.");
     } catch (err: any) {
       showToast(err.message || "فشل حذف الفاتورة.", "error");
+    }
+  };
+
+  // Bulk delete handler
+  const handleBulkDelete = async () => {
+    const count = selectedBillIds.size;
+    if (count === 0) return;
+
+    if (!confirm(`هل أنت متأكد من حذف ${count} فاتورة؟ هذا الإجراء لا يمكن التراجع عنه.`)) {
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("bills")
+        .delete()
+        .in("id", Array.from(selectedBillIds));
+
+      if (error) throw error;
+
+      setBills(prev => prev.filter(b => !selectedBillIds.has(b.id)));
+      setSelectedBillIds(new Set());
+      showToast(`✓ تم حذف ${count} فاتورة بنجاح.`);
+    } catch (err: any) {
+      showToast(err.message || "فشل حذف الفواتير.", "error");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -152,8 +189,6 @@ export default function BillsManagement() {
   const handleGenerateForMonth = async (targetMonth: number) => {
     if (!userId) return;
 
-    // Step 1: Get UNIQUE recurring templates (deduplicated by title+category+amount)
-    // Use a Map keyed by "title|category|amount" to get one entry per unique bill type
     const allRecurring = bills.filter(b => b.is_recurring);
     if (allRecurring.length === 0) {
       showToast("لا توجد فواتير متكررة مسجلة بعد!", "error");
@@ -169,7 +204,6 @@ export default function BillsManagement() {
     }
     const uniqueTemplates = Array.from(uniqueTemplatesMap.values());
 
-    // Step 2: Filter out templates already generated for this EXACT month
     const toInsert = uniqueTemplates.filter(template => {
       return !bills.some(
         b =>
@@ -213,8 +247,49 @@ export default function BillsManagement() {
     }
   };
 
-  // Separate recurring templates (unique, earliest per title) and normal bills
-  const recurringTemplates = bills.filter(b => b.is_recurring);
+  // Delete all recurring bills for a given month (toggle off)
+  const handleDeleteMonthBills = async (monthNum: number) => {
+    const monthName = arabicMonths[monthNum - 1];
+    if (!confirm(`هل تريد حذف كل الفواتير المتكررة لشهر ${monthName}؟`)) {
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const { error } = await supabase
+        .from("bills")
+        .delete()
+        .eq("billing_month", monthNum)
+        .eq("is_recurring", true);
+
+      if (error) throw error;
+
+      setBills(prev => prev.filter(b => !(b.billing_month === monthNum && b.is_recurring)));
+      setSelectedBillIds(prev => {
+        const toRemove = bills.filter(b => b.billing_month === monthNum && b.is_recurring).map(b => b.id);
+        const next = new Set(prev);
+        toRemove.forEach(id => next.delete(id));
+        return next;
+      });
+      showToast(`✓ تم حذف جميع الفواتير المتكررة لشهر ${monthName}.`);
+    } catch (err: any) {
+      showToast(err.message || "فشل حذف فواتير الشهر.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Fix: UNIQUE recurring templates keyed by title|category|amount
+  const recurringTemplatesMap = new Map<string, Bill>();
+  for (const b of bills) {
+    if (b.is_recurring) {
+      const key = `${b.title}|${b.category}|${b.amount}`;
+      if (!recurringTemplatesMap.has(key)) {
+        recurringTemplatesMap.set(key, b);
+      }
+    }
+  }
+  const recurringTemplates = Array.from(recurringTemplatesMap.values());
 
   // Filter bills for the main table
   const filteredBills = bills.filter(bill => {
@@ -223,6 +298,41 @@ export default function BillsManagement() {
   });
 
   const totalAmountFiltered = filteredBills.reduce((sum, b) => sum + Number(b.amount), 0);
+
+  // Checkbox helpers
+  const allFilteredSelected =
+    filteredBills.length > 0 && filteredBills.every(b => selectedBillIds.has(b.id));
+  const someFilteredSelected = filteredBills.some(b => selectedBillIds.has(b.id));
+
+  const handleSelectAll = () => {
+    if (allFilteredSelected) {
+      // Deselect all filtered
+      setSelectedBillIds(prev => {
+        const next = new Set(prev);
+        filteredBills.forEach(b => next.delete(b.id));
+        return next;
+      });
+    } else {
+      // Select all filtered
+      setSelectedBillIds(prev => {
+        const next = new Set(prev);
+        filteredBills.forEach(b => next.add(b.id));
+        return next;
+      });
+    }
+  };
+
+  const handleToggleRow = (id: string) => {
+    setSelectedBillIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   if (loading) {
     return (
@@ -389,14 +499,13 @@ export default function BillsManagement() {
               </div>
             ) : (
               <>
-                {/* Recurring templates summary */}
+                {/* Recurring templates summary — UNIQUE count */}
                 <div style={{ marginBottom: "1rem" }}>
                   <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "0.6rem", fontWeight: 600 }}>
                     {recurringTemplates.length} فاتورة متكررة مسجلة:
                   </p>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                    {/* Show distinct recurring bills (by title) */}
-                    {Array.from(new Map(recurringTemplates.map(b => [b.title + b.amount, b])).values()).map(b => (
+                    {recurringTemplates.map(b => (
                       <div key={b.id} style={{
                         display: "flex",
                         justifyContent: "space-between",
@@ -413,9 +522,9 @@ export default function BillsManagement() {
                   </div>
                 </div>
 
-                {/* Month picker to generate for */}
+                {/* Month picker to generate/delete for */}
                 <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginBottom: "0.5rem", fontWeight: 600 }}>
-                  اختر الشهر لتوليد الفواتير له:
+                  اختر الشهر لتوليد أو حذف فواتيره:
                 </p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.4rem" }}>
                   {arabicMonths.map((m, idx) => {
@@ -427,7 +536,11 @@ export default function BillsManagement() {
                       <button
                         key={idx}
                         className="btn btn-secondary"
-                        onClick={() => handleGenerateForMonth(monthNum)}
+                        onClick={() =>
+                          alreadyGenerated
+                            ? handleDeleteMonthBills(monthNum)
+                            : handleGenerateForMonth(monthNum)
+                        }
                         disabled={actionLoading}
                         style={{
                           padding: "0.4rem 0.25rem",
@@ -438,7 +551,7 @@ export default function BillsManagement() {
                             : "1px solid var(--border-color)",
                           color: alreadyGenerated ? "#10b981" : "var(--text-secondary)"
                         }}
-                        title={alreadyGenerated ? `تم التوليد لشهر ${m} مسبقاً` : `توليد فواتير ${m}`}
+                        title={alreadyGenerated ? `حذف فواتير ${m} المتكررة` : `توليد فواتير ${m}`}
                       >
                         {alreadyGenerated && (
                           <Check size={10} style={{ position: "absolute", top: "3px", left: "3px", color: "#10b981" }} />
@@ -496,6 +609,18 @@ export default function BillsManagement() {
               <table className="students-table">
                 <thead>
                   <tr>
+                    <th style={{ width: "40px", textAlign: "center" }}>
+                      <input
+                        type="checkbox"
+                        checked={allFilteredSelected}
+                        ref={el => {
+                          if (el) el.indeterminate = someFilteredSelected && !allFilteredSelected;
+                        }}
+                        onChange={handleSelectAll}
+                        style={{ cursor: "pointer", width: "16px", height: "16px", accentColor: "#3b82f6" }}
+                        title="تحديد الكل"
+                      />
+                    </th>
                     <th>بيان الفاتورة</th>
                     <th>التصنيف</th>
                     <th>الشهر المالي</th>
@@ -505,7 +630,21 @@ export default function BillsManagement() {
                 </thead>
                 <tbody>
                   {filteredBills.map(bill => (
-                    <tr key={bill.id}>
+                    <tr
+                      key={bill.id}
+                      style={{
+                        background: selectedBillIds.has(bill.id) ? "rgba(59,130,246,0.08)" : undefined,
+                        transition: "background 0.15s ease"
+                      }}
+                    >
+                      <td style={{ textAlign: "center" }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedBillIds.has(bill.id)}
+                          onChange={() => handleToggleRow(bill.id)}
+                          style={{ cursor: "pointer", width: "16px", height: "16px", accentColor: "#3b82f6" }}
+                        />
+                      </td>
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                           {bill.is_recurring && (
@@ -558,6 +697,64 @@ export default function BillsManagement() {
           </div>
         </section>
       </div>
+
+      {/* Floating Bulk Action Bar */}
+      {selectedBillIds.size > 0 && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "2rem",
+            left: "50%",
+            transform: "translateX(-50%)",
+            background: "rgba(15,23,42,0.95)",
+            backdropFilter: "blur(12px)",
+            border: "1px solid var(--border-color)",
+            borderRadius: "12px",
+            padding: "0.75rem 1.5rem",
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+            zIndex: 100
+          }}
+        >
+          <span style={{ color: "var(--text-secondary)", fontSize: "0.9rem", fontWeight: 500 }}>
+            تم تحديد {selectedBillIds.size} فاتورة
+          </span>
+          <button
+            className="btn btn-primary"
+            onClick={handleBulkDelete}
+            disabled={actionLoading}
+            style={{
+              background: "rgba(239,68,68,0.15)",
+              border: "1px solid rgba(239,68,68,0.4)",
+              color: "#f87171",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              padding: "0.45rem 1rem",
+              fontSize: "0.88rem"
+            }}
+          >
+            <Trash2 size={15} />
+            حذف المحدد
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setSelectedBillIds(new Set())}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              padding: "0.45rem 1rem",
+              fontSize: "0.88rem"
+            }}
+          >
+            <X size={15} />
+            إلغاء التحديد
+          </button>
+        </div>
+      )}
 
       {/* Toast Alert */}
       {toast && (
