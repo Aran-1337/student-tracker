@@ -96,7 +96,7 @@ export default function PlansPage() {
           {
             id: "plan-1",
             name: "باقة الحضور والغياب",
-            description: JSON.stringify({ summary: "إدارة كاملة لحضور وغياب الطلاب مع دعم QR Code", customFeatures: [] }),
+            description: JSON.stringify({ summary: "إدارة كاملة لحضور وغياب الطلاب مع دعم QR Code", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية", "الحضور والغياب + QR"] }),
             price: 150,
             duration_months: 1,
             has_bills: false,
@@ -107,7 +107,7 @@ export default function PlansPage() {
           {
             id: "plan-2",
             name: "الباقة الشاملة",
-            description: JSON.stringify({ summary: "إدارة الحضور والغياب بالإضافة إلى إدارة المصروفات والفواتير", customFeatures: [] }),
+            description: JSON.stringify({ summary: "إدارة الحضور والغياب بالإضافة إلى إدارة المصروفات والفواتير", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية", "المصروفات والفواتير", "الحضور والغياب + QR"] }),
             price: 250,
             duration_months: 1,
             has_bills: true,
@@ -263,30 +263,8 @@ export default function PlansPage() {
                 </span>
               </div>
 
-              {/* Features */}
+              {/* Custom Features */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                {/* Always included */}
-                {[
-                  { label: "إدارة الطلاب والمجموعات", included: true },
-                  { label: "التقارير المالية", included: true },
-                  { label: "المصروفات والفواتير", included: plan.has_bills },
-                  { label: "الحضور والغياب + QR", included: plan.has_attendance }
-                ].map((f, i) => (
-                  <div key={i} style={{
-                    display: "flex", alignItems: "center", gap: "0.5rem",
-                    fontSize: "0.85rem",
-                    color: f.included ? "var(--text-primary)" : "var(--text-muted)",
-                    opacity: f.included ? 1 : 0.5
-                  }}>
-                    {f.included
-                      ? <CheckCircle2 size={15} style={{ color: plan.color, flexShrink: 0 }} />
-                      : <X size={15} style={{ flexShrink: 0 }} />
-                    }
-                    {f.label}
-                  </div>
-                ))}
-                
-                {/* Custom Features */}
                 {parseDescription(plan.description).customFeatures.map((f, i) => (
                   <div key={`custom-${i}`} style={{
                     display: "flex", alignItems: "center", gap: "0.5rem",
@@ -406,7 +384,8 @@ export default function PlansPage() {
 
               {/* Features */}
               <div className="form-group">
-                <label className="form-label">المميزات المتاحة في هذه الباقة</label>
+                <label className="form-label" style={{ marginBottom: "0.25rem" }}>صلاحيات النظام البرمجية</label>
+                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "0.75rem" }}>تفعيل هذه الخيارات يمنح المعلم الصلاحية البرمجية، لكنها لن تظهر كنص في الباقة إلا إذا أضفتها يدوياً في "مميزات إضافية" بالأعلى.</p>
                 <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
                   {featureList.map(feat => {
                     const included = form[feat.key as keyof typeof form] as boolean;
