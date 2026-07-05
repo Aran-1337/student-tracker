@@ -13,7 +13,9 @@ import {
   BookOpen,
   Receipt,
   Shield,
-  Lock
+  Lock,
+  Menu,
+  X
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -28,6 +30,7 @@ export default function DashboardLayout({
   const [hasBills, setHasBills] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     async function checkSession() {
@@ -40,7 +43,6 @@ export default function DashboardLayout({
       
       const user = session.user;
       
-      // Get teacher profile, self-heal if missing
       let { data: teacherData, error: teacherError } = await supabase
         .from("teachers")
         .select("name, is_active, has_bills_feature, is_admin, subscription_expires_at")
@@ -63,7 +65,6 @@ export default function DashboardLayout({
       if (teacherData) {
         setTeacherName(teacherData.name || user.email?.split("@")[0] || "المعلم");
         
-        // Subscription check
         const active = teacherData.is_active !== false;
         const expired = teacherData.subscription_expires_at 
           ? new Date(teacherData.subscription_expires_at) < new Date()
@@ -77,7 +78,6 @@ export default function DashboardLayout({
         setHasBills(billsEnabled);
         setIsAdmin(teacherData.is_admin === true);
 
-        // Security check: if trying to access bills page but it's disabled
         if (pathname === "/dashboard/bills" && !billsEnabled) {
           router.replace("/dashboard");
           return;
@@ -89,6 +89,11 @@ export default function DashboardLayout({
     
     checkSession();
   }, [router, pathname]);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -103,7 +108,6 @@ export default function DashboardLayout({
     );
   }
 
-  // Account Blocked Screen
   if (isBlocked) {
     return (
       <div className="login-container" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
@@ -128,35 +132,44 @@ export default function DashboardLayout({
   const menuItems = [
     { name: "الرئيسية والمجموعات", path: "/dashboard", icon: LayoutDashboard },
     { name: "إدارة الطلاب", path: "/dashboard/students", icon: Users },
-    // Show bills link only if feature flag is active
     ...(hasBills ? [{ name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt }] : []),
     { name: "التقارير المالية", path: "/dashboard/reports", icon: TrendingUp },
     { name: "الإعدادات", path: "/dashboard/settings", icon: Settings },
-    // Show Admin Link if user is an admin
     ...(isAdmin ? [{ name: "لوحة المدير العام", path: "/admin", icon: Shield }] : [])
   ];
 
   return (
     <div className="dashboard-layout">
-      {/* Sidebar (Right side in RTL) */}
+      {/* Sidebar (desktop) / Top nav (mobile) */}
       <aside className="sidebar">
-        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-          {/* Logo */}
-          <div className="logo" style={{ marginBottom: "2rem" }}>
-            <div className="stat-icon-wrapper stat-icon-teal" style={{ width: "2.5rem", height: "2.5rem" }}>
-              <BookOpen size={20} />
+        <div className="sidebar-inner">
+          {/* Logo + Hamburger row */}
+          <div className="sidebar-top-row">
+            <div className="logo">
+              <div className="stat-icon-wrapper stat-icon-teal" style={{ width: "2.5rem", height: "2.5rem", flexShrink: 0 }}>
+                <BookOpen size={20} />
+              </div>
+              <span className="logo-text monospace" style={{ fontWeight: 700 }}>Student Tracker</span>
             </div>
-            <span className="logo-text monospace" style={{ fontWeight: 700 }}>Student Tracker</span>
+
+            {/* Hamburger button – mobile only */}
+            <button
+              className="hamburger-btn"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="القائمة"
+            >
+              {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
           </div>
 
-          {/* Teacher Profile Quick Info */}
-          <div style={{ padding: "0 0.5rem 1.25rem 0.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1rem" }}>
+          {/* Teacher name – hidden on mobile when menu closed */}
+          <div className={`sidebar-profile ${mobileMenuOpen ? "open" : ""}`}>
             <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>أهلاً بك،</p>
-            <p style={{ fontWeight: 700, fontSize: "1.1rem", color: "#ffffff", marginTop: "4px" }}>{teacherName}</p>
+            <p style={{ fontWeight: 700, fontSize: "1.05rem", color: "#ffffff", marginTop: "4px" }}>{teacherName}</p>
           </div>
 
           {/* Navigation Links */}
-          <nav className="sidebar-menu">
+          <nav className={`sidebar-menu ${mobileMenuOpen ? "open" : ""}`}>
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.path;
@@ -171,12 +184,21 @@ export default function DashboardLayout({
                 </Link>
               );
             })}
+
+            {/* Logout button inside menu on mobile */}
+            <button 
+              className={`btn btn-secondary sidebar-logout-mobile ${mobileMenuOpen ? "open" : ""}`}
+              onClick={handleLogout}
+            >
+              <LogOut size={16} />
+              <span>تسجيل الخروج</span>
+            </button>
           </nav>
 
-          {/* Logout Button */}
-          <div style={{ marginTop: "auto", borderTop: "1px solid var(--border-color)", paddingTop: "1.5rem" }}>
+          {/* Logout Button – desktop only */}
+          <div className="sidebar-logout-desktop">
             <button 
-              className="btn btn-secondary" 
+              className="btn btn-secondary"
               onClick={handleLogout}
               style={{ width: "100%", justifyContent: "center" }}
             >
@@ -187,7 +209,15 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {/* Content Area (Left side) */}
+      {/* Mobile overlay backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="mobile-overlay"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Content Area */}
       <main className="content-area">
         {children}
       </main>
