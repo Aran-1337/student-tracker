@@ -31,6 +31,18 @@ interface Student {
   book_2: boolean;
 }
 
+const formatTimeTo12H = (timeStr: string) => {
+  if (!timeStr) return "";
+  const parts = timeStr.split(":");
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1] || "00";
+  const ampm = hours >= 12 ? "م" : "ص";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const strHours = String(hours).padStart(2, "0");
+  return `${strHours}:${minutes} ${ampm}`;
+};
+
 const arabicDays = ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
 const arabicMonths = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -134,7 +146,7 @@ export default function DashboardOverview() {
     });
 
     if (conflictingGroup) {
-      const conflictStart = formatTimeHM(conflictingGroup.time);
+      const conflictStart = formatTimeTo12H(conflictingGroup.time);
       alert(
         `عذراً، لا يمكن إنشاء المجموعة! يوجد تعارض في المواعيد مع مجموعة "${conflictingGroup.name}" المسجلة في نفس اليوم (${groupDay}) الساعة (${conflictStart}). يجب أن يكون الفرق بين مواعيد المجموعات ساعة كاملة على الأقل.`
       );
@@ -368,7 +380,7 @@ export default function DashboardOverview() {
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <Clock size={14} />
-                        <span className="monospace">الوقت: {group.time.slice(0, 5)}</span>
+                        <span className="monospace">الوقت: {formatTimeTo12H(group.time)}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
                         <Users size={14} style={{ color: "var(--color-teal)" }} />

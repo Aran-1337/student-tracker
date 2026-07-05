@@ -29,6 +29,18 @@ interface Student {
   book_2: boolean;
 }
 
+const formatTimeTo12H = (timeStr: string) => {
+  if (!timeStr) return "";
+  const parts = timeStr.split(":");
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1] || "00";
+  const ampm = hours >= 12 ? "م" : "ص";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const strHours = String(hours).padStart(2, "0");
+  return `${strHours}:${minutes} ${ampm}`;
+};
+
 const arabicMonths = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
@@ -254,7 +266,7 @@ export default function StudentsManagement() {
                   <option value="">بدون مجموعة</option>
                   {groups.map(group => (
                     <option key={group.id} value={group.id}>
-                      {group.name} {group.is_private ? "(خاصة) " : ""}({group.day_of_week} - {group.time.slice(0, 5)})
+                      {group.name} {group.is_private ? "(خاصة) " : ""}({group.day_of_week} - {formatTimeTo12H(group.time)})
                     </option>
                   ))}
                 </select>
@@ -299,7 +311,7 @@ export default function StudentsManagement() {
                 className={`chip ${group.is_private ? "private" : ""} ${activeFilter === group.id ? "active" : ""}`}
                 onClick={() => setActiveFilter(group.id)}
               >
-                <span>{group.name} {group.is_private ? "★ " : ""}({group.day_of_week} {group.time.slice(0, 5)})</span>
+                <span>{group.name} {group.is_private ? "★ " : ""}({group.day_of_week} {formatTimeTo12H(group.time)})</span>
               </button>
             ))}
           </div>
