@@ -30,6 +30,7 @@ interface Teacher {
   is_active: boolean;
   has_bills_feature: boolean;
   has_attendance_feature: boolean;
+  is_center_mode?: boolean;
   plan_id: string | null;
   subscription_expires_at: string;
   created_at: string;
@@ -58,7 +59,9 @@ interface Plan {
   duration_months: number;
   has_bills: boolean;
   has_attendance: boolean;
+  has_center_mode?: boolean;
   color: string;
+  is_active: boolean;
 }
 
 export default function AdminPanel() {
@@ -155,6 +158,7 @@ export default function AdminPanel() {
             plan_id: localMapping[t.id] || null,
             has_bills_feature: teacherOverrides.has_bills_feature !== undefined ? teacherOverrides.has_bills_feature : t.has_bills_feature,
             has_attendance_feature: teacherOverrides.has_attendance_feature !== undefined ? teacherOverrides.has_attendance_feature : t.has_attendance_feature,
+            is_center_mode: teacherOverrides.is_center_mode !== undefined ? teacherOverrides.is_center_mode : t.is_center_mode,
             subscription_expires_at: teacherOverrides.subscription_expires_at !== undefined ? teacherOverrides.subscription_expires_at : t.subscription_expires_at
           };
         });
@@ -304,6 +308,22 @@ export default function AdminPanel() {
     }
   };
 
+  const handleToggleCenterMode = async (teacherId: string, currentStatus: boolean) => {
+    setUpdatingId(teacherId);
+    try {
+      const newStatus = !currentStatus;
+      // Use local storage to bypass missing column in DB
+      updateTeacherLocal(teacherId, { is_center_mode: newStatus });
+
+      setTeachers(teachers.map(t => t.id === teacherId ? { ...t, is_center_mode: newStatus } : t));
+      showToast("تم تحديث نظام السنتر بنجاح.");
+    } catch (err: any) {
+      showToast("حدث خطأ أثناء تحديث ميزة السنتر.", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const handleAssignPlan = async (teacher: Teacher, planId: string) => {
     setUpdatingId(teacher.id);
     try {
@@ -336,6 +356,7 @@ export default function AdminPanel() {
       updateTeacherLocal(teacher.id, {
         has_bills_feature: plan.has_bills,
         has_attendance_feature: plan.has_attendance,
+        is_center_mode: plan.has_center_mode || false,
         subscription_expires_at: newExpiry.toISOString()
       });
 
@@ -344,6 +365,7 @@ export default function AdminPanel() {
         plan_id: plan.id,
         has_bills_feature: plan.has_bills,
         has_attendance_feature: plan.has_attendance,
+        is_center_mode: plan.has_center_mode || false,
         is_active: true,
         subscription_expires_at: newExpiry.toISOString()
       } : t));
@@ -584,6 +606,7 @@ export default function AdminPanel() {
                   <th style={{ color: "var(--color-teal)" }}>الباقة</th>
                   <th>ميزة الفواتير</th>
                   <th>ميزة الحضور</th>
+                  <th>ميزة السنتر</th>
                   <th>حالة الاشتراك</th>
                   <th>تاريخ انتهاء الاشتراك</th>
                   <th style={{ color: "#f87171" }}>حذف</th>

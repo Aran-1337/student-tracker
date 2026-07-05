@@ -20,6 +20,7 @@ interface Group {
   day_of_week: string;
   time: string;
   is_private?: boolean;
+  sub_teacher_id?: string | null;
 }
 
 interface Student {
@@ -64,6 +65,10 @@ export default function DashboardOverview() {
   const [groupDay, setGroupDay] = useState("السبت");
   const [groupTime, setGroupTime] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [groupSubTeacherId, setGroupSubTeacherId] = useState("");
+
+  const [hasCenterMode, setHasCenterMode] = useState(false);
+  const [subTeachers, setSubTeachers] = useState<any[]>([]);
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -83,8 +88,28 @@ export default function DashboardOverview() {
         if (!session) return;
         setUserId(session.user.id);
 
+        const localFeatures = JSON.parse(localStorage.getItem("teacher_features") || "{}");
+        const myOverrides = localFeatures[session.user.id] || {};
+        
+        let centerMode = myOverrides.is_center_mode;
+        if (centerMode === undefined) {
+          const { data: teacher } = await supabase.from("teachers").select("is_center_mode").eq("id", session.user.id).single();
+          if (teacher && teacher.is_center_mode !== undefined) centerMode = teacher.is_center_mode;
+        }
+        setHasCenterMode(centerMode || false);
+
+        if (centerMode) {
+          const { data: subs } = await supabase.from("sub_teachers").select("*").eq("center_id", session.user.id);
+          if (subs) {
+            setSubTeachers(subs);
+          } else {
+             const local = JSON.parse(localStorage.getItem("sub_teachers_local") || "[]");
+             setSubTeachers(local);
+          }
+        }
+
         // Fetch groups
-        let { data: grpData, error: grpError } = await supabase.from("groups").select("id, name, day_of_week, time, is_private, teacher_id").order("created_at", { ascending: false });
+        let { data: grpData, error: grpError } = await supabase.from("groups").select("id, name, day_of_week, time, is_private, teacher_id, sub_teacher_id").order("created_at", { ascending: false });
 
         setGroups(grpData || []);
 
@@ -128,12 +153,6 @@ export default function DashboardOverview() {
       return hours * 60 + minutes;
     };
 
-    const formatTimeHM = (timeStr: string) => {
-      if (!timeStr) return "";
-      const parts = timeStr.split(":");
-      return `${parts[0].padStart(2, "0")}:${parts[1].padStart(2, "0")}`;
-    };
-
     const targetMinutes = timeToMinutes(groupTime);
     const conflictingGroup = groups.find(g => {
       if (g.day_of_week !== groupDay) return false;
@@ -159,17 +178,46 @@ export default function DashboardOverview() {
             name: groupName,
             day_of_week: groupDay,
             time: groupTime,
-            is_private: isPrivate
+            is_private: isPrivate,
+            sub_teacher_id: hasCenterMode && groupSubTeacherId ? groupSubTeacherId : null
           }
         ])
         .select();
 
-      if (error) throw error;
+      if (error) {
+         // Maybe missing column? Insert without it
+         const { data: fallbackData, error: fallbackError } = await supabase
+          .from("groups")
+          .insert([
+            {
+              teacher_id: userId,
+              name: groupName,
+              day_of_week: groupDay,
+              time: groupTime,
+              is_private: isPrivate
+            }
+          ])
+          .select();
+         
+         if (fallbackError) throw fallbackError;
+         
+         // Try to save to local storage for demo if column missing
+         if (fallbackData && hasCenterMode && groupSubTeacherId) {
+             const mapping = JSON.parse(localStorage.getItem("group_subteachers") || "{}");
+             mapping[fallbackData[0].id] = groupSubTeacherId;
+             localStorage.setItem("group_subteachers", JSON.stringify(mapping));
+             fallbackData[0].sub_teacher_id = groupSubTeacherId;
+         }
+         
+         setGroups([fallbackData[0], ...groups]);
+      } else {
+        setGroups([data[0], ...groups]);
+      }
 
-      setGroups([data[0], ...groups]);
       setGroupName("");
       setGroupTime("");
       setIsPrivate(false);
+      setGroupSubTeacherId("");
       showToast("تم إنشاء المجموعة بنجاح.");
     } catch (err: any) {
       showToast(err.message || "فشل إنشاء المجموعة.", "error");
@@ -323,6 +371,25 @@ export default function DashboardOverview() {
                   مجموعة خاصة / فردية
                 </label>
               </div>
+              
+              {hasCenterMode && (
+                <div className="form-group" style={{ marginBottom: "1rem" }}>
+                  <label className="form-label" htmlFor="gSubTeacher">المعلم (اختياري)</label>
+                  <select
+                    id="gSubTeacher"
+                    className="form-input"
+                    value={groupSubTeacherId}
+                    onChange={(e) => setGroupSubTeacherId(e.target.value)}
+                    style={{ padding: "0.7rem 0.5rem" }}
+                  >
+                    <option value="">-- المركز بالكامل --</option>
+                    {subTeachers.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
               <button
                 type="submit"
                 className="btn btn-primary"
@@ -352,6 +419,7 @@ export default function DashboardOverview() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
               {groups.map(group => {
                 const groupStudentCount = students.filter(s => s.group_id === group.id).length;
+                const subTeacher = subTeachers.find(t => t.id === group.sub_teacher_id);
                 return (
                   <div key={group.id} className={`glass-panel panel-content ${group.is_private ? "group-card-private" : ""}`} style={{ background: "rgba(255,255,255,0.02)", position: "relative" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
@@ -370,6 +438,12 @@ export default function DashboardOverview() {
                     </div>
                     
                     <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
+                      {hasCenterMode && subTeacher && (
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--color-teal)" }}>
+                          <Users size={14} />
+                          <span>المعلم: {subTeacher.name}</span>
+                        </div>
+                      )}
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <Calendar size={14} />
                         <span>اليوم: {group.day_of_week}</span>

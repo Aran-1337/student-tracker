@@ -34,32 +34,41 @@ export default function DashboardLayout({
   const [isBlocked, setIsBlocked] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
+  const [hasCenterMode, setHasCenterMode] = useState(false);
+
   useEffect(() => {
     async function checkSession() {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error || !session) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         router.replace("/login");
         return;
       }
       
       const user = session.user;
       
+      // Load teacher_features overrides from localStorage since columns are missing
+      const localFeatures = JSON.parse(localStorage.getItem("teacher_features") || "{}");
+      const myOverrides = localFeatures[user.id] || {};
+
       let { data: teacherData, error: teacherError } = await supabase
         .from("teachers")
         .select("name, is_active, has_bills_feature, has_attendance_feature, is_admin, subscription_expires_at")
         .eq("id", user.id)
         .single();
 
-      // Fallback: if query failed (e.g. missing column), fetch minimal fields
       if (teacherError) {
         const { data: fallback } = await supabase
           .from("teachers")
-          .select("name, is_active, has_bills_feature, is_admin, subscription_expires_at")
+          .select("name, is_active, is_admin")
           .eq("id", user.id)
           .single();
         if (fallback) {
-          teacherData = { ...fallback, has_attendance_feature: true };
+          teacherData = { 
+            ...fallback, 
+            has_bills_feature: true, 
+            has_attendance_feature: true, 
+            subscription_expires_at: "" 
+          };
           teacherError = null;
         }
       }
@@ -69,30 +78,43 @@ export default function DashboardLayout({
         const { data: newProfile } = await supabase
           .from("teachers")
           .insert([{ id: user.id, name: defaultName, email: user.email }])
-          .select("name, is_active, has_bills_feature, is_admin, subscription_expires_at")
+          .select("name, is_active, is_admin")
           .single();
         
         if (newProfile) {
-          teacherData = { ...newProfile, has_attendance_feature: true };
+          teacherData = { 
+            ...newProfile, 
+            has_bills_feature: true, 
+            has_attendance_feature: true, 
+            subscription_expires_at: "" 
+          };
         }
       }
       
       if (teacherData) {
         setTeacherName(teacherData.name || user.email?.split("@")[0] || "المعلم");
         
+        // Use overrides if available
+        const isCenterModeEnabled = myOverrides.is_center_mode !== undefined ? myOverrides.is_center_mode : false;
+        setHasCenterMode(isCenterModeEnabled);
+
+        const billsEnabled = myOverrides.has_bills_feature !== undefined ? myOverrides.has_bills_feature : (teacherData.has_bills_feature !== false);
+        setHasBills(billsEnabled);
+
+        const attendanceEnabled = myOverrides.has_attendance_feature !== undefined ? myOverrides.has_attendance_feature : (teacherData.has_attendance_feature !== false);
+        setHasAttendance(attendanceEnabled);
+
+        const expiredAtStr = myOverrides.subscription_expires_at !== undefined ? myOverrides.subscription_expires_at : teacherData.subscription_expires_at;
+
         const active = teacherData.is_active !== false;
-        const expired = teacherData.subscription_expires_at 
-          ? new Date(teacherData.subscription_expires_at) < new Date()
+        const expired = expiredAtStr 
+          ? new Date(expiredAtStr) < new Date()
           : false;
           
         if (!active || expired) {
           setIsBlocked(true);
         }
         
-        const billsEnabled = teacherData.has_bills_feature !== false;
-        setHasBills(billsEnabled);
-        const attendanceEnabled = teacherData.has_attendance_feature !== false;
-        setHasAttendance(attendanceEnabled);
         setIsAdmin(teacherData.is_admin === true);
 
         if (pathname === "/dashboard/bills" && !billsEnabled) {
@@ -100,6 +122,10 @@ export default function DashboardLayout({
           return;
         }
         if ((pathname === "/dashboard/attendance" || pathname === "/dashboard/attendance/scan") && !attendanceEnabled) {
+          router.replace("/dashboard");
+          return;
+        }
+        if (pathname === "/dashboard/teachers" && !isCenterModeEnabled) {
           router.replace("/dashboard");
           return;
         }
@@ -152,6 +178,7 @@ export default function DashboardLayout({
 
   const menuItems = [
     { name: "الرئيسية والمجموعات", path: "/dashboard", icon: LayoutDashboard },
+    ...(hasCenterMode ? [{ name: "إدارة المعلمين", path: "/dashboard/teachers", icon: Users }] : []),
     { name: "إدارة الطلاب", path: "/dashboard/students", icon: Users },
     ...(hasAttendance ? [{ name: "الحضور والغياب", path: "/dashboard/attendance", icon: ClipboardCheck }] : []),
     ...(hasBills ? [{ name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt }] : []),

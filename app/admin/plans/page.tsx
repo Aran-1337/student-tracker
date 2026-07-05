@@ -28,6 +28,7 @@ interface Plan {
   duration_months: number;
   has_bills: boolean;
   has_attendance: boolean;
+  has_center_mode?: boolean;
   color: string;
   is_active: boolean;
   created_at: string;
@@ -42,10 +43,11 @@ const defaultForm = {
     "الحضور والغياب + QR",
     "المصروفات والفواتير"
   ] as string[],
-  price: 0,
+  price: "" as string | number,
   duration_months: 1,
   has_bills: false,
   has_attendance: false,
+  has_center_mode: false,
   color: "#14b8a6",
   is_active: true
 };
@@ -63,7 +65,8 @@ function parseDescription(desc: string | null) {
 
 const featureList = [
   { key: "has_bills", label: "المصروفات والفواتير", icon: Receipt, color: "#a78bfa" },
-  { key: "has_attendance", label: "الحضور والغياب + QR", icon: ClipboardCheck, color: "#14b8a6" }
+  { key: "has_attendance", label: "الحضور والغياب", icon: ClipboardCheck, color: "#14b8a6" },
+  { key: "has_center_mode", label: "نظام السنتر (إضافة معلمين)", icon: Users, color: "#f59e0b" }
 ];
 
 const colorOptions = [
@@ -171,6 +174,7 @@ export default function PlansPage() {
       duration_months: plan.duration_months,
       has_bills: plan.has_bills,
       has_attendance: plan.has_attendance,
+      has_center_mode: plan.has_center_mode || false,
       color: plan.color,
       is_active: plan.is_active
     });
@@ -193,11 +197,13 @@ export default function PlansPage() {
     
     try {
       let updatedPlans = [...plans];
+      const parsedPrice = Number(form.price) || 0;
+      
       if (editingPlan) {
-        updatedPlans = plans.map(p => p.id === editingPlan.id ? { ...p, ...form, description: payloadDesc } : p);
+        updatedPlans = plans.map(p => p.id === editingPlan.id ? { ...p, ...form, price: parsedPrice, description: payloadDesc } : p);
         showToast("✓ تم تحديث الباقة بنجاح");
       } else {
-        const newPlan = { id: `plan-${Date.now()}`, ...form, description: payloadDesc, created_at: new Date().toISOString() };
+        const newPlan = { id: `plan-${Date.now()}`, ...form, price: parsedPrice, description: payloadDesc, created_at: new Date().toISOString() };
         updatedPlans = [...plans, newPlan];
         showToast("✓ تم إنشاء الباقة بنجاح");
       }

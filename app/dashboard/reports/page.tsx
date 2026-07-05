@@ -45,6 +45,12 @@ export default function ReportsPage() {
   const [book1Price, setBook1Price] = useState(50);
   const [book2Price, setBook2Price] = useState(50);
 
+  // Center Mode settings
+  const [hasCenterMode, setHasCenterMode] = useState(false);
+  const [subTeachers, setSubTeachers] = useState<any[]>([]);
+  const [groups, setGroups] = useState<any[]>([]);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
+
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
@@ -71,7 +77,31 @@ export default function ReportsPage() {
           setBook2Price(Number(teacher.book_2_price) || 0);
         }
 
-        // 2. Fetch students
+        // 2. Center Mode Check
+        const localFeatures = JSON.parse(localStorage.getItem("teacher_features") || "{}");
+        const myOverrides = localFeatures[session.user.id] || {};
+        let centerMode = myOverrides.is_center_mode;
+        if (centerMode === undefined) {
+          const { data: tData } = await supabase.from("teachers").select("is_center_mode").eq("id", session.user.id).single();
+          if (tData && tData.is_center_mode !== undefined) centerMode = tData.is_center_mode;
+        }
+        setHasCenterMode(centerMode || false);
+
+        if (centerMode) {
+          const { data: subs } = await supabase.from("sub_teachers").select("*").eq("center_id", session.user.id);
+          if (subs) {
+            setSubTeachers(subs);
+          } else {
+            setSubTeachers(JSON.parse(localStorage.getItem("sub_teachers_local") || "[]"));
+          }
+          
+          const { data: grps } = await supabase.from("groups").select("id, sub_teacher_id").eq("teacher_id", session.user.id);
+          if (grps) {
+             setGroups(grps);
+          }
+        }
+
+        // 3. Fetch students
         const { data: studentsData, error: studentsError } = await supabase
           .from("students")
           .select("*");
@@ -86,7 +116,7 @@ export default function ReportsPage() {
         }));
         setStudents(validatedStudents);
 
-        // 3. Fetch bills
+        // 4. Fetch bills
         const { data: billsData, error: billsError } = await supabase
           .from("bills")
           .select("*");
@@ -107,19 +137,29 @@ export default function ReportsPage() {
   const totalStudents = students.length;
   const currentMonthIndex = new Date().getMonth();
 
+  // Apply Teacher Filter
+  const filteredStudents = selectedTeacherId === "all" 
+    ? students 
+    : students.filter(s => {
+        const studentGroup = groups.find(g => g.id === s.group_id);
+        return studentGroup && studentGroup.sub_teacher_id === selectedTeacherId;
+      });
+
+  const totalFilteredStudents = filteredStudents.length;
+
   // Calculations
   // 1. Subscriptions
-  const paidThisMonthCount = students.filter(s => s.months[currentMonthIndex] === true).length;
+  const paidThisMonthCount = filteredStudents.filter(s => s.months[currentMonthIndex] === true).length;
   const currentMonthEarnings = paidThisMonthCount * monthlyPrice;
 
-  const totalPaidMonthsCount = students.reduce((acc, s) => {
+  const totalPaidMonthsCount = filteredStudents.reduce((acc, s) => {
     return acc + s.months.filter(m => m === true).length;
   }, 0);
   const totalSubscriptionEarnings = totalPaidMonthsCount * monthlyPrice;
 
   // 2. Books
-  const book1Count = students.filter(s => s.book_1).length;
-  const book2Count = students.filter(s => s.book_2).length;
+  const book1Count = filteredStudents.filter(s => s.book_1).length;
+  const book2Count = filteredStudents.filter(s => s.book_2).length;
   const book1Earnings = book1Count * book1Price;
   const book2Earnings = book2Count * book2Price;
   const totalBookEarnings = book1Earnings + book2Earnings;
@@ -135,7 +175,7 @@ export default function ReportsPage() {
 
   // Month-by-month statistics (Subscriptions revenue vs Month expenses)
   const monthsReport = arabicMonths.map((name, index) => {
-    const paidCount = students.filter(s => s.months[index] === true).length;
+    const paidCount = filteredStudents.filter(s => s.months[index] === true).length;
     const subscriptionEarnings = paidCount * monthlyPrice;
 
     // Filter bills for this specific month (1-indexed in database)
@@ -143,7 +183,7 @@ export default function ReportsPage() {
     const monthExpenses = monthBills.reduce((sum, b) => sum + Number(b.amount), 0);
 
     const netProfit = subscriptionEarnings - monthExpenses;
-    const percentage = totalStudents > 0 ? Math.round((paidCount / totalStudents) * 100) : 0;
+    const percentage = totalFilteredStudents > 0 ? Math.round((paidCount / totalFilteredStudents) * 100) : 0;
 
     return { name, paidCount, subscriptionEarnings, monthExpenses, netProfit, percentage };
   });
@@ -159,9 +199,27 @@ export default function ReportsPage() {
   return (
     <div>
       {/* Title */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>التقارير المالية</h1>
-        <p style={{ color: "var(--text-secondary)" }}>تحليلات الإيرادات الكلية، المصروفات، وصافي الأرباح</p>
+      <div style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem" }}>
+        <div>
+          <h1 style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>التقارير المالية</h1>
+          <p style={{ color: "var(--text-secondary)" }}>تحليلات الإيرادات الكلية، المصروفات، وصافي الأرباح</p>
+        </div>
+        {hasCenterMode && (
+          <div style={{ minWidth: "250px" }}>
+            <label className="form-label" style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>فلتر حسب المعلم:</label>
+            <select
+              className="form-input"
+              value={selectedTeacherId}
+              onChange={(e) => setSelectedTeacherId(e.target.value)}
+              style={{ padding: "0.5rem", borderRadius: "8px", border: "1px solid var(--border-color)", background: "var(--bg-card)" }}
+            >
+              <option value="all">كل معلمين السنتر</option>
+              {subTeachers.map(t => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Main Earnings Summary Cards (4 Cards Grid) */}
