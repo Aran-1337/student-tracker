@@ -23,7 +23,7 @@ interface Group {
   name: string;
   day_of_week: string;
   time: string;
-  sessions_per_month: number;
+  sessions_per_month?: number;
 }
 
 interface Student {
@@ -61,11 +61,6 @@ export default function AttendancePage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [customSessions, setCustomSessions] = useState<number | string | null>(null);
-
-  useEffect(() => {
-    setCustomSessions(null);
-  }, [selectedGroupId]);
 
   // QR Modal
   const [qrStudent, setQrStudent] = useState<Student | null>(null);
@@ -83,26 +78,12 @@ export default function AttendancePage() {
       if (!session) return;
       setUserId(session.user.id);
 
-      let { data: grpData, error: grpError } = await supabase.from("groups").select("id, name, day_of_week, time, sessions_per_month").order("created_at");
-      
-      if (grpError) {
-        // Fallback for older schemas missing sessions_per_month
-        const fallback = await supabase.from("groups").select("id, name, day_of_week, time").order("created_at");
-        grpData = fallback.data as any;
-      }
+      // Fallback for older schemas missing sessions_per_month
+      let { data: grpData, error: grpError } = await supabase.from("groups").select("id, name, day_of_week, time").order("created_at");
 
       const { data: stData } = await supabase.from("students").select("id, name, group_id").order("name");
 
-      // Merge with localStorage if DB doesn't have it
-      const mergedGroups = (grpData || []).map(g => {
-        const localVal = typeof window !== "undefined" ? localStorage.getItem(`group_sessions_${g.id}`) : null;
-        return { 
-          ...g, 
-          sessions_per_month: localVal ? Number(localVal) : (g.sessions_per_month ?? 8) 
-        };
-      });
-
-      setGroups(mergedGroups);
+      setGroups(grpData || []);
       setStudents(stData || []);
       setLoading(false);
     }
@@ -126,9 +107,7 @@ export default function AttendancePage() {
 
   // ── Helpers ──────────────────────────────────────────────────────
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
-  const sessionsCount = customSessions !== null && customSessions !== "" 
-    ? Number(customSessions) 
-    : (selectedGroup?.sessions_per_month ?? 8);
+  const sessionsCount = 8;
 
   const filteredStudents = students.filter(s => {
     if (selectedGroupId === "all") return true;
@@ -315,34 +294,6 @@ export default function AttendancePage() {
             >
               {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
-          </div>
-
-          {/* Sessions count info / override */}
-          <div className="form-group" style={{ margin: 0, minWidth: "120px" }}>
-            <label className="form-label">عدد الحصص (الجدول)</label>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <input
-                type="number"
-                min="1"
-                max="30"
-                className="form-input"
-                value={customSessions !== null ? customSessions : (selectedGroup?.sessions_per_month ?? 8)}
-                onChange={e => {
-                  const val = e.target.value;
-                  setCustomSessions(val);
-                  const num = Number(val);
-                  if (num > 0 && num <= 30 && selectedGroupId !== "all") {
-                    // Save to localStorage instead of DB to bypass schema cache error
-                    if (typeof window !== "undefined") {
-                      localStorage.setItem(`group_sessions_${selectedGroupId}`, num.toString());
-                    }
-                    setGroups(groups.map(g => g.id === selectedGroupId ? { ...g, sessions_per_month: num } : g));
-                  }
-                }}
-                style={{ padding: "0.6rem 0.5rem", width: "70px", textAlign: "center", fontWeight: "bold", color: "var(--color-teal)" }}
-              />
-              <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 600 }}>حصص</span>
-            </div>
           </div>
         </div>
       </div>
