@@ -107,7 +107,7 @@ export default function AttendancePage() {
 
   // ── Helpers ──────────────────────────────────────────────────────
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
-  const sessionsCount = 8;
+  const sessionsCount = 12;
 
   const filteredStudents = students.filter(s => {
     if (selectedGroupId === "all") return true;
