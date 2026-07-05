@@ -11,7 +11,9 @@ import {
   Settings, 
   LogOut, 
   BookOpen,
-  Receipt
+  Receipt,
+  Shield,
+  Lock
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -23,6 +25,9 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [teacherName, setTeacherName] = useState("");
+  const [hasBills, setHasBills] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
 
   useEffect(() => {
     async function checkSession() {
@@ -35,10 +40,10 @@ export default function DashboardLayout({
       
       const user = session.user;
       
-      // Get teacher profile, self-heal if missing (e.g., registered before SQL trigger was active)
+      // Get teacher profile, self-heal if missing
       let { data: teacherData, error: teacherError } = await supabase
         .from("teachers")
-        .select("name")
+        .select("name, is_active, has_bills_feature, is_admin, subscription_expires_at")
         .eq("id", user.id)
         .single();
         
@@ -46,8 +51,8 @@ export default function DashboardLayout({
         const defaultName = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split("@")[0] || "المعلم";
         const { data: newProfile, error: insertError } = await supabase
           .from("teachers")
-          .insert([{ id: user.id, name: defaultName }])
-          .select("name")
+          .insert([{ id: user.id, name: defaultName, email: user.email }])
+          .select("name, is_active, has_bills_feature, is_admin, subscription_expires_at")
           .single();
         
         if (!insertError && newProfile) {
@@ -55,12 +60,35 @@ export default function DashboardLayout({
         }
       }
       
-      setTeacherName(teacherData?.name || user.email?.split("@")[0] || "المعلم");
+      if (teacherData) {
+        setTeacherName(teacherData.name || user.email?.split("@")[0] || "المعلم");
+        
+        // Subscription check
+        const active = teacherData.is_active !== false;
+        const expired = teacherData.subscription_expires_at 
+          ? new Date(teacherData.subscription_expires_at) < new Date()
+          : false;
+          
+        if (!active || expired) {
+          setIsBlocked(true);
+        }
+        
+        const billsEnabled = teacherData.has_bills_feature !== false;
+        setHasBills(billsEnabled);
+        setIsAdmin(teacherData.is_admin === true);
+
+        // Security check: if trying to access bills page but it's disabled
+        if (pathname === "/dashboard/bills" && !billsEnabled) {
+          router.replace("/dashboard");
+          return;
+        }
+      }
+      
       setLoading(false);
     }
     
     checkSession();
-  }, [router, pathname]); // Re-run profile check on navigation just in case settings page updates name
+  }, [router, pathname]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -75,12 +103,37 @@ export default function DashboardLayout({
     );
   }
 
+  // Account Blocked Screen
+  if (isBlocked) {
+    return (
+      <div className="login-container" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+        <div className="glass-panel panel-content" style={{ maxWidth: "450px", textAlign: "center", padding: "3rem 2rem" }}>
+          <div className="stat-icon-wrapper" style={{ margin: "0 auto 1.5rem auto", background: "rgba(239, 68, 68, 0.15)", color: "#ef4444", width: "4rem", height: "4rem" }}>
+            <Lock size={32} />
+          </div>
+          <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem", color: "#ffffff" }}>عذراً، الحساب معطل!</h2>
+          <p style={{ color: "var(--text-secondary)", lineHeight: "1.6", marginBottom: "2rem" }}>
+            انتهت صلاحية اشتراكك السنوي أو تم إيقاف حسابك مؤقتاً من قبل الإدارة العامة. 
+            يرجى التواصل مع الدعم الفني أو المدير العام لتفعيل وتجديد الاشتراك.
+          </p>
+          <button className="btn btn-secondary" onClick={handleLogout} style={{ width: "100%", justifyContent: "center" }}>
+            <LogOut size={16} />
+            <span>تسجيل الخروج</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const menuItems = [
     { name: "الرئيسية والمجموعات", path: "/dashboard", icon: LayoutDashboard },
     { name: "إدارة الطلاب", path: "/dashboard/students", icon: Users },
-    { name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt },
+    // Show bills link only if feature flag is active
+    ...(hasBills ? [{ name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt }] : []),
     { name: "التقارير المالية", path: "/dashboard/reports", icon: TrendingUp },
     { name: "الإعدادات", path: "/dashboard/settings", icon: Settings },
+    // Show Admin Link if user is an admin
+    ...(isAdmin ? [{ name: "لوحة المدير العام", path: "/admin", icon: Shield }] : [])
   ];
 
   return (
