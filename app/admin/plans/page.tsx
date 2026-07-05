@@ -95,7 +95,31 @@ export default function PlansPage() {
       // Load plans from localStorage instead of DB to bypass missing table
       const savedPlans = localStorage.getItem("saas_plans");
       if (savedPlans) {
-        setPlans(JSON.parse(savedPlans));
+        let parsed = JSON.parse(savedPlans);
+        // Migration: auto-add standard features to old default plans if they are empty
+        let migrated = false;
+        parsed = parsed.map((p: any) => {
+          if (p.id === "plan-1" || p.id === "plan-2") {
+            const desc = parseDescription(p.description);
+            if (desc.customFeatures.length === 0) {
+              migrated = true;
+              return {
+                ...p,
+                description: JSON.stringify({
+                  summary: desc.summary,
+                  customFeatures: p.id === "plan-1" 
+                    ? ["إدارة الطلاب والمجموعات", "التقارير المالية", "الحضور والغياب + QR"]
+                    : ["إدارة الطلاب والمجموعات", "التقارير المالية", "المصروفات والفواتير", "الحضور والغياب + QR"]
+                })
+              };
+            }
+          }
+          return p;
+        });
+        if (migrated) {
+          localStorage.setItem("saas_plans", JSON.stringify(parsed));
+        }
+        setPlans(parsed);
       } else {
         const defaultPlans = [
           {
