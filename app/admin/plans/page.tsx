@@ -36,6 +36,7 @@ interface Plan {
 const defaultForm = {
   name: "",
   description: "",
+  customFeatures: [] as string[],
   price: 0,
   duration_months: 1,
   has_bills: false,
@@ -43,6 +44,17 @@ const defaultForm = {
   color: "#14b8a6",
   is_active: true
 };
+
+function parseDescription(desc: string | null) {
+  if (!desc) return { summary: "", customFeatures: [] };
+  try {
+    const parsed = JSON.parse(desc);
+    if (parsed && typeof parsed === "object" && Array.isArray(parsed.customFeatures)) {
+      return { summary: parsed.summary || "", customFeatures: parsed.customFeatures as string[] };
+    }
+  } catch (e) {}
+  return { summary: desc, customFeatures: [] };
+}
 
 const featureList = [
   { key: "has_bills", label: "المصروفات والفواتير", icon: Receipt, color: "#a78bfa" },
@@ -124,9 +136,11 @@ export default function PlansPage() {
 
   const openEdit = (plan: Plan) => {
     setEditingPlan(plan);
+    const { summary, customFeatures } = parseDescription(plan.description);
     setForm({
       name: plan.name,
-      description: plan.description || "",
+      description: summary,
+      customFeatures: customFeatures,
       price: plan.price,
       duration_months: plan.duration_months,
       has_bills: plan.has_bills,
@@ -134,21 +148,42 @@ export default function PlansPage() {
       color: plan.color,
       is_active: plan.is_active
     });
+    setNewFeature("");
     setShowForm(true);
   };
+
+  const [newFeature, setNewFeature] = useState("");
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) { showToast("اسم الباقة مطلوب", "error"); return; }
     setSaving(true);
+    
+    // Serialize description and custom features
+    const payloadDesc = JSON.stringify({
+      summary: form.description,
+      customFeatures: form.customFeatures
+    });
+    
+    const dbPayload = {
+      name: form.name,
+      description: payloadDesc,
+      price: form.price,
+      duration_months: form.duration_months,
+      has_bills: form.has_bills,
+      has_attendance: form.has_attendance,
+      color: form.color,
+      is_active: form.is_active
+    };
+
     try {
       if (editingPlan) {
-        const { data, error } = await supabase.from("plans").update(form).eq("id", editingPlan.id).select().single();
+        const { data, error } = await supabase.from("plans").update(dbPayload).eq("id", editingPlan.id).select().single();
         if (error) throw error;
         setPlans(plans.map(p => p.id === editingPlan.id ? data : p));
         showToast("✓ تم تحديث الباقة بنجاح");
       } else {
-        const { data, error } = await supabase.from("plans").insert([form]).select().single();
+        const { data, error } = await supabase.from("plans").insert([dbPayload]).select().single();
         if (error) throw error;
         setPlans([...plans, data]);
         showToast("✓ تم إنشاء الباقة بنجاح");
@@ -217,7 +252,10 @@ export default function PlansPage() {
                     <h3 style={{ fontSize: "1.2rem", color: "#fff" }}>{plan.name}</h3>
                     {!plan.is_active && <span style={{ fontSize: "0.7rem", padding: "1px 6px", borderRadius: "4px", background: "rgba(239,68,68,0.15)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)" }}>معطّلة</span>}
                   </div>
-                  {plan.description && <p style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>{plan.description}</p>}
+                  {(() => {
+                    const { summary } = parseDescription(plan.description);
+                    return summary ? <p style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>{summary}</p> : null;
+                  })()}
                 </div>
                 <div style={{ display: "flex", gap: "0.4rem" }}>
                   <button onClick={() => openEdit(plan)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: "4px" }} title="تعديل">
@@ -261,6 +299,17 @@ export default function PlansPage() {
                     {f.label}
                   </div>
                 ))}
+                
+                {/* Custom Features */}
+                {parseDescription(plan.description).customFeatures.map((f, i) => (
+                  <div key={`custom-${i}`} style={{
+                    display: "flex", alignItems: "center", gap: "0.5rem",
+                    fontSize: "0.85rem", color: "var(--text-primary)"
+                  }}>
+                    <CheckCircle2 size={15} style={{ color: plan.color, flexShrink: 0 }} />
+                    {f}
+                  </div>
+                ))}
               </div>
             </div>
           ))}
@@ -295,6 +344,52 @@ export default function PlansPage() {
               <div className="form-group">
                 <label className="form-label">وصف مختصر</label>
                 <input className="form-input" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="وصف قصير للباقة" />
+              </div>
+
+              {/* Custom Features Input */}
+              <div className="form-group" style={{ background: "rgba(0,0,0,0.1)", padding: "1rem", borderRadius: "8px", border: "1px dashed var(--border-color)" }}>
+                <label className="form-label" style={{ marginBottom: "0.5rem" }}>مميزات إضافية (اختياري)</label>
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                  <input 
+                    className="form-input" 
+                    value={newFeature} 
+                    onChange={e => setNewFeature(e.target.value)} 
+                    placeholder="مثال: استخراج تقارير PDF"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (newFeature.trim()) {
+                          setForm({ ...form, customFeatures: [...form.customFeatures, newFeature.trim()] });
+                          setNewFeature("");
+                        }
+                      }
+                    }}
+                  />
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => {
+                      if (newFeature.trim()) {
+                        setForm({ ...form, customFeatures: [...form.customFeatures, newFeature.trim()] });
+                        setNewFeature("");
+                      }
+                    }}
+                  >
+                    إضافة
+                  </button>
+                </div>
+                {form.customFeatures.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                    {form.customFeatures.map((f, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg-primary)", padding: "0.4rem 0.75rem", borderRadius: "6px", fontSize: "0.85rem" }}>
+                        <span>{f}</span>
+                        <button type="button" onClick={() => setForm({ ...form, customFeatures: form.customFeatures.filter((_, idx) => idx !== i) })} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="form-row">
