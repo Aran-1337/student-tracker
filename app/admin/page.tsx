@@ -14,7 +14,10 @@ import {
   ToggleRight,
   Calendar,
   Lock,
-  ArrowRight
+  ArrowRight,
+  UserPlus,
+  Trash2,
+  Mail
 } from "lucide-react";
 import Link from "next/link";
 
@@ -39,6 +42,12 @@ interface Group {
   teacher_id: string;
 }
 
+interface AdminEmail {
+  id: string;
+  email: string;
+  created_at: string;
+}
+
 export default function AdminPanel() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -48,8 +57,11 @@ export default function AdminPanel() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [adminEmails, setAdminEmails] = useState<AdminEmail[]>([]);
 
-  // Editing state (track unsaved changes per teacher)
+  // Form state
+  const [newAdminEmail, setNewAdminEmail] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -99,9 +111,16 @@ export default function AdminPanel() {
           .from("groups")
           .select("id, teacher_id");
 
+        // Fetch authorized admin email addresses
+        const { data: adminsData } = await supabase
+          .from("admins")
+          .select("*")
+          .order("created_at", { ascending: false });
+
         setTeachers(teachersData || []);
         setStudents(studentsData || []);
         setGroups(groupsData || []);
+        setAdminEmails(adminsData || []);
 
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل البيانات الإدارية.", "error");
@@ -112,6 +131,77 @@ export default function AdminPanel() {
 
     loadAdminData();
   }, [router]);
+
+  const handleAddAdminEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminEmail.trim()) return;
+
+    setActionLoading(true);
+    try {
+      const emailInput = newAdminEmail.trim().toLowerCase();
+
+      // Check if already exists in list
+      if (adminEmails.find(a => a.email === emailInput)) {
+        throw new Error("هذا البريد الإلكتروني مسجل بالفعل كمسؤول.");
+      }
+
+      const { data, error } = await supabase
+        .from("admins")
+        .insert([{ email: emailInput }])
+        .select();
+
+      if (error) throw error;
+
+      setAdminEmails([data[0], ...adminEmails]);
+      setNewAdminEmail("");
+      showToast("تمت إضافة بريد المسؤول بنجاح وسيتلقى صلاحيات الإدارة عند تسجيل دخوله.");
+      
+      // Refresh teachers list to reflect the automatic trigger change
+      const { data: teachersData } = await supabase
+        .from("teachers")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setTeachers(teachersData || []);
+
+    } catch (err: any) {
+      showToast(err.message || "فشل تسجيل بريد المسؤول.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteAdminEmail = async (adminId: string, email: string) => {
+    if (email === "3bdeniovlr@gmail.com") {
+      showToast("لا يمكن إلغاء صلاحيات المسؤول الرئيسي للنظام!", "error");
+      return;
+    }
+
+    if (!confirm(`هل أنت متأكد من إلغاء صلاحيات الإدارة عن البريد: ${email}؟`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("admins")
+        .delete()
+        .eq("id", adminId);
+
+      if (error) throw error;
+
+      setAdminEmails(adminEmails.filter(a => a.id !== adminId));
+      showToast("تم إلغاء بريد المسؤول وسحب صلاحيات الإدارة بنجاح.");
+
+      // Refresh teachers list to reflect the automatic trigger change
+      const { data: teachersData } = await supabase
+        .from("teachers")
+        .select("*")
+        .order("created_at", { ascending: false });
+      setTeachers(teachersData || []);
+
+    } catch (err: any) {
+      showToast(err.message || "فشل إلغاء بريد المسؤول.", "error");
+    }
+  };
 
   const handleToggleActive = async (teacherId: string, currentStatus: boolean) => {
     setUpdatingId(teacherId);
@@ -210,7 +300,7 @@ export default function AdminPanel() {
               مدير النظام
             </span>
           </div>
-          <p style={{ color: "var(--text-secondary)" }}>إدارة حسابات الأساتذة، الاشتراكات السنوية، وصلاحيات الميزات</p>
+          <p style={{ color: "var(--text-secondary)" }}>إدارة حسابات الأساتذة، الاشتراكات السنوية، والتحكم بصلاحيات ومسؤولي النظام</p>
         </div>
         
         <Link href="/dashboard" className="btn btn-secondary">
@@ -252,157 +342,236 @@ export default function AdminPanel() {
         </div>
       </section>
 
-      {/* Teachers Management Table */}
-      <section className="glass-panel panel-content">
-        <h2 className="panel-title">
-          <Shield size={18} style={{ color: "#a78bfa" }} />
-          <span>إدارة حسابات واشتراكات المعلمين</span>
-        </h2>
+      {/* Dashboard Grid split */}
+      <div className="dashboard-grid" style={{ gridTemplateColumns: "350px 1fr" }}>
+        
+        {/* Right side: Manage Admin Emails */}
+        <aside className="sidebar-panels" style={{ gap: 0 }}>
+          <div className="glass-panel panel-content">
+            <h2 className="panel-title">
+              <Shield size={18} className="stat-icon-amber" style={{ background: "none", border: "none", color: "#a78bfa" }} />
+              <span>ترخيص مسؤولي النظام (Admins)</span>
+            </h2>
 
-        <div className="table-container" style={{ marginTop: "1.5rem" }}>
-          <table className="report-table">
-            <thead>
-              <tr>
-                <th>المعلم والبريد</th>
-                <th>تاريخ التسجيل</th>
-                <th>إحصائيات الطلاب</th>
-                <th>ميزة الفواتير</th>
-                <th>حالة الاشتراك</th>
-                <th>تاريخ انتهاء الاشتراك</th>
-              </tr>
-            </thead>
-            <tbody>
-              {teachers.map(teacher => {
-                const teacherStudentsCount = students.filter(s => s.teacher_id === teacher.id).length;
-                const teacherGroupsCount = groups.filter(g => g.teacher_id === teacher.id).length;
-                
-                const regDate = new Date(teacher.created_at).toLocaleDateString("ar-EG", {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric"
-                });
+            {/* Add Admin Email Form */}
+            <form onSubmit={handleAddAdminEmail} style={{ marginBottom: "1.5rem" }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="aEmail">البريد الإلكتروني للترخيص</label>
+                <div className="search-input-wrapper" style={{ flex: "none" }}>
+                  <Mail className="search-icon" size={18} />
+                  <input
+                    id="aEmail"
+                    type="email"
+                    required
+                    placeholder="email@example.com"
+                    className="search-input"
+                    value={newAdminEmail}
+                    onChange={(e) => setNewAdminEmail(e.target.value)}
+                    style={{ direction: "ltr", textAlign: "right" }}
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: "100%", marginTop: "0.5rem" }}
+                disabled={actionLoading}
+              >
+                <UserPlus size={18} />
+                <span>{actionLoading ? "جاري الترخيص..." : "ترخيص كمسؤول"}</span>
+              </button>
+            </form>
 
-                const formattedExpiry = teacher.subscription_expires_at 
-                  ? new Date(teacher.subscription_expires_at).toISOString().split("T")[0]
-                  : "";
-
-                const isExpired = teacher.subscription_expires_at 
-                  ? new Date(teacher.subscription_expires_at) < new Date()
-                  : false;
-
-                const isUpdating = updatingId === teacher.id;
-
-                return (
-                  <tr key={teacher.id} style={{ opacity: isUpdating ? 0.6 : 1, transition: "opacity 0.2s" }}>
-                    {/* Name & Email */}
-                    <td>
-                      <div>
-                        <div style={{ fontWeight: 700, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          {teacher.name}
-                          {teacher.is_admin && <span className="private-badge" style={{ fontSize: "0.65rem", padding: "1px 6px" }}>مدير</span>}
-                        </div>
-                        <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "2px" }} className="monospace">
-                          {teacher.email || "لا يوجد بريد مسجل"}
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Registration Date */}
-                    <td style={{ fontSize: "0.9rem" }}>{regDate}</td>
-
-                    {/* Stats */}
-                    <td>
-                      <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                        <p style={{ display: "inline-block", marginRight: "1rem" }}>
-                          طلاب: <strong className="monospace" style={{ color: "var(--color-teal)" }}>{teacherStudentsCount}</strong>
-                        </p>
-                        <p style={{ display: "inline-block" }}>
-                          مجموعات: <strong className="monospace" style={{ color: "var(--color-info)" }}>{teacherGroupsCount}</strong>
-                        </p>
-                      </div>
-                    </td>
-
-                    {/* Bills Feature Toggle */}
-                    <td>
+            {/* List of Admin Emails */}
+            <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "1rem" }}>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "0.75rem", fontWeight: 600 }}>المسؤولون المرخصون حالياً:</p>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {adminEmails.map(admin => (
+                  <div 
+                    key={admin.id} 
+                    style={{ 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      alignItems: "center", 
+                      background: "rgba(255,255,255,0.02)", 
+                      padding: "8px 12px", 
+                      borderRadius: "6px",
+                      border: "1px solid var(--border-color)"
+                    }}
+                  >
+                    <span className="monospace" style={{ fontSize: "0.85rem", wordBreak: "break-all" }}>{admin.email}</span>
+                    {admin.email !== "3bdeniovlr@gmail.com" ? (
                       <button
                         className="btn-icon"
-                        onClick={() => handleToggleBills(teacher.id, teacher.has_bills_feature)}
-                        disabled={isUpdating}
-                        style={{ background: "none", border: "none", color: teacher.has_bills_feature ? "var(--color-teal)" : "var(--text-muted)", cursor: "pointer" }}
-                        title={teacher.has_bills_feature ? "تعطيل ميزة الفواتير" : "تفعيل ميزة الفواتير"}
+                        onClick={() => handleDeleteAdminEmail(admin.id, admin.email)}
+                        style={{ border: "none", background: "none", cursor: "pointer" }}
+                        title="إلغاء صلاحية المسؤول"
                       >
-                        {teacher.has_bills_feature ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                            <ToggleRight size={32} />
-                            <span style={{ fontSize: "0.8rem" }}>مفعلة</span>
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                            <ToggleLeft size={32} />
-                            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>معطلة</span>
-                          </div>
-                        )}
+                        <Trash2 size={14} className="color-danger" />
                       </button>
-                    </td>
+                    ) : (
+                      <span className="private-badge" style={{ fontSize: "0.6rem", padding: "1px 4px" }}>الرئيسي</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </aside>
 
-                    {/* Subscription Status Toggle */}
-                    <td>
-                      <button
-                        onClick={() => handleToggleActive(teacher.id, teacher.is_active)}
-                        disabled={isUpdating}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: (teacher.is_active && !isExpired) ? "#10b981" : "#ef4444",
-                          cursor: "pointer"
-                        }}
-                        title={teacher.is_active ? "تعطيل الاشتراك" : "تفعيل الاشتراك"}
-                      >
-                        {teacher.is_active && !isExpired ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                            <ToggleRight size={32} />
-                            <span style={{ fontSize: "0.8rem" }}>نشط</span>
-                          </div>
-                        ) : (
-                          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                            <ToggleLeft size={32} />
-                            <span style={{ fontSize: "0.8rem", color: "#ef4444" }}>
-                              {isExpired ? "منتهي" : "معطل"}
-                            </span>
-                          </div>
-                        )}
-                      </button>
-                    </td>
+        {/* Left Side: Teachers Management Table */}
+        <section className="glass-panel panel-content">
+          <h2 className="panel-title">
+            <Users size={18} style={{ color: "var(--color-info)" }} />
+            <span>إدارة حسابات واشتراكات المعلمين</span>
+          </h2>
 
-                    {/* Expiration Date Editor */}
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <Calendar size={14} style={{ color: isExpired ? "#ef4444" : "var(--text-muted)" }} />
-                        <input
-                          type="date"
-                          className="search-input"
-                          value={formattedExpiry}
+          <div className="table-container" style={{ marginTop: "1.5rem" }}>
+            <table className="report-table">
+              <thead>
+                <tr>
+                  <th>المعلم والبريد</th>
+                  <th>تاريخ التسجيل</th>
+                  <th>إحصائيات الطلاب</th>
+                  <th>ميزة الفواتير</th>
+                  <th>حالة الاشتراك</th>
+                  <th>تاريخ انتهاء الاشتراك</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teachers.map(teacher => {
+                  const teacherStudentsCount = students.filter(s => s.teacher_id === teacher.id).length;
+                  const teacherGroupsCount = groups.filter(g => g.teacher_id === teacher.id).length;
+                  
+                  const regDate = new Date(teacher.created_at).toLocaleDateString("ar-EG", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric"
+                  });
+
+                  const formattedExpiry = teacher.subscription_expires_at 
+                    ? new Date(teacher.subscription_expires_at).toISOString().split("T")[0]
+                    : "";
+
+                  const isExpired = teacher.subscription_expires_at 
+                    ? new Date(teacher.subscription_expires_at) < new Date()
+                    : false;
+
+                  const isUpdating = updatingId === teacher.id;
+
+                  return (
+                    <tr key={teacher.id} style={{ opacity: isUpdating ? 0.6 : 1, transition: "opacity 0.2s" }}>
+                      {/* Name & Email */}
+                      <td>
+                        <div>
+                          <div style={{ fontWeight: 700, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            {teacher.name}
+                            {teacher.is_admin && <span className="private-badge" style={{ fontSize: "0.65rem", padding: "1px 6px" }}>مدير</span>}
+                          </div>
+                          <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "2px" }} className="monospace">
+                            {teacher.email || "لا يوجد بريد مسجل"}
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Registration Date */}
+                      <td style={{ fontSize: "0.9rem" }}>{regDate}</td>
+
+                      {/* Stats */}
+                      <td>
+                        <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                          <p style={{ display: "inline-block", marginRight: "1rem" }}>
+                            طلاب: <strong className="monospace" style={{ color: "var(--color-teal)" }}>{teacherStudentsCount}</strong>
+                          </p>
+                          <p style={{ display: "inline-block" }}>
+                            مجموعات: <strong className="monospace" style={{ color: "var(--color-info)" }}>{teacherGroupsCount}</strong>
+                          </p>
+                        </div>
+                      </td>
+
+                      {/* Bills Feature Toggle */}
+                      <td>
+                        <button
+                          className="btn-icon"
+                          onClick={() => handleToggleBills(teacher.id, teacher.has_bills_feature)}
                           disabled={isUpdating}
-                          onChange={(e) => handleUpdateExpiration(teacher.id, e.target.value)}
+                          style={{ background: "none", border: "none", color: teacher.has_bills_feature ? "var(--color-teal)" : "var(--text-muted)", cursor: "pointer" }}
+                          title={teacher.has_bills_feature ? "تعطيل ميزة الفواتير" : "تفعيل ميزة الفواتير"}
+                        >
+                          {teacher.has_bills_feature ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              <ToggleRight size={32} />
+                              <span style={{ fontSize: "0.8rem" }}>مفعلة</span>
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              <ToggleLeft size={32} />
+                              <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>معطلة</span>
+                            </div>
+                          )}
+                        </button>
+                      </td>
+
+                      {/* Subscription Status Toggle */}
+                      <td>
+                        <button
+                          onClick={() => handleToggleActive(teacher.id, teacher.is_active)}
+                          disabled={isUpdating}
                           style={{
-                            padding: "4px 8px",
-                            fontSize: "0.85rem",
-                            border: isExpired ? "1px solid rgba(239,68,68,0.4)" : "1px solid var(--border-color)",
-                            background: "rgba(0,0,0,0.2)",
-                            color: isExpired ? "#f87171" : "#ffffff",
-                            borderRadius: "4px",
-                            width: "135px"
+                            background: "none",
+                            border: "none",
+                            color: (teacher.is_active && !isExpired) ? "#10b981" : "#ef4444",
+                            cursor: "pointer"
                           }}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+                          title={teacher.is_active ? "تعطيل الاشتراك" : "تفعيل الاشتراك"}
+                        >
+                          {teacher.is_active && !isExpired ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              <ToggleRight size={32} />
+                              <span style={{ fontSize: "0.8rem" }}>نشط</span>
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                              <ToggleLeft size={32} />
+                              <span style={{ fontSize: "0.8rem", color: "#ef4444" }}>
+                                {isExpired ? "منتهي" : "معطل"}
+                              </span>
+                            </div>
+                          )}
+                        </button>
+                      </td>
+
+                      {/* Expiration Date Editor */}
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <Calendar size={14} style={{ color: isExpired ? "#ef4444" : "var(--text-muted)" }} />
+                          <input
+                            type="date"
+                            className="search-input"
+                            value={formattedExpiry}
+                            disabled={isUpdating}
+                            onChange={(e) => handleUpdateExpiration(teacher.id, e.target.value)}
+                            style={{
+                              padding: "4px 8px",
+                              fontSize: "0.85rem",
+                              border: isExpired ? "1px solid rgba(239,68,68,0.4)" : "1px solid var(--border-color)",
+                              background: "rgba(0,0,0,0.2)",
+                              color: isExpired ? "#f87171" : "#ffffff",
+                              borderRadius: "4px",
+                              width: "135px"
+                            }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
 
       {/* Toast Alert */}
       {toast && (

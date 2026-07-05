@@ -47,7 +47,7 @@ create table if not exists public.students (
     created_at timestamp with time zone default now() not null
 );
 
--- 4. Create Bills Table (if not exists)
+-- 4. Create Bills Table
 create table if not exists public.bills (
     id uuid primary key default gen_random_uuid(),
     teacher_id uuid references public.teachers(id) on delete cascade not null,
@@ -58,11 +58,19 @@ create table if not exists public.bills (
     created_at timestamp with time zone default now() not null
 );
 
+-- 5. Create Admin Emails Table
+create table if not exists public.admins (
+    id uuid primary key default gen_random_uuid(),
+    email text unique not null,
+    created_at timestamp with time zone default now() not null
+);
+
 -- Enable Row Level Security (RLS)
 alter table public.teachers enable row level security;
 alter table public.groups enable row level security;
 alter table public.students enable row level security;
 alter table public.bills enable row level security;
+alter table public.admins enable row level security;
 
 -- RLS Policies for Teachers Table
 drop policy if exists "Allow select own profile" on public.teachers;
@@ -101,11 +109,24 @@ create policy "Teachers can manage their own bills or admin manage" on public.bi
     for all using (teacher_id = auth.uid() or public.is_admin(auth.uid()))
     with check (teacher_id = auth.uid() or public.is_admin(auth.uid()));
 
--- Automatic Profile Creation Trigger on Auth Signup
+-- RLS Policies for Admins Table
+drop policy if exists "Admins can manage admin list" on public.admins;
+create policy "Admins can manage admin list" on public.admins
+    for all using (public.is_admin(auth.uid()))
+    with check (public.is_admin(auth.uid()));
+
+-- Automatic Profile Creation Trigger on Auth Signup (with Auto-Admin logic)
 create or replace function public.handle_new_user()
 returns trigger as $$
+declare
+    v_is_admin boolean := false;
 begin
-    insert into public.teachers (id, name, email)
+    -- Auto-grant admin role if email is listed in admins table
+    select exists (
+        select 1 from public.admins where email = new.email
+    ) into v_is_admin;
+
+    insert into public.teachers (id, name, email, is_admin)
     values (
         new.id,
         coalesce(
@@ -114,7 +135,8 @@ begin
             split_part(new.email, '@', 1),
             'معلم جديد'
         ),
-        new.email
+        new.email,
+        v_is_admin
     );
     return new;
 end;
@@ -122,23 +144,40 @@ $$ language plpgsql security definer;
 
 -- Drop trigger if it already exists to avoid errors
 drop trigger if exists on_auth_user_created on auth.users;
-
 create trigger on_auth_user_created
     after insert on auth.users
     for each row execute procedure public.handle_new_user();
 
--- Migration script for existing databases:
--- Run this in SQL Editor to update your tables:
--- 
--- alter table public.teachers 
--- add column if not exists email text,
--- add column if not exists is_admin boolean not null default false,
--- add column if not exists is_active boolean not null default true,
--- add column if not exists has_bills_feature boolean not null default true,
--- add column if not exists subscription_expires_at timestamp with time zone default (now() + interval '1 year') not null,
--- add column if not exists monthly_price numeric not null default 100,
--- add column if not exists book_1_price numeric not null default 50,
--- add column if not exists book_2_price numeric not null default 50;
--- 
--- alter table public.groups
--- add column if not exists is_private boolean not null default false;
+-- Trigger to sync is_admin on teachers when admin email list changes
+create or replace function public.handle_admin_email_change()
+returns trigger as $$
+begin
+    if (TG_OP = 'INSERT') then
+        update public.teachers set is_admin = true where email = new.email;
+        return new;
+    elsif (TG_OP = 'DELETE') then
+        -- Don't de-admin the primary master account
+        if (old.email = '3bdeniovlr@gmail.com') then
+            return old;
+        end if;
+        update public.teachers set is_admin = false where email = old.email;
+        return old;
+    end if;
+    return null;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_admin_email_change on public.admins;
+create trigger on_admin_email_change
+    after insert or delete on public.admins
+    for each row execute procedure public.handle_admin_email_change();
+
+-- Seed primary master administrator email
+insert into public.admins (email) 
+values ('3bdeniovlr@gmail.com')
+on conflict (email) do nothing;
+
+-- Update existing teachers matching seed email to be admin
+update public.teachers 
+set is_admin = true 
+where email = '3bdeniovlr@gmail.com';
