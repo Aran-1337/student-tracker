@@ -50,17 +50,30 @@ export default function DashboardLayout({
         .select("name, is_active, has_bills_feature, has_attendance_feature, is_admin, subscription_expires_at")
         .eq("id", user.id)
         .single();
+
+      // Fallback: if query failed (e.g. missing column), fetch minimal fields
+      if (teacherError) {
+        const { data: fallback } = await supabase
+          .from("teachers")
+          .select("name, is_active, has_bills_feature, is_admin, subscription_expires_at")
+          .eq("id", user.id)
+          .single();
+        if (fallback) {
+          teacherData = { ...fallback, has_attendance_feature: true };
+          teacherError = null;
+        }
+      }
         
       if (teacherError || !teacherData) {
         const defaultName = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split("@")[0] || "المعلم";
-        const { data: newProfile, error: insertError } = await supabase
+        const { data: newProfile } = await supabase
           .from("teachers")
           .insert([{ id: user.id, name: defaultName, email: user.email }])
-          .select("name, is_active, has_bills_feature, has_attendance_feature, is_admin, subscription_expires_at")
+          .select("name, is_active, has_bills_feature, is_admin, subscription_expires_at")
           .single();
         
-        if (!insertError && newProfile) {
-          teacherData = newProfile;
+        if (newProfile) {
+          teacherData = { ...newProfile, has_attendance_feature: true };
         }
       }
       
