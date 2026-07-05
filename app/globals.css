@@ -681,8 +681,7 @@ h1, h2, h3, h4, h5, h6 {
    ============================================= */
 
 .dashboard-layout {
-  display: grid;
-  grid-template-columns: 280px 1fr;
+  display: block;
   min-height: 100vh;
 }
 
@@ -690,12 +689,18 @@ h1, h2, h3, h4, h5, h6 {
   background: var(--bg-secondary);
   border-left: 1px solid var(--border-color);
   padding: 2rem 1.5rem;
+  width: 280px;
   height: 100vh;
-  position: sticky;
+  position: fixed;
   top: 0;
+  right: 0;
   z-index: 40;
   box-shadow: -4px 0 24px 0 rgba(0, 0, 0, 0.25);
   overflow-y: auto;
+}
+
+.content-area {
+  margin-right: 280px;
 }
 
 .sidebar-inner {
@@ -789,19 +794,34 @@ h1, h2, h3, h4, h5, h6 {
    MOBILE / TABLET (≤ 768px)
    ============================================= */
 @media (max-width: 768px) {
-  /* Layout: sidebar becomes top header */
+  /* Layout: single column, header + content */
   .dashboard-layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+    display: block;
+    min-height: 100vh;
   }
 
+  /* Sidebar becomes a slim fixed top bar — override desktop fixed right */
   .sidebar {
-    height: auto;
-    position: sticky;
+    position: fixed;
     top: 0;
-    padding: 0.85rem 1rem;
+    right: 0;
+    left: 0;
+    width: 100% !important;
+    height: auto !important;
+    z-index: 50;
+    padding: 0.7rem 1rem;
     overflow: visible;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    background: rgba(15, 23, 42, 0.97);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+  }
+
+  /* Remove desktop right margin, add top padding instead */
+  .content-area {
+    margin-right: 0 !important;
+    padding: 1rem;
+    padding-top: calc(60px + 1rem);
   }
 
   .sidebar-inner {
@@ -819,49 +839,75 @@ h1, h2, h3, h4, h5, h6 {
     justify-content: center;
   }
 
-  /* Profile: visible only when menu open */
+  /* Drawer panel — slides in from top as fixed overlay */
   .sidebar-profile {
     display: none;
-    padding: 0.75rem 0.5rem;
-    margin-bottom: 0.5rem;
   }
-  .sidebar-profile.open {
-    display: block;
-  }
-
-  /* Nav menu: hidden by default on mobile, shown when open */
   .sidebar-menu {
     display: none;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding-top: 0.5rem;
-    border-top: 1px solid var(--border-color);
-    margin-top: 0.75rem;
   }
+  .sidebar-logout-mobile {
+    display: none;
+  }
+
+  /* When open: full-screen fixed drawer */
+  .sidebar-profile.open,
   .sidebar-menu.open {
     display: flex;
   }
+  .sidebar-logout-mobile.open {
+    display: flex;
+  }
+
+  /* The drawer container when open */
+  .sidebar-menu.open {
+    position: fixed;
+    top: 56px; /* below the top bar */
+    right: 0;
+    left: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.99);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 1rem;
+    overflow-y: auto;
+    z-index: 49;
+    border-top: 1px solid var(--border-color);
+    animation: slideDown 0.2s ease;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .sidebar-profile.open {
+    flex-direction: column;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 0.5rem;
+  }
 
   .sidebar-link {
-    padding: 0.75rem 1rem;
-    white-space: nowrap;
+    padding: 0.85rem 1rem;
+    border-radius: 10px;
+    font-size: 1rem;
   }
 
   .sidebar-link.active {
     border-right: 3px solid var(--color-teal);
     border-bottom: none;
-    border-radius: 8px;
+    border-radius: 10px;
   }
 
-  /* Logout inside mobile menu */
   .sidebar-logout-mobile {
-    display: flex;
     width: 100%;
     justify-content: center;
-    margin-top: 0.5rem;
-  }
-  .sidebar-logout-mobile.open {
-    display: flex;
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
   }
 
   /* Hide desktop logout on mobile */
@@ -869,18 +915,14 @@ h1, h2, h3, h4, h5, h6 {
     display: none;
   }
 
-  /* Overlay */
+  /* Overlay backdrop */
   .mobile-overlay {
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.45);
-    z-index: 39;
-  }
-
-  /* Content area padding */
-  .content-area {
-    padding: 1rem;
+    background: rgba(0,0,0,0.5);
+    z-index: 48;
+    top: 56px;
   }
 
   /* Dashboard grid: stack panels vertically */
