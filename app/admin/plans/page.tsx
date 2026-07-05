@@ -388,7 +388,13 @@ export default function PlansPage() {
               <div className="form-row">
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">السعر (جنيه)</label>
-                  <input type="number" className="form-input" value={form.price} onChange={e => setForm({ ...form, price: Number(e.target.value) })} min={0} />
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={form.price === 0 ? "" : form.price} 
+                    onChange={e => setForm({ ...form, price: e.target.value === "" ? 0 : Number(e.target.value) })} 
+                    min={0} 
+                  />
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label">المدة (أشهر)</label>
