@@ -9,7 +9,8 @@ import {
   Calendar, 
   Users,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Receipt
 } from "lucide-react";
 
 interface Student {
@@ -21,6 +22,14 @@ interface Student {
   book_2: boolean;
 }
 
+interface Bill {
+  id: string;
+  title: string;
+  amount: number;
+  category: "إيجار" | "رواتب سكرتارية" | "أخرى";
+  billing_month: number;
+}
+
 const arabicMonths = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
@@ -29,6 +38,7 @@ const arabicMonths = [
 export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState<Student[]>([]);
+  const [bills, setBills] = useState<Bill[]>([]);
   
   // Pricing settings from teachers table
   const [monthlyPrice, setMonthlyPrice] = useState(100);
@@ -75,6 +85,15 @@ export default function ReportsPage() {
             : Array(12).fill(false)
         }));
         setStudents(validatedStudents);
+
+        // 3. Fetch bills
+        const { data: billsData, error: billsError } = await supabase
+          .from("bills")
+          .select("*");
+
+        if (billsError) throw billsError;
+        setBills(billsData || []);
+
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل التقارير.", "error");
       } finally {
@@ -105,15 +124,28 @@ export default function ReportsPage() {
   const book2Earnings = book2Count * book2Price;
   const totalBookEarnings = book1Earnings + book2Earnings;
 
-  // 3. Combined
-  const totalEarnings = totalSubscriptionEarnings + totalBookEarnings;
+  // 3. Gross Revenue
+  const totalGrossEarnings = totalSubscriptionEarnings + totalBookEarnings;
 
-  // Month-by-month statistics
+  // 4. Expenses / Bills
+  const totalExpenses = bills.reduce((sum, b) => sum + Number(b.amount), 0);
+
+  // 5. Net Profit
+  const totalNetProfit = totalGrossEarnings - totalExpenses;
+
+  // Month-by-month statistics (Subscriptions revenue vs Month expenses)
   const monthsReport = arabicMonths.map((name, index) => {
     const paidCount = students.filter(s => s.months[index] === true).length;
-    const earnings = paidCount * monthlyPrice;
+    const subscriptionEarnings = paidCount * monthlyPrice;
+
+    // Filter bills for this specific month (1-indexed in database)
+    const monthBills = bills.filter(b => b.billing_month === index + 1);
+    const monthExpenses = monthBills.reduce((sum, b) => sum + Number(b.amount), 0);
+
+    const netProfit = subscriptionEarnings - monthExpenses;
     const percentage = totalStudents > 0 ? Math.round((paidCount / totalStudents) * 100) : 0;
-    return { name, paidCount, earnings, percentage };
+
+    return { name, paidCount, subscriptionEarnings, monthExpenses, netProfit, percentage };
   });
 
   if (loading) {
@@ -129,37 +161,51 @@ export default function ReportsPage() {
       {/* Title */}
       <div style={{ marginBottom: "2rem" }}>
         <h1 style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>التقارير المالية</h1>
-        <p style={{ color: "var(--text-secondary)" }}>تحليلات الاشتراكات وأرباح الكتب الدراسية</p>
+        <p style={{ color: "var(--text-secondary)" }}>تحليلات الإيرادات الكلية، المصروفات، وصافي الأرباح</p>
       </div>
 
-      {/* Main Earnings Summary Cards */}
-      <section className="stats-grid" style={{ marginBottom: "2.5rem" }}>
-        <div className="stat-card glass-panel report-card-green">
+      {/* Main Earnings Summary Cards (4 Cards Grid) */}
+      <section className="stats-grid" style={{ marginBottom: "2.5rem", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+        {/* Net Profit Card */}
+        <div className="stat-card glass-panel report-card-green" style={{ borderLeft: "4px solid #10b981" }}>
           <div className="stat-icon-wrapper" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
             <DollarSign size={24} />
           </div>
           <div className="stat-info">
-            <span className="stat-label" style={{ color: "#a7f3d0" }}>إجمالي الأرباح الكلي</span>
-            <span className="stat-value monospace" style={{ fontSize: "2.2rem", fontWeight: 900 }}>{totalEarnings} ج.م</span>
+            <span className="stat-label" style={{ color: "#a7f3d0" }}>صافي الأرباح الكلي</span>
+            <span className="stat-value monospace" style={{ fontSize: "1.8rem", fontWeight: 900, color: "#10b981" }}>{totalNetProfit} ج.م</span>
           </div>
         </div>
 
-        <div className="stat-card glass-panel report-card-teal">
+        {/* Gross Revenue Card */}
+        <div className="stat-card glass-panel" style={{ borderLeft: "4px solid var(--color-teal)" }}>
           <div className="stat-icon-wrapper" style={{ background: "rgba(20, 184, 166, 0.15)", color: "var(--color-teal)", border: "1px solid rgba(20, 184, 166, 0.2)" }}>
-            <CheckCircle2 size={24} />
+            <TrendingUp size={24} />
           </div>
           <div className="stat-info">
-            <span className="stat-label" style={{ color: "#99f6e4" }}>أرباح الاشتراكات الكلية</span>
-            <span className="stat-value monospace">{totalSubscriptionEarnings} ج.م</span>
+            <span className="stat-label">إجمالي الإيرادات الكلي</span>
+            <span className="stat-value monospace">{totalGrossEarnings} ج.م</span>
           </div>
         </div>
 
-        <div className="stat-card glass-panel report-card-amber">
+        {/* Total Expenses Card */}
+        <div className="stat-card glass-panel" style={{ borderLeft: "4px solid #ef4444" }}>
+          <div className="stat-icon-wrapper" style={{ background: "rgba(239, 68, 68, 0.15)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
+            <Receipt size={24} />
+          </div>
+          <div className="stat-info">
+            <span className="stat-label" style={{ color: "#fca5a5" }}>إجمالي المصروفات (الفواتير)</span>
+            <span className="stat-value monospace" style={{ color: "#f87171" }}>{totalExpenses} ج.م</span>
+          </div>
+        </div>
+
+        {/* Book Earnings Card */}
+        <div className="stat-card glass-panel" style={{ borderLeft: "4px solid var(--color-amber)" }}>
           <div className="stat-icon-wrapper" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-amber)", border: "1px solid rgba(245, 158, 11, 0.2)" }}>
             <BookOpen size={24} />
           </div>
           <div className="stat-info">
-            <span className="stat-label" style={{ color: "#fde68a" }}>أرباح الكتب الكلية</span>
+            <span className="stat-label">أرباح الكتب الكلية</span>
             <span className="stat-value monospace">{totalBookEarnings} ج.م</span>
           </div>
         </div>
@@ -184,48 +230,48 @@ export default function ReportsPage() {
             </div>
             <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
               <div>
-                <p style={{ fontWeight: 600 }}>أرباح الشهر الحالي ({arabicMonths[currentMonthIndex]})</p>
+                <p style={{ fontWeight: 600 }}>أرباح الاشتراك في الشهر الحالي ({arabicMonths[currentMonthIndex]})</p>
                 <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{paidThisMonthCount} طالب دفعوا الاشتراك</p>
               </div>
               <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{currentMonthEarnings} ج.م</span>
             </div>
             <div className="flex-between" style={{ paddingBottom: "0.5rem" }}>
               <div>
-                <p style={{ fontWeight: 600 }}>إجمالي الشهور المدفوعة</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>مجموع كل عمليات الدفع المفعلة لجميع الطلاب</p>
+                <p style={{ fontWeight: 600 }}>إجمالي إيراد الاشتراكات</p>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>مجموع كل عمليات دفع الشهور المسجلة لجميع الطلاب</p>
               </div>
-              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{totalPaidMonthsCount} شهر</span>
+              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{totalSubscriptionEarnings} ج.م</span>
             </div>
           </div>
         </section>
 
-        {/* Books Card Details */}
+        {/* Expenses & Books Split Card */}
         <section className="glass-panel panel-content">
           <h2 className="panel-title">
-            <BookOpen size={18} style={{ color: "var(--color-amber)" }} />
-            <span>تفاصيل أرباح الكتب الدراسية</span>
+            <Receipt size={18} style={{ color: "var(--color-amber)" }} />
+            <span>تفاصيل الفواتير والكتب</span>
           </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", marginTop: "1rem" }}>
-            <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1.25rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginTop: "1rem" }}>
+            <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
               <div>
-                <p style={{ fontWeight: 600 }}>أرباح الكتاب الأول (كتاب ١)</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>تم استلامه بواسطة {book1Count} طالب (سعر النسخة: {book1Price} ج.م)</p>
+                <p style={{ fontWeight: 600 }}>إجمالي الفواتير والمصروفات</p>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>تشمل الإيجارات ورواتب السكرتارية والمصروفات الأخرى</p>
               </div>
-              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--color-amber)" }}>{book1Earnings} ج.م</span>
+              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700, color: "#f87171" }}>-{totalExpenses} ج.م</span>
             </div>
-            <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1.25rem" }}>
+            <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
               <div>
-                <p style={{ fontWeight: 600 }}>أرباح الكتاب الثاني (كتاب ٢)</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>تم استلامه بواسطة {book2Count} طالب (سعر النسخة: {book2Price} ج.م)</p>
+                <p style={{ fontWeight: 600 }}>إجمالي أرباح كتاب ١</p>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{book1Count} طالب استلموا الكتاب بسعر {book1Price} ج.م</p>
               </div>
-              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--color-amber)" }}>{book2Earnings} ج.م</span>
+              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{book1Earnings} ج.م</span>
             </div>
             <div className="flex-between" style={{ paddingBottom: "0.5rem" }}>
               <div>
-                <p style={{ fontWeight: 600 }}>إجمالي الكتب المستلمة</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>مجموع مستلمي كلا الكتابين</p>
+                <p style={{ fontWeight: 600 }}>إجمالي أرباح كتاب ٢</p>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{book2Count} طالب استلموا الكتاب بسعر {book2Price} ج.م</p>
               </div>
-              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{book1Count + book2Count} نسخة</span>
+              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{book2Earnings} ج.م</span>
             </div>
           </div>
         </section>
@@ -236,7 +282,7 @@ export default function ReportsPage() {
       <section className="glass-panel panel-content" style={{ marginTop: "2rem" }}>
         <h2 className="panel-title">
           <Calendar size={18} style={{ color: "var(--color-info)" }} />
-          <span>تقرير الاشتراكات الشهري بالتفصيل</span>
+          <span>التقرير المالي التفصيلي للشهور الـ 12</span>
         </h2>
         
         <div className="table-container" style={{ marginTop: "1rem" }}>
@@ -244,9 +290,11 @@ export default function ReportsPage() {
             <thead>
               <tr>
                 <th>الشهر</th>
-                <th>عدد الطلاب الذين دفعوا</th>
-                <th>أرباح الاشتراك لهذا الشهر</th>
-                <th>نسبة سداد الطلاب (%)</th>
+                <th>عدد الاشتراكات المدفوعة</th>
+                <th>إيراد الاشتراك</th>
+                <th>المصروفات والفواتير</th>
+                <th>صافي الربح</th>
+                <th>نسبة السداد للطلاب (%)</th>
               </tr>
             </thead>
             <tbody>
@@ -254,8 +302,17 @@ export default function ReportsPage() {
                 <tr key={month.name}>
                   <td style={{ fontWeight: 600 }}>{month.name}</td>
                   <td className="monospace">{month.paidCount} طالب</td>
-                  <td className="monospace" style={{ color: month.earnings > 0 ? "var(--color-teal)" : "var(--text-muted)", fontWeight: month.earnings > 0 ? 600 : 400 }}>
-                    {month.earnings} ج.م
+                  <td className="monospace" style={{ color: month.subscriptionEarnings > 0 ? "var(--color-teal)" : "var(--text-muted)", fontWeight: month.subscriptionEarnings > 0 ? 600 : 400 }}>
+                    {month.subscriptionEarnings} ج.م
+                  </td>
+                  <td className="monospace" style={{ color: month.monthExpenses > 0 ? "#f87171" : "var(--text-muted)" }}>
+                    {month.monthExpenses > 0 ? `-${month.monthExpenses}` : "0"} ج.م
+                  </td>
+                  <td className="monospace" style={{ 
+                    color: month.netProfit > 0 ? "#10b981" : month.netProfit < 0 ? "#ef4444" : "var(--text-muted)", 
+                    fontWeight: month.netProfit !== 0 ? 700 : 400 
+                  }}>
+                    {month.netProfit} ج.م
                   </td>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>

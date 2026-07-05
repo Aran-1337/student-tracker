@@ -10,7 +10,8 @@ import {
   TrendingUp, 
   Settings, 
   LogOut, 
-  BookOpen
+  BookOpen,
+  Receipt
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -77,6 +78,7 @@ export default function DashboardLayout({
   const menuItems = [
     { name: "الرئيسية والمجموعات", path: "/dashboard", icon: LayoutDashboard },
     { name: "إدارة الطلاب", path: "/dashboard/students", icon: Users },
+    { name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt },
     { name: "التقارير المالية", path: "/dashboard/reports", icon: TrendingUp },
     { name: "الإعدادات", path: "/dashboard/settings", icon: Settings },
   ];

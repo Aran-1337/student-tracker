@@ -87,3 +87,24 @@ add column if not exists book_2_price numeric not null default 50;
 
 alter table public.groups
 add column if not exists is_private boolean not null default false;
+
+-- 4. Create Bills Table (if not exists)
+create table if not exists public.bills (
+    id uuid primary key default gen_random_uuid(),
+    teacher_id uuid references public.teachers(id) on delete cascade not null,
+    title text not null,
+    amount numeric not null check (amount >= 0),
+    category text not null check (category in ('إيجار', 'رواتب سكرتارية', 'أخرى')),
+    billing_month integer not null check (billing_month >= 1 and billing_month <= 12),
+    created_at timestamp with time zone default now() not null
+);
+
+-- Enable RLS
+alter table public.bills enable row level security;
+
+-- RLS Policies
+drop policy if exists "Teachers can manage their own bills" on public.bills;
+create policy "Teachers can manage their own bills"
+    on public.bills for all
+    using (teacher_id = auth.uid())
+    with check (teacher_id = auth.uid());
