@@ -86,13 +86,22 @@ export default function DashboardOverview() {
         setUserId(session.user.id);
 
         // Fetch groups
-        const { data: groupsData, error: groupsError } = await supabase
-          .from("groups")
-          .select("*")
-          .order("created_at", { ascending: false });
+        let { data: grpData, error: grpError } = await supabase.from("groups").select("id, name, day_of_week, time, is_private, sessions_per_month, teacher_id").order("created_at", { ascending: false });
 
-        if (groupsError) throw groupsError;
-        setGroups(groupsData || []);
+        if (grpError) {
+          const fallback = await supabase.from("groups").select("id, name, day_of_week, time, is_private, teacher_id").order("created_at", { ascending: false });
+          grpData = fallback.data as any;
+        }
+
+        const mergedGroups = (grpData || []).map(g => {
+          const localVal = typeof window !== "undefined" ? localStorage.getItem(`group_sessions_${g.id}`) : null;
+          return {
+            ...g,
+            sessions_per_month: localVal ? Number(localVal) : (g.sessions_per_month ?? 8)
+          };
+        });
+
+        setGroups(mergedGroups);
 
         // Fetch students
         const { data: studentsData, error: studentsError } = await supabase
@@ -165,15 +174,25 @@ export default function DashboardOverview() {
             name: groupName,
             day_of_week: groupDay,
             time: groupTime,
-            is_private: isPrivate,
-            sessions_per_month: groupSessions
+            is_private: isPrivate
           }
         ])
         .select();
 
+      // If they specified custom sessions, we save it in localStorage immediately!
+      if (data && data[0] && groupSessions !== 8) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(`group_sessions_${data[0].id}`, groupSessions.toString());
+        }
+      }
+
       if (error) throw error;
 
-      setGroups([data[0], ...groups]);
+      const newGroup = { 
+        ...data[0], 
+        sessions_per_month: groupSessions 
+      };
+      setGroups([newGroup, ...groups]);
       setGroupName("");
       setGroupTime("");
       setGroupSessions(8);

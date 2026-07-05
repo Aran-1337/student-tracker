@@ -93,7 +93,16 @@ export default function AttendancePage() {
 
       const { data: stData } = await supabase.from("students").select("id, name, group_id").order("name");
 
-      setGroups((grpData || []).map(g => ({ ...g, sessions_per_month: g.sessions_per_month ?? 8 })));
+      // Merge with localStorage if DB doesn't have it
+      const mergedGroups = (grpData || []).map(g => {
+        const localVal = typeof window !== "undefined" ? localStorage.getItem(`group_sessions_${g.id}`) : null;
+        return { 
+          ...g, 
+          sessions_per_month: localVal ? Number(localVal) : (g.sessions_per_month ?? 8) 
+        };
+      });
+
+      setGroups(mergedGroups);
       setStudents(stData || []);
       setLoading(false);
     }
@@ -323,7 +332,10 @@ export default function AttendancePage() {
                   setCustomSessions(val);
                   const num = Number(val);
                   if (num > 0 && num <= 30 && selectedGroupId !== "all") {
-                    supabase.from("groups").update({ sessions_per_month: num }).eq("id", selectedGroupId).then();
+                    // Save to localStorage instead of DB to bypass schema cache error
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem(`group_sessions_${selectedGroupId}`, num.toString());
+                    }
                     setGroups(groups.map(g => g.id === selectedGroupId ? { ...g, sessions_per_month: num } : g));
                   }
                 }}
