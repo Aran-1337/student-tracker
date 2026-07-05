@@ -61,6 +61,11 @@ export default function AttendancePage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [customSessions, setCustomSessions] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCustomSessions(null);
+  }, [selectedGroupId]);
 
   // QR Modal
   const [qrStudent, setQrStudent] = useState<Student | null>(null);
@@ -107,7 +112,7 @@ export default function AttendancePage() {
 
   // ── Helpers ──────────────────────────────────────────────────────
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
-  const sessionsCount = selectedGroup?.sessions_per_month ?? 8;
+  const sessionsCount = customSessions ?? (selectedGroup?.sessions_per_month ?? 8);
 
   const filteredStudents = students.filter(s => {
     if (selectedGroupId === "all") return true;
@@ -296,21 +301,31 @@ export default function AttendancePage() {
             </select>
           </div>
 
-          {/* Sessions count info */}
-          {selectedGroup && (
-            <div style={{
-              padding: "0.6rem 1rem",
-              borderRadius: "8px",
-              background: "rgba(20,184,166,0.1)",
-              border: "1px solid rgba(20,184,166,0.2)",
-              color: "var(--color-teal)",
-              fontSize: "0.85rem",
-              fontWeight: 600,
-              alignSelf: "flex-end"
-            }}>
-              {selectedGroup.sessions_per_month} حصة / شهر
+          {/* Sessions count info / override */}
+          <div className="form-group" style={{ margin: 0, minWidth: "120px" }}>
+            <label className="form-label">عدد الحصص (الجدول)</label>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <input
+                type="number"
+                min="1"
+                max="30"
+                className="form-input"
+                value={sessionsCount}
+                onChange={e => {
+                  const val = Number(e.target.value);
+                  if (val > 0 && val <= 30) {
+                    setCustomSessions(val);
+                    if (selectedGroupId !== "all") {
+                      supabase.from("groups").update({ sessions_per_month: val }).eq("id", selectedGroupId).then();
+                      setGroups(groups.map(g => g.id === selectedGroupId ? { ...g, sessions_per_month: val } : g));
+                    }
+                  }
+                }}
+                style={{ padding: "0.6rem 0.5rem", width: "70px", textAlign: "center", fontWeight: "bold", color: "var(--color-teal)" }}
+              />
+              <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 600 }}>حصص</span>
             </div>
-          )}
+          </div>
         </div>
       </div>
 

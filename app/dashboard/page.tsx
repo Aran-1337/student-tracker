@@ -20,6 +20,7 @@ interface Group {
   day_of_week: string;
   time: string;
   is_private?: boolean;
+  sessions_per_month?: number;
 }
 
 interface Student {
@@ -63,6 +64,7 @@ export default function DashboardOverview() {
   const [groupName, setGroupName] = useState("");
   const [groupDay, setGroupDay] = useState("السبت");
   const [groupTime, setGroupTime] = useState("");
+  const [groupSessions, setGroupSessions] = useState<number>(8);
   const [isPrivate, setIsPrivate] = useState(false);
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -163,7 +165,8 @@ export default function DashboardOverview() {
             name: groupName,
             day_of_week: groupDay,
             time: groupTime,
-            is_private: isPrivate
+            is_private: isPrivate,
+            sessions_per_month: groupSessions
           }
         ])
         .select();
@@ -173,6 +176,7 @@ export default function DashboardOverview() {
       setGroups([data[0], ...groups]);
       setGroupName("");
       setGroupTime("");
+      setGroupSessions(8);
       setIsPrivate(false);
       showToast("تم إنشاء المجموعة بنجاح.");
     } catch (err: any) {
@@ -315,6 +319,19 @@ export default function DashboardOverview() {
                   />
                 </div>
               </div>
+              <div className="form-group" style={{ marginTop: "0.5rem" }}>
+                <label className="form-label" htmlFor="gSessions">عدد حصص الشهر</label>
+                <input
+                  id="gSessions"
+                  type="number"
+                  min="1"
+                  max="30"
+                  required
+                  className="form-input"
+                  value={groupSessions}
+                  onChange={(e) => setGroupSessions(Number(e.target.value))}
+                />
+              </div>
               <div className="form-group" style={{ flexDirection: "row", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", marginBottom: "1rem" }}>
                 <input
                   id="gPrivate"
@@ -381,6 +398,10 @@ export default function DashboardOverview() {
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <Clock size={14} />
                         <span className="monospace">الوقت: {formatTimeTo12H(group.time)}</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <Calendar size={14} />
+                        <span>حصص الشهر: {group.sessions_per_month ?? 8} حصص</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
                         <Users size={14} style={{ color: "var(--color-teal)" }} />
