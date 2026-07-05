@@ -36,7 +36,12 @@ interface Plan {
 const defaultForm = {
   name: "",
   description: "",
-  customFeatures: [] as string[],
+  customFeatures: [
+    "إدارة الطلاب والمجموعات",
+    "التقارير المالية",
+    "الحضور والغياب + QR",
+    "المصروفات والفواتير"
+  ] as string[],
   price: 0,
   duration_months: 1,
   has_bills: false,
