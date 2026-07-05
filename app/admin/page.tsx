@@ -17,7 +17,8 @@ import {
   ArrowRight,
   UserPlus,
   Trash2,
-  Mail
+  Mail,
+  Package
 } from "lucide-react";
 import Link from "next/link";
 
@@ -29,6 +30,7 @@ interface Teacher {
   is_active: boolean;
   has_bills_feature: boolean;
   has_attendance_feature: boolean;
+  plan_id: string | null;
   subscription_expires_at: string;
   created_at: string;
 }
@@ -49,6 +51,16 @@ interface AdminEmail {
   created_at: string;
 }
 
+interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  duration_months: number;
+  has_bills: boolean;
+  has_attendance: boolean;
+  color: string;
+}
+
 export default function AdminPanel() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -59,6 +71,7 @@ export default function AdminPanel() {
   const [students, setStudents] = useState<Student[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [adminEmails, setAdminEmails] = useState<AdminEmail[]>([]);
+  const [plans, setPlans] = useState<Plan[]>([]);
 
   // Form state
   const [newAdminEmail, setNewAdminEmail] = useState("");
@@ -118,10 +131,18 @@ export default function AdminPanel() {
           .select("*")
           .order("created_at", { ascending: false });
 
+        // Fetch plans
+        const { data: plansData } = await supabase
+          .from("plans")
+          .select("id, name, price, duration_months, has_bills, has_attendance, color")
+          .eq("is_active", true)
+          .order("price");
+
         setTeachers(teachersData || []);
         setStudents(studentsData || []);
         setGroups(groupsData || []);
         setAdminEmails(adminsData || []);
+        setPlans(plansData || []);
 
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل البيانات الإدارية.", "error");
@@ -259,6 +280,53 @@ export default function AdminPanel() {
       showToast("تم تحديث ميزة الحضور والغياب بنجاح.");
     } catch (err: any) {
       showToast("حدث خطأ أثناء تحديث ميزة الحضور.", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleAssignPlan = async (teacher: Teacher, planId: string) => {
+    setUpdatingId(teacher.id);
+    try {
+      if (planId === "") {
+        // Remove plan
+        const { error } = await supabase
+          .from("teachers")
+          .update({ plan_id: null })
+          .eq("id", teacher.id);
+        if (error) throw error;
+        setTeachers(teachers.map(t => t.id === teacher.id ? { ...t, plan_id: null } : t));
+        showToast("تم إلغاء تعيين الباقة.");
+        return;
+      }
+      const plan = plans.find(p => p.id === planId);
+      if (!plan) return;
+      // Calculate new expiry
+      const newExpiry = new Date();
+      newExpiry.setMonth(newExpiry.getMonth() + plan.duration_months);
+      // Apply plan features to teacher
+      const { error } = await supabase
+        .from("teachers")
+        .update({
+          plan_id: plan.id,
+          has_bills_feature: plan.has_bills,
+          has_attendance_feature: plan.has_attendance,
+          is_active: true,
+          subscription_expires_at: newExpiry.toISOString()
+        })
+        .eq("id", teacher.id);
+      if (error) throw error;
+      setTeachers(teachers.map(t => t.id === teacher.id ? {
+        ...t,
+        plan_id: plan.id,
+        has_bills_feature: plan.has_bills,
+        has_attendance_feature: plan.has_attendance,
+        is_active: true,
+        subscription_expires_at: newExpiry.toISOString()
+      } : t));
+      showToast(`✓ تم تعيين باقة "${plan.name}" لـ ${teacher.name} وتفعيل كل مميزاتها تلقائياً.`);
+    } catch (err: any) {
+      showToast(err.message || "فشل تعيين الباقة", "error");
     } finally {
       setUpdatingId(null);
     }
@@ -476,10 +544,16 @@ export default function AdminPanel() {
 
         {/* Left Side: Teachers Management Table */}
         <section className="glass-panel panel-content">
-          <h2 className="panel-title">
-            <Users size={18} style={{ color: "var(--color-info)" }} />
-            <span>إدارة حسابات واشتراكات المعلمين</span>
-          </h2>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <h2 className="panel-title" style={{ margin: 0, border: "none", paddingBottom: 0 }}>
+              <Users size={18} style={{ color: "var(--color-info)" }} />
+              <span>إدارة حسابات واشتراكات المعلمين</span>
+            </h2>
+            <Link href="/admin/plans" className="btn btn-secondary" style={{ fontSize: "0.85rem", gap: "0.4rem" }}>
+              <Package size={15} />
+              <span>إدارة الباقات</span>
+            </Link>
+          </div>
 
           <div className="table-container" style={{ marginTop: "1.5rem" }}>
             <table className="report-table">
@@ -488,6 +562,7 @@ export default function AdminPanel() {
                   <th>المعلم والبريد</th>
                   <th>تاريخ التسجيل</th>
                   <th>إحصائيات الطلاب</th>
+                  <th style={{ color: "var(--color-teal)" }}>الباقة</th>
                   <th>ميزة الفواتير</th>
                   <th>ميزة الحضور</th>
                   <th>حالة الاشتراك</th>
@@ -544,6 +619,48 @@ export default function AdminPanel() {
                             مجموعات: <strong className="monospace" style={{ color: "var(--color-info)" }}>{teacherGroupsCount}</strong>
                           </p>
                         </div>
+                      </td>
+
+                      {/* Plan Assignment */}
+                      <td>
+                        {plans.length > 0 ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <select
+                              value={teacher.plan_id || ""}
+                              disabled={isUpdating}
+                              onChange={e => handleAssignPlan(teacher, e.target.value)}
+                              style={{
+                                background: "rgba(0,0,0,0.25)",
+                                border: teacher.plan_id
+                                  ? `1px solid ${plans.find(p => p.id === teacher.plan_id)?.color || "var(--border-color)"}`
+                                  : "1px solid var(--border-color)",
+                                borderRadius: "8px",
+                                color: teacher.plan_id
+                                  ? (plans.find(p => p.id === teacher.plan_id)?.color || "#fff")
+                                  : "var(--text-muted)",
+                                fontSize: "0.82rem",
+                                fontWeight: 600,
+                                padding: "0.4rem 0.6rem",
+                                cursor: "pointer",
+                                minWidth: "130px"
+                              }}
+                            >
+                              <option value="">— بدون باقة —</option>
+                              {plans.map(p => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} ({p.price}ج)
+                                </option>
+                              ))}
+                            </select>
+                            {teacher.plan_id && (
+                              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                                يفعّل كل مميزات الباقة تلقائياً
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>لا توجد باقات</span>
+                        )}
                       </td>
 
                       {/* Bills Feature Toggle */}
