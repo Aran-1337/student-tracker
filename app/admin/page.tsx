@@ -264,6 +264,39 @@ export default function AdminPanel() {
     }
   };
 
+  const handleDeleteTeacher = async (teacher: Teacher) => {
+    // Protect the master admin account
+    if (teacher.email === "3bdeniovlr@gmail.com") {
+      showToast("لا يمكن حذف حساب المسؤول الرئيسي للنظام!", "error");
+      return;
+    }
+
+    const confirmed = confirm(
+      `تحذير: سيتم حذف حساب المعلم "${teacher.name}" وكل بياناته (طلابه، مجموعاته، فواتيره) نهائياً. هذا الإجراء لا يمكن التراجع عنه.\n\nهل أنت متأكد تماماً؟`
+    );
+    if (!confirmed) return;
+
+    setUpdatingId(teacher.id);
+    try {
+      // Deleting from teachers cascades to groups, students, bills via FK
+      const { error } = await supabase
+        .from("teachers")
+        .delete()
+        .eq("id", teacher.id);
+
+      if (error) throw error;
+
+      setTeachers(teachers.filter(t => t.id !== teacher.id));
+      setStudents(students.filter(s => s.teacher_id !== teacher.id));
+      setGroups(groups.filter(g => g.teacher_id !== teacher.id));
+      showToast(`✓ تم حذف حساب ${teacher.name} وكل بياناته بنجاح.`);
+    } catch (err: any) {
+      showToast(err.message || "فشل حذف المعلم.", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="loading-wrapper">
@@ -437,6 +470,7 @@ export default function AdminPanel() {
                   <th>ميزة الفواتير</th>
                   <th>حالة الاشتراك</th>
                   <th>تاريخ انتهاء الاشتراك</th>
+                  <th style={{ color: "#f87171" }}>حذف</th>
                 </tr>
               </thead>
               <tbody>
@@ -559,6 +593,23 @@ export default function AdminPanel() {
                             }}
                           />
                         </div>
+                      </td>
+
+                      {/* Delete Teacher */}
+                      <td>
+                        {teacher.email !== "3bdeniovlr@gmail.com" ? (
+                          <button
+                            className="btn btn-secondary btn-icon"
+                            onClick={() => handleDeleteTeacher(teacher)}
+                            disabled={isUpdating}
+                            title="حذف حساب المعلم وكل بياناته"
+                            style={{ border: "none", background: "none" }}
+                          >
+                            <Trash2 size={16} className="color-danger" />
+                          </button>
+                        ) : (
+                          <span style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>محمي</span>
+                        )}
                       </td>
                     </tr>
                   );
