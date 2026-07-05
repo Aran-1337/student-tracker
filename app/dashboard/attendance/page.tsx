@@ -83,10 +83,15 @@ export default function AttendancePage() {
       if (!session) return;
       setUserId(session.user.id);
 
-      const [{ data: grpData }, { data: stData }] = await Promise.all([
-        supabase.from("groups").select("id, name, day_of_week, time, sessions_per_month").order("created_at"),
-        supabase.from("students").select("id, name, group_id").order("name")
-      ]);
+      let { data: grpData, error: grpError } = await supabase.from("groups").select("id, name, day_of_week, time, sessions_per_month").order("created_at");
+      
+      if (grpError) {
+        // Fallback for older schemas missing sessions_per_month
+        const fallback = await supabase.from("groups").select("id, name, day_of_week, time").order("created_at");
+        grpData = fallback.data as any;
+      }
+
+      const { data: stData } = await supabase.from("students").select("id, name, group_id").order("name");
 
       setGroups((grpData || []).map(g => ({ ...g, sessions_per_month: g.sessions_per_month ?? 8 })));
       setStudents(stData || []);
