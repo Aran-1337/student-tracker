@@ -61,7 +61,7 @@ export default function AttendancePage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
-  const [customSessions, setCustomSessions] = useState<number | null>(null);
+  const [customSessions, setCustomSessions] = useState<number | string | null>(null);
 
   useEffect(() => {
     setCustomSessions(null);
@@ -117,7 +117,9 @@ export default function AttendancePage() {
 
   // ── Helpers ──────────────────────────────────────────────────────
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
-  const sessionsCount = customSessions ?? (selectedGroup?.sessions_per_month ?? 8);
+  const sessionsCount = customSessions !== null && customSessions !== "" 
+    ? Number(customSessions) 
+    : (selectedGroup?.sessions_per_month ?? 8);
 
   const filteredStudents = students.filter(s => {
     if (selectedGroupId === "all") return true;
@@ -315,15 +317,14 @@ export default function AttendancePage() {
                 min="1"
                 max="30"
                 className="form-input"
-                value={sessionsCount}
+                value={customSessions !== null ? customSessions : (selectedGroup?.sessions_per_month ?? 8)}
                 onChange={e => {
-                  const val = Number(e.target.value);
-                  if (val > 0 && val <= 30) {
-                    setCustomSessions(val);
-                    if (selectedGroupId !== "all") {
-                      supabase.from("groups").update({ sessions_per_month: val }).eq("id", selectedGroupId).then();
-                      setGroups(groups.map(g => g.id === selectedGroupId ? { ...g, sessions_per_month: val } : g));
-                    }
+                  const val = e.target.value;
+                  setCustomSessions(val);
+                  const num = Number(val);
+                  if (num > 0 && num <= 30 && selectedGroupId !== "all") {
+                    supabase.from("groups").update({ sessions_per_month: num }).eq("id", selectedGroupId).then();
+                    setGroups(groups.map(g => g.id === selectedGroupId ? { ...g, sessions_per_month: num } : g));
                   }
                 }}
                 style={{ padding: "0.6rem 0.5rem", width: "70px", textAlign: "center", fontWeight: "bold", color: "var(--color-teal)" }}
