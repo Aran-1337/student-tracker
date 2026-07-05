@@ -15,7 +15,8 @@ import {
   Shield,
   Lock,
   Menu,
-  X
+  X,
+  ClipboardCheck
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -133,6 +134,7 @@ export default function DashboardLayout({
     { name: "الرئيسية والمجموعات", path: "/dashboard", icon: LayoutDashboard },
     { name: "إدارة الطلاب", path: "/dashboard/students", icon: Users },
     ...(hasBills ? [{ name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt }] : []),
+    { name: "الحضور والغياب", path: "/dashboard/attendance", icon: ClipboardCheck },
     { name: "التقارير المالية", path: "/dashboard/reports", icon: TrendingUp },
     { name: "الإعدادات", path: "/dashboard/settings", icon: Settings },
     ...(isAdmin ? [{ name: "لوحة المدير العام", path: "/admin", icon: Shield }] : [])
