@@ -152,27 +152,43 @@ export default function BillsManagement() {
   const handleGenerateForMonth = async (targetMonth: number) => {
     if (!userId) return;
 
-    const recurringTemplates = bills.filter(b => b.is_recurring);
-    if (recurringTemplates.length === 0) {
+    // Step 1: Get UNIQUE recurring templates (deduplicated by title+category+amount)
+    // Use a Map keyed by "title|category|amount" to get one entry per unique bill type
+    const allRecurring = bills.filter(b => b.is_recurring);
+    if (allRecurring.length === 0) {
       showToast("لا توجد فواتير متكررة مسجلة بعد!", "error");
       return;
     }
 
-    // Check if bills already generated for this month (avoid duplicates)
-    const alreadyExists = bills.some(
-      b => b.is_recurring && b.billing_month === targetMonth
-    );
-
-    if (alreadyExists) {
-      if (!confirm(`يبدو أن الفواتير المتكررة موجودة بالفعل لشهر ${arabicMonths[targetMonth - 1]}. هل تريد إضافتها مجدداً؟`)) {
-        return;
+    const uniqueTemplatesMap = new Map<string, Bill>();
+    for (const b of allRecurring) {
+      const key = `${b.title}|${b.category}|${b.amount}`;
+      if (!uniqueTemplatesMap.has(key)) {
+        uniqueTemplatesMap.set(key, b);
       }
+    }
+    const uniqueTemplates = Array.from(uniqueTemplatesMap.values());
+
+    // Step 2: Filter out templates already generated for this EXACT month
+    const toInsert = uniqueTemplates.filter(template => {
+      return !bills.some(
+        b =>
+          b.is_recurring &&
+          b.billing_month === targetMonth &&
+          b.title === template.title &&
+          b.category === template.category &&
+          Number(b.amount) === Number(template.amount)
+      );
+    });
+
+    if (toInsert.length === 0) {
+      showToast(`الفواتير المتكررة موجودة بالفعل لشهر ${arabicMonths[targetMonth - 1]}! لا يوجد جديد للإضافة.`, "error");
+      return;
     }
 
     setActionLoading(true);
     try {
-      // Build insert rows from all recurring templates, changing their month to targetMonth
-      const insertRows = recurringTemplates.map(b => ({
+      const insertRows = toInsert.map(b => ({
         teacher_id: userId,
         title: b.title,
         amount: b.amount,
@@ -189,7 +205,7 @@ export default function BillsManagement() {
       if (error) throw error;
 
       setBills([...(data || []), ...bills]);
-      showToast(`✓ تم توليد ${insertRows.length} فاتورة متكررة لشهر ${arabicMonths[targetMonth - 1]} بنجاح!`);
+      showToast(`✓ تم توليد ${insertRows.length} فاتورة لشهر ${arabicMonths[targetMonth - 1]} بنجاح!`);
     } catch (err: any) {
       showToast(err.message || "فشل توليد الفواتير المتكررة.", "error");
     } finally {
