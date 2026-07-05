@@ -29,6 +29,7 @@ export default function DashboardLayout({
   const [loading, setLoading] = useState(true);
   const [teacherName, setTeacherName] = useState("");
   const [hasBills, setHasBills] = useState(true);
+  const [hasAttendance, setHasAttendance] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -46,7 +47,7 @@ export default function DashboardLayout({
       
       let { data: teacherData, error: teacherError } = await supabase
         .from("teachers")
-        .select("name, is_active, has_bills_feature, is_admin, subscription_expires_at")
+        .select("name, is_active, has_bills_feature, has_attendance_feature, is_admin, subscription_expires_at")
         .eq("id", user.id)
         .single();
         
@@ -55,7 +56,7 @@ export default function DashboardLayout({
         const { data: newProfile, error: insertError } = await supabase
           .from("teachers")
           .insert([{ id: user.id, name: defaultName, email: user.email }])
-          .select("name, is_active, has_bills_feature, is_admin, subscription_expires_at")
+          .select("name, is_active, has_bills_feature, has_attendance_feature, is_admin, subscription_expires_at")
           .single();
         
         if (!insertError && newProfile) {
@@ -77,9 +78,15 @@ export default function DashboardLayout({
         
         const billsEnabled = teacherData.has_bills_feature !== false;
         setHasBills(billsEnabled);
+        const attendanceEnabled = teacherData.has_attendance_feature !== false;
+        setHasAttendance(attendanceEnabled);
         setIsAdmin(teacherData.is_admin === true);
 
         if (pathname === "/dashboard/bills" && !billsEnabled) {
+          router.replace("/dashboard");
+          return;
+        }
+        if ((pathname === "/dashboard/attendance" || pathname === "/dashboard/attendance/scan") && !attendanceEnabled) {
           router.replace("/dashboard");
           return;
         }
@@ -134,7 +141,7 @@ export default function DashboardLayout({
     { name: "الرئيسية والمجموعات", path: "/dashboard", icon: LayoutDashboard },
     { name: "إدارة الطلاب", path: "/dashboard/students", icon: Users },
     ...(hasBills ? [{ name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt }] : []),
-    { name: "الحضور والغياب", path: "/dashboard/attendance", icon: ClipboardCheck },
+    ...(hasAttendance ? [{ name: "الحضور والغياب", path: "/dashboard/attendance", icon: ClipboardCheck }] : []),
     { name: "التقارير المالية", path: "/dashboard/reports", icon: TrendingUp },
     { name: "الإعدادات", path: "/dashboard/settings", icon: Settings },
     ...(isAdmin ? [{ name: "لوحة المدير العام", path: "/admin", icon: Shield }] : [])

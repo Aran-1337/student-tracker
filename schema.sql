@@ -11,6 +11,7 @@ create table if not exists public.teachers (
     is_admin boolean not null default false,
     is_active boolean not null default true,
     has_bills_feature boolean not null default true,
+    has_attendance_feature boolean not null default true,
     subscription_expires_at timestamp with time zone default (now() + interval '1 year') not null,
     monthly_price numeric not null default 100,
     book_1_price numeric not null default 50,

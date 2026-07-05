@@ -28,6 +28,7 @@ interface Teacher {
   is_admin: boolean;
   is_active: boolean;
   has_bills_feature: boolean;
+  has_attendance_feature: boolean;
   subscription_expires_at: string;
   created_at: string;
 }
@@ -238,6 +239,26 @@ export default function AdminPanel() {
       showToast("تم تحديث صلاحية ميزة الفواتير بنجاح.");
     } catch (err: any) {
       showToast("حدث خطأ أثناء تحديث ميزة الفواتير.", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleToggleAttendance = async (teacherId: string, currentStatus: boolean) => {
+    setUpdatingId(teacherId);
+    try {
+      const newStatus = !currentStatus;
+      const { error } = await supabase
+        .from("teachers")
+        .update({ has_attendance_feature: newStatus })
+        .eq("id", teacherId);
+
+      if (error) throw error;
+
+      setTeachers(teachers.map(t => t.id === teacherId ? { ...t, has_attendance_feature: newStatus } : t));
+      showToast("تم تحديث ميزة الحضور والغياب بنجاح.");
+    } catch (err: any) {
+      showToast("حدث خطأ أثناء تحديث ميزة الحضور.", "error");
     } finally {
       setUpdatingId(null);
     }
@@ -468,6 +489,7 @@ export default function AdminPanel() {
                   <th>تاريخ التسجيل</th>
                   <th>إحصائيات الطلاب</th>
                   <th>ميزة الفواتير</th>
+                  <th>ميزة الحضور</th>
                   <th>حالة الاشتراك</th>
                   <th>تاريخ انتهاء الاشتراك</th>
                   <th style={{ color: "#f87171" }}>حذف</th>
@@ -534,6 +556,29 @@ export default function AdminPanel() {
                           title={teacher.has_bills_feature ? "تعطيل ميزة الفواتير" : "تفعيل ميزة الفواتير"}
                         >
                           {teacher.has_bills_feature ? (
+                            <>
+                              <ToggleRight size={38} />
+                              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>مفعلة</span>
+                            </>
+                          ) : (
+                            <>
+                              <ToggleLeft size={38} />
+                              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>معطلة</span>
+                            </>
+                          )}
+                        </button>
+                      </td>
+
+                      {/* Attendance Feature Toggle */}
+                      <td>
+                        <button
+                          className="toggle-button"
+                          onClick={() => handleToggleAttendance(teacher.id, teacher.has_attendance_feature ?? true)}
+                          disabled={isUpdating}
+                          style={{ color: (teacher.has_attendance_feature ?? true) ? "var(--color-teal)" : "var(--text-muted)" }}
+                          title={(teacher.has_attendance_feature ?? true) ? "تعطيل ميزة الحضور" : "تفعيل ميزة الحضور"}
+                        >
+                          {(teacher.has_attendance_feature ?? true) ? (
                             <>
                               <ToggleRight size={38} />
                               <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>مفعلة</span>
