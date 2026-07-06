@@ -144,7 +144,20 @@ export default function PlansPage() {
             duration_months: 1,
             has_bills: true,
             has_attendance: true,
+            has_center_mode: false,
             color: "#8b5cf6",
+            is_active: true
+          },
+          {
+            id: "plan-3",
+            name: "باقة السنتر المتكاملة",
+            description: JSON.stringify({ summary: "النظام الشامل مع إمكانية إضافة وإدارة معلمين فرعيين تحت حسابك الخاص", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية والمصروفات", "الحضور والغياب + QR", "إدارة حسابات المعلمين الفرعيين"] }),
+            price: 500,
+            duration_months: 1,
+            has_bills: true,
+            has_attendance: true,
+            has_center_mode: true,
+            color: "#f59e0b",
             is_active: true
           }
         ];

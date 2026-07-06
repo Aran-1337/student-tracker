@@ -141,8 +141,9 @@ export default function AdminPanel() {
           parsedPlans = JSON.parse(savedPlans);
         } else {
           parsedPlans = [
-            { id: "plan-1", name: "باقة الحضور والغياب", description: JSON.stringify({ summary: "إدارة كاملة لحضور وغياب الطلاب مع دعم QR Code", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية", "الحضور والغياب + QR"] }), price: 150, duration_months: 1, has_bills: false, has_attendance: true, color: "#14b8a6", is_active: true },
-            { id: "plan-2", name: "الباقة الشاملة", description: JSON.stringify({ summary: "إدارة الحضور والغياب بالإضافة إلى إدارة المصروفات والفواتير", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية", "المصروفات والفواتير", "الحضور والغياب + QR"] }), price: 250, duration_months: 1, has_bills: true, has_attendance: true, color: "#8b5cf6", is_active: true }
+            { id: "plan-1", name: "باقة الحضور والغياب", description: JSON.stringify({ summary: "إدارة كاملة لحضور وغياب الطلاب مع دعم QR Code", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية", "الحضور والغياب + QR"] }), price: 150, duration_months: 1, has_bills: false, has_attendance: true, has_center_mode: false, color: "#14b8a6", is_active: true },
+            { id: "plan-2", name: "الباقة الشاملة", description: JSON.stringify({ summary: "إدارة الحضور والغياب بالإضافة إلى إدارة المصروفات والفواتير", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية", "المصروفات والفواتير", "الحضور والغياب + QR"] }), price: 250, duration_months: 1, has_bills: true, has_attendance: true, has_center_mode: false, color: "#8b5cf6", is_active: true },
+            { id: "plan-3", name: "باقة السنتر المتكاملة", description: JSON.stringify({ summary: "النظام الشامل مع إمكانية إضافة وإدارة معلمين فرعيين تحت حسابك الخاص", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية والمصروفات", "الحضور والغياب + QR", "إدارة حسابات المعلمين الفرعيين"] }), price: 500, duration_months: 1, has_bills: true, has_attendance: true, has_center_mode: true, color: "#f59e0b", is_active: true }
           ];
           localStorage.setItem("saas_plans", JSON.stringify(parsedPlans));
         }
