@@ -211,7 +211,8 @@ export default function PlansPage() {
         updatedPlans = plans.map(p => p.id === editingPlan.id ? { ...p, ...form, price: parsedPrice, description: payloadDesc } : p);
         showToast("✓ تم تحديث الباقة بنجاح");
       } else {
-        const newPlan = { id: `plan-${Date.now()}`, ...form, price: parsedPrice, description: payloadDesc, created_at: new Date().toISOString() };
+        const { customFeatures, ...restForm } = form;
+        const newPlan = { id: `plan-${Date.now()}`, ...restForm, price: parsedPrice, description: payloadDesc, created_at: new Date().toISOString() };
         
         const { error } = await supabase.from("plans").insert([newPlan]);
         if (error) throw error;

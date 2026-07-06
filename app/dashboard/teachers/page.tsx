@@ -24,7 +24,6 @@ export default function CenterTeachersPage() {
   };
 
   const fetchTeachers = async () => {
-    setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -40,7 +39,7 @@ export default function CenterTeachersPage() {
       }
 
       setTeachers(data || []);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error(err);
     } finally {
       setLoading(false);
@@ -48,6 +47,7 @@ export default function CenterTeachersPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
     fetchTeachers();
   }, []);
 
@@ -73,7 +73,7 @@ export default function CenterTeachersPage() {
       setShowAddForm(false);
       showToast("تم إضافة المعلم بنجاح!");
       fetchTeachers();
-    } catch (err: any) {
+    } catch {
       showToast("فشل إضافة المعلم.", "error");
     } finally {
       setActionLoading(false);
@@ -93,7 +93,7 @@ export default function CenterTeachersPage() {
       
       showToast("تم حذف المعلم.");
       fetchTeachers();
-    } catch (err: any) {
+    } catch {
       showToast("فشل الحذف.", "error");
     }
   };

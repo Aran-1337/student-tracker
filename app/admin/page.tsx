@@ -146,6 +146,7 @@ export default function AdminPanel() {
             has_bills_feature: t.has_bills_feature,
             has_attendance_feature: t.has_attendance_feature,
             is_center_mode: t.is_center_mode,
+            subscription_started_at: t.subscription_started_at,
             subscription_expires_at: t.subscription_expires_at
           };
         });
@@ -326,6 +327,7 @@ export default function AdminPanel() {
         has_bills_feature: plan.has_bills,
         has_attendance_feature: plan.has_attendance,
         is_center_mode: plan.has_center_mode || false,
+        subscription_started_at: new Date().toISOString(),
         subscription_expires_at: newExpiry.toISOString()
       };
       
@@ -354,6 +356,23 @@ export default function AdminPanel() {
 
       setTeachers(teachers.map(t => t.id === teacherId ? { ...t, subscription_expires_at: expirationDate } : t));
       showToast("تم تحديث تاريخ انتهاء الاشتراك بنجاح.");
+    } catch (err: any) {
+      showToast("حدث خطأ أثناء تحديث التاريخ.", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleUpdateStartDate = async (teacherId: string, newDateStr: string) => {
+    if (!newDateStr) return;
+    setUpdatingId(teacherId);
+    try {
+      const startDate = new Date(newDateStr).toISOString();
+      const { error } = await supabase.from("teachers").update({ subscription_started_at: startDate }).eq("id", teacherId);
+      if (error) throw error;
+
+      setTeachers(teachers.map(t => t.id === teacherId ? { ...t, subscription_started_at: startDate } : t));
+      showToast("تم تحديث تاريخ بداية الاشتراك بنجاح.");
     } catch (err: any) {
       showToast("حدث خطأ أثناء تحديث التاريخ.", "error");
     } finally {
@@ -575,6 +594,7 @@ export default function AdminPanel() {
                   <th>ميزة الحضور</th>
                   <th>ميزة السنتر</th>
                   <th>حالة الاشتراك</th>
+                  <th>تاريخ بداية الاشتراك</th>
                   <th>تاريخ انتهاء الاشتراك</th>
                   <th style={{ color: "#f87171" }}>حذف</th>
                 </tr>
@@ -589,6 +609,10 @@ export default function AdminPanel() {
                     month: "long",
                     day: "numeric"
                   });
+
+                  const formattedStart = teacher.subscription_started_at 
+                    ? new Date(teacher.subscription_started_at).toISOString().split("T")[0]
+                    : "";
 
                   const formattedExpiry = teacher.subscription_expires_at 
                     ? new Date(teacher.subscription_expires_at).toISOString().split("T")[0]
@@ -718,6 +742,29 @@ export default function AdminPanel() {
                         </button>
                       </td>
 
+                      {/* Center Mode Toggle */}
+                      <td>
+                        <button
+                          className="toggle-button"
+                          onClick={() => handleToggleCenterMode(teacher.id, teacher.is_center_mode ?? false)}
+                          disabled={isUpdating}
+                          style={{ color: (teacher.is_center_mode ?? false) ? "var(--color-info)" : "var(--text-muted)" }}
+                          title={(teacher.is_center_mode ?? false) ? "تعطيل نظام السنتر" : "تفعيل نظام السنتر"}
+                        >
+                          {(teacher.is_center_mode ?? false) ? (
+                            <>
+                              <ToggleRight size={38} />
+                              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>نشط</span>
+                            </>
+                          ) : (
+                            <>
+                              <ToggleLeft size={38} />
+                              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>معطل</span>
+                            </>
+                          )}
+                        </button>
+                      </td>
+
                       {/* Subscription Status Toggle */}
                       <td>
                         <button
@@ -741,6 +788,29 @@ export default function AdminPanel() {
                             </>
                           )}
                         </button>
+                      </td>
+
+                      {/* Start Date Editor */}
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <Calendar size={14} style={{ color: "var(--text-muted)" }} />
+                          <input
+                            type="date"
+                            className="search-input"
+                            value={formattedStart}
+                            disabled={isUpdating}
+                            onChange={(e) => handleUpdateStartDate(teacher.id, e.target.value)}
+                            style={{
+                              padding: "4px 8px",
+                              fontSize: "0.85rem",
+                              border: "1px solid var(--border-color)",
+                              background: "rgba(0,0,0,0.2)",
+                              color: "#ffffff",
+                              borderRadius: "4px",
+                              width: "135px"
+                            }}
+                          />
+                        </div>
                       </td>
 
                       {/* Expiration Date Editor */}

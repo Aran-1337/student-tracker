@@ -46,7 +46,7 @@ export default function LoginPage() {
       } else {
         router.replace("/dashboard");
       }
-    } catch (err: any) {
+    } catch {
       setErrorMsg("حدث خطأ أثناء الاتصال بالخادم.");
     } finally {
       setLoading(false);

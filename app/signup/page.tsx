@@ -59,7 +59,7 @@ export default function SignupPage() {
           setPassword("");
         }
       }
-    } catch (err: any) {
+    } catch {
       setErrorMsg("حدث خطأ أثناء الاتصال بالخادم.");
     } finally {
       setLoading(false);
