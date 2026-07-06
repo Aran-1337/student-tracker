@@ -32,6 +32,7 @@ interface Teacher {
   has_attendance_feature: boolean;
   is_center_mode?: boolean;
   plan_id: string | null;
+  subscription_started_at?: string;
   subscription_expires_at: string;
   created_at: string;
 }
