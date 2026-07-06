@@ -78,22 +78,13 @@ export default function ReportsPage() {
         }
 
         // 2. Center Mode Check
-        const localFeatures = JSON.parse(localStorage.getItem("teacher_features") || "{}");
-        const myOverrides = localFeatures[session.user.id] || {};
-        let centerMode = myOverrides.is_center_mode;
-        if (centerMode === undefined) {
-          const { data: tData } = await supabase.from("teachers").select("is_center_mode").eq("id", session.user.id).single();
-          if (tData && tData.is_center_mode !== undefined) centerMode = tData.is_center_mode;
-        }
-        setHasCenterMode(centerMode || false);
+        const { data: tData } = await supabase.from("teachers").select("is_center_mode").eq("id", session.user.id).single();
+        const centerMode = tData?.is_center_mode || false;
+        setHasCenterMode(centerMode);
 
         if (centerMode) {
           const { data: subs } = await supabase.from("sub_teachers").select("*").eq("center_id", session.user.id);
-          if (subs) {
-            setSubTeachers(subs);
-          } else {
-            setSubTeachers(JSON.parse(localStorage.getItem("sub_teachers_local") || "[]"));
-          }
+          setSubTeachers(subs || []);
           
           const { data: grps } = await supabase.from("groups").select("id, sub_teacher_id").eq("teacher_id", session.user.id);
           if (grps) {

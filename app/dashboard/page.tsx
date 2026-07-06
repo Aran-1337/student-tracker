@@ -88,24 +88,13 @@ export default function DashboardOverview() {
         if (!session) return;
         setUserId(session.user.id);
 
-        const localFeatures = JSON.parse(localStorage.getItem("teacher_features") || "{}");
-        const myOverrides = localFeatures[session.user.id] || {};
-        
-        let centerMode = myOverrides.is_center_mode;
-        if (centerMode === undefined) {
-          const { data: teacher } = await supabase.from("teachers").select("is_center_mode").eq("id", session.user.id).single();
-          if (teacher && teacher.is_center_mode !== undefined) centerMode = teacher.is_center_mode;
-        }
-        setHasCenterMode(centerMode || false);
+        const { data: teacher } = await supabase.from("teachers").select("is_center_mode").eq("id", session.user.id).single();
+        const centerMode = teacher?.is_center_mode || false;
+        setHasCenterMode(centerMode);
 
         if (centerMode) {
           const { data: subs } = await supabase.from("sub_teachers").select("*").eq("center_id", session.user.id);
-          if (subs) {
-            setSubTeachers(subs);
-          } else {
-             const local = JSON.parse(localStorage.getItem("sub_teachers_local") || "[]");
-             setSubTeachers(local);
-          }
+          setSubTeachers(subs || []);
         }
 
         // Fetch groups
@@ -185,34 +174,11 @@ export default function DashboardOverview() {
         .select();
 
       if (error) {
-         // Maybe missing column? Insert without it
-         const { data: fallbackData, error: fallbackError } = await supabase
-          .from("groups")
-          .insert([
-            {
-              teacher_id: userId,
-              name: groupName,
-              day_of_week: groupDay,
-              time: groupTime,
-              is_private: isPrivate
-            }
-          ])
-          .select();
-         
-         if (fallbackError) throw fallbackError;
-         
-         // Try to save to local storage for demo if column missing
-         if (fallbackData && hasCenterMode && groupSubTeacherId) {
-             const mapping = JSON.parse(localStorage.getItem("group_subteachers") || "{}");
-             mapping[fallbackData[0].id] = groupSubTeacherId;
-             localStorage.setItem("group_subteachers", JSON.stringify(mapping));
-             fallbackData[0].sub_teacher_id = groupSubTeacherId;
-         }
-         
-         setGroups([fallbackData[0], ...groups]);
-      } else {
-        setGroups([data[0], ...groups]);
+        showToast("حدث خطأ، تأكد من تحديث قاعدة البيانات", "error");
+        return;
       }
+
+      setGroups([data[0], ...groups]);
 
       setGroupName("");
       setGroupTime("");

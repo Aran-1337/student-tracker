@@ -36,17 +36,12 @@ export default function CenterTeachersPage() {
         .order("created_at", { ascending: true });
 
       if (error) {
-        // Fallback to local storage if DB is missing table
-        const local = JSON.parse(localStorage.getItem("sub_teachers_local") || "[]");
-        setTeachers(local);
         throw error;
       }
 
       setTeachers(data || []);
     } catch (err: any) {
       console.error(err);
-      const local = JSON.parse(localStorage.getItem("sub_teachers_local") || "[]");
-      setTeachers(local);
     } finally {
       setLoading(false);
     }
@@ -72,12 +67,7 @@ export default function CenterTeachersPage() {
         .from("sub_teachers")
         .insert([newTeacherObj]);
 
-      if (error) {
-        // Use local storage fallback
-        const local = JSON.parse(localStorage.getItem("sub_teachers_local") || "[]");
-        local.push(newTeacherObj);
-        localStorage.setItem("sub_teachers_local", JSON.stringify(local));
-      }
+      if (error) throw error;
 
       setNewTeacherName("");
       setShowAddForm(false);
@@ -99,11 +89,7 @@ export default function CenterTeachersPage() {
         .delete()
         .eq("id", id);
 
-      if (error) {
-        const local = JSON.parse(localStorage.getItem("sub_teachers_local") || "[]");
-        const filtered = local.filter((t: any) => t.id !== id);
-        localStorage.setItem("sub_teachers_local", JSON.stringify(filtered));
-      }
+      if (error) throw error;
       
       showToast("تم حذف المعلم.");
       fetchTeachers();

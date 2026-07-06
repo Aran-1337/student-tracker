@@ -134,33 +134,19 @@ export default function AdminPanel() {
           .select("*")
           .order("created_at", { ascending: false });
 
-        // Load plans from localStorage
-        const savedPlans = localStorage.getItem("saas_plans");
-        let parsedPlans = [];
-        if (savedPlans) {
-          parsedPlans = JSON.parse(savedPlans);
-        } else {
-          parsedPlans = [
-            { id: "plan-1", name: "باقة الحضور والغياب", description: JSON.stringify({ summary: "إدارة كاملة لحضور وغياب الطلاب مع دعم QR Code", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية", "الحضور والغياب + QR"] }), price: 150, duration_months: 1, has_bills: false, has_attendance: true, has_center_mode: false, color: "#14b8a6", is_active: true },
-            { id: "plan-2", name: "الباقة الشاملة", description: JSON.stringify({ summary: "إدارة الحضور والغياب بالإضافة إلى إدارة المصروفات والفواتير", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية", "المصروفات والفواتير", "الحضور والغياب + QR"] }), price: 250, duration_months: 1, has_bills: true, has_attendance: true, has_center_mode: false, color: "#8b5cf6", is_active: true },
-            { id: "plan-3", name: "باقة السنتر المتكاملة", description: JSON.stringify({ summary: "النظام الشامل مع إمكانية إضافة وإدارة معلمين فرعيين تحت حسابك الخاص", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية والمصروفات", "الحضور والغياب + QR", "إدارة حسابات المعلمين الفرعيين"] }), price: 500, duration_months: 1, has_bills: true, has_attendance: true, has_center_mode: true, color: "#f59e0b", is_active: true }
-          ];
-          localStorage.setItem("saas_plans", JSON.stringify(parsedPlans));
-        }
-
-        // Load plan mappings and features
-        const localMapping = JSON.parse(localStorage.getItem("teacher_plans_mapping") || "{}");
-        const localFeatures = JSON.parse(localStorage.getItem("teacher_features") || "{}");
+        // Load plans from Supabase
+        const { data: plansData } = await supabase.from("plans").select("*");
+        setPlans(plansData || []);
         
+        // No local mapping needed, just use teachersData directly
         const mappedTeachers = (teachersData || []).map(t => {
-          const teacherOverrides = localFeatures[t.id] || {};
           return {
             ...t,
-            plan_id: localMapping[t.id] || null,
-            has_bills_feature: teacherOverrides.has_bills_feature !== undefined ? teacherOverrides.has_bills_feature : t.has_bills_feature,
-            has_attendance_feature: teacherOverrides.has_attendance_feature !== undefined ? teacherOverrides.has_attendance_feature : t.has_attendance_feature,
-            is_center_mode: teacherOverrides.is_center_mode !== undefined ? teacherOverrides.is_center_mode : t.is_center_mode,
-            subscription_expires_at: teacherOverrides.subscription_expires_at !== undefined ? teacherOverrides.subscription_expires_at : t.subscription_expires_at
+            plan_id: t.plan_id || null,
+            has_bills_feature: t.has_bills_feature,
+            has_attendance_feature: t.has_attendance_feature,
+            is_center_mode: t.is_center_mode,
+            subscription_expires_at: t.subscription_expires_at
           };
         });
 
@@ -168,7 +154,6 @@ export default function AdminPanel() {
         setStudents(studentsData || []);
         setGroups(groupsData || []);
         setAdminEmails(adminsData || []);
-        setPlans(parsedPlans.filter((p: any) => p.is_active));
 
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل البيانات الإدارية.", "error");
@@ -251,12 +236,6 @@ export default function AdminPanel() {
     }
   };
 
-  const updateTeacherLocal = (teacherId: string, updates: any) => {
-    const localFeatures = JSON.parse(localStorage.getItem("teacher_features") || "{}");
-    localFeatures[teacherId] = { ...(localFeatures[teacherId] || {}), ...updates };
-    localStorage.setItem("teacher_features", JSON.stringify(localFeatures));
-  };
-
   const handleToggleActive = async (teacherId: string, currentStatus: boolean) => {
     setUpdatingId(teacherId);
     try {
@@ -281,8 +260,8 @@ export default function AdminPanel() {
     setUpdatingId(teacherId);
     try {
       const newStatus = !currentStatus;
-      // Use local storage to bypass missing column in DB
-      updateTeacherLocal(teacherId, { has_bills_feature: newStatus });
+      const { error } = await supabase.from("teachers").update({ has_bills_feature: newStatus }).eq("id", teacherId);
+      if (error) throw error;
       
       setTeachers(teachers.map(t => t.id === teacherId ? { ...t, has_bills_feature: newStatus } : t));
       showToast("تم تحديث صلاحية ميزة الفواتير بنجاح.");
@@ -297,8 +276,8 @@ export default function AdminPanel() {
     setUpdatingId(teacherId);
     try {
       const newStatus = !currentStatus;
-      // Use local storage to bypass missing column in DB
-      updateTeacherLocal(teacherId, { has_attendance_feature: newStatus });
+      const { error } = await supabase.from("teachers").update({ has_attendance_feature: newStatus }).eq("id", teacherId);
+      if (error) throw error;
 
       setTeachers(teachers.map(t => t.id === teacherId ? { ...t, has_attendance_feature: newStatus } : t));
       showToast("تم تحديث ميزة الحضور والغياب بنجاح.");
@@ -313,8 +292,8 @@ export default function AdminPanel() {
     setUpdatingId(teacherId);
     try {
       const newStatus = !currentStatus;
-      // Use local storage to bypass missing column in DB
-      updateTeacherLocal(teacherId, { is_center_mode: newStatus });
+      const { error } = await supabase.from("teachers").update({ is_center_mode: newStatus }).eq("id", teacherId);
+      if (error) throw error;
 
       setTeachers(teachers.map(t => t.id === teacherId ? { ...t, is_center_mode: newStatus } : t));
       showToast("تم تحديث نظام السنتر بنجاح.");
@@ -328,11 +307,9 @@ export default function AdminPanel() {
   const handleAssignPlan = async (teacher: Teacher, planId: string) => {
     setUpdatingId(teacher.id);
     try {
-      const localMapping = JSON.parse(localStorage.getItem("teacher_plans_mapping") || "{}");
-
       if (planId === "") {
-        delete localMapping[teacher.id];
-        localStorage.setItem("teacher_plans_mapping", JSON.stringify(localMapping));
+        const { error } = await supabase.from("teachers").update({ plan_id: null }).eq("id", teacher.id);
+        if (error) throw error;
 
         setTeachers(teachers.map(t => t.id === teacher.id ? { ...t, plan_id: null } : t));
         showToast("تم إلغاء تعيين الباقة.");
@@ -343,32 +320,21 @@ export default function AdminPanel() {
       const newExpiry = new Date();
       newExpiry.setMonth(newExpiry.getMonth() + plan.duration_months);
       
-      // Update DB ONLY for is_active which exists in schema
-      const { error } = await supabase
-        .from("teachers")
-        .update({ is_active: true })
-        .eq("id", teacher.id);
-      if (error) throw error;
-
-      localMapping[teacher.id] = plan.id;
-      localStorage.setItem("teacher_plans_mapping", JSON.stringify(localMapping));
-
-      // Update features in local storage
-      updateTeacherLocal(teacher.id, {
-        has_bills_feature: plan.has_bills,
-        has_attendance_feature: plan.has_attendance,
-        is_center_mode: plan.has_center_mode || false,
-        subscription_expires_at: newExpiry.toISOString()
-      });
-
-      setTeachers(teachers.map(t => t.id === teacher.id ? {
-        ...t,
+      const updates = { 
+        is_active: true,
         plan_id: plan.id,
         has_bills_feature: plan.has_bills,
         has_attendance_feature: plan.has_attendance,
         is_center_mode: plan.has_center_mode || false,
-        is_active: true,
         subscription_expires_at: newExpiry.toISOString()
+      };
+      
+      const { error } = await supabase.from("teachers").update(updates).eq("id", teacher.id);
+      if (error) throw error;
+
+      setTeachers(teachers.map(t => t.id === teacher.id ? { 
+        ...t, 
+        ...updates
       } : t));
       showToast(`✓ تم تعيين باقة "${plan.name}" لـ ${teacher.name} وتفعيل كل مميزاتها تلقائياً.`);
     } catch (err: any) {
@@ -383,8 +349,8 @@ export default function AdminPanel() {
     setUpdatingId(teacherId);
     try {
       const expirationDate = new Date(newDateStr).toISOString();
-      // Bypass missing column
-      updateTeacherLocal(teacherId, { subscription_expires_at: expirationDate });
+      const { error } = await supabase.from("teachers").update({ subscription_expires_at: expirationDate }).eq("id", teacherId);
+      if (error) throw error;
 
       setTeachers(teachers.map(t => t.id === teacherId ? { ...t, subscription_expires_at: expirationDate } : t));
       showToast("تم تحديث تاريخ انتهاء الاشتراك بنجاح.");

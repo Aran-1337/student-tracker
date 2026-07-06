@@ -46,13 +46,9 @@ export default function DashboardLayout({
       
       const user = session.user;
       
-      // Load teacher_features overrides from localStorage since columns are missing
-      const localFeatures = JSON.parse(localStorage.getItem("teacher_features") || "{}");
-      const myOverrides = localFeatures[user.id] || {};
-
       let { data: teacherData, error: teacherError } = await supabase
         .from("teachers")
-        .select("name, is_active, has_bills_feature, has_attendance_feature, is_admin, subscription_expires_at")
+        .select("name, is_active, has_bills_feature, has_attendance_feature, is_center_mode, is_admin, subscription_expires_at")
         .eq("id", user.id)
         .single();
 
@@ -67,6 +63,7 @@ export default function DashboardLayout({
             ...fallback, 
             has_bills_feature: true, 
             has_attendance_feature: true, 
+            is_center_mode: false,
             subscription_expires_at: "" 
           };
           teacherError = null;
@@ -86,6 +83,7 @@ export default function DashboardLayout({
             ...newProfile, 
             has_bills_feature: true, 
             has_attendance_feature: true, 
+            is_center_mode: false,
             subscription_expires_at: "" 
           };
         }
@@ -94,17 +92,16 @@ export default function DashboardLayout({
       if (teacherData) {
         setTeacherName(teacherData.name || user.email?.split("@")[0] || "المعلم");
         
-        // Use overrides if available
-        const isCenterModeEnabled = myOverrides.is_center_mode !== undefined ? myOverrides.is_center_mode : false;
-        setHasCenterMode(isCenterModeEnabled);
-
-        const billsEnabled = myOverrides.has_bills_feature !== undefined ? myOverrides.has_bills_feature : (teacherData.has_bills_feature !== false);
+        const centerMode = teacherData.is_center_mode === true;
+        setHasCenterMode(centerMode);
+        
+        const billsEnabled = teacherData.has_bills_feature !== false;
         setHasBills(billsEnabled);
-
-        const attendanceEnabled = myOverrides.has_attendance_feature !== undefined ? myOverrides.has_attendance_feature : (teacherData.has_attendance_feature !== false);
+        
+        const attendanceEnabled = teacherData.has_attendance_feature !== false;
         setHasAttendance(attendanceEnabled);
 
-        const expiredAtStr = myOverrides.subscription_expires_at !== undefined ? myOverrides.subscription_expires_at : teacherData.subscription_expires_at;
+        const expiredAtStr = teacherData.subscription_expires_at;
 
         const active = teacherData.is_active !== false;
         const expired = expiredAtStr 
@@ -125,7 +122,7 @@ export default function DashboardLayout({
           router.replace("/dashboard");
           return;
         }
-        if (pathname === "/dashboard/teachers" && !isCenterModeEnabled) {
+        if (pathname === "/dashboard/teachers" && !centerMode) {
           router.replace("/dashboard");
           return;
         }
