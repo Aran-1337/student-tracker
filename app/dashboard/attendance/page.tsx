@@ -38,8 +38,7 @@ interface AttendanceRecord {
   session_date: string;
   month: number;
   year: number;
-  status: string;
-  scanned_by_qr: boolean;
+  status: "present" | "absent";
 }
 
 const arabicMonths = [
@@ -157,7 +156,7 @@ export default function AttendancePage() {
     } else {
       // Insert (mark present)
       const sessionMonth = parseInt(dateStr.split("-")[1], 10);
-      const sessionYear = parseInt(dateStr.split("-")[0], 10);
+      const currentYear = parseInt(dateStr.split("-")[0], 10);
       const { data, error } = await supabase
         .from("attendance_records")
         .insert([{
@@ -166,9 +165,8 @@ export default function AttendancePage() {
           group_id: student.group_id,
           session_date: dateStr,
           month: sessionMonth,
-          year: sessionYear,
-          status: "present",
-          scanned_by_qr: false
+          year: currentYear,
+          status: "present"
         }])
         .select()
         .single();
@@ -193,8 +191,7 @@ export default function AttendancePage() {
           session_date: dateStr,
           month: sessionMonth,
           year: sessionYear,
-          status: "present",
-          scanned_by_qr: false
+          status: "present"
         }));
 
       if (toInsert.length === 0) {

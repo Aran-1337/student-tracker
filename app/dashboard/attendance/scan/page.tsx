@@ -123,8 +123,7 @@ export default function QRScanPage() {
         session_date: todayDateStr,
         month: selectedMonth,
         year: selectedYear,
-        status: "present",
-        scanned_by_qr: true
+        status: "present"
       }], { onConflict: "student_id,session_date" });
 
     if (error) {
