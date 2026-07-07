@@ -510,11 +510,6 @@ export default function DashboardOverview() {
           </div>
 
           {/* Divider for Grades Section */}
-          {grades.length > 0 && (
-            <div style={{ marginTop: "1rem", marginBottom: "0.5rem" }}>
-                  <h2 style={{ fontSize: "1.5rem", color: "var(--text-primary)" }}>تقسيم السنين الدراسية</h2>
-                </div>
-              )}
 
               {grades.map(grade => {
                 const gradeGroups = groups.filter(g => g.grade_id === grade.id);
