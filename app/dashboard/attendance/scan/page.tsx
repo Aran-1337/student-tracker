@@ -148,7 +148,10 @@ export default function QRScanPage() {
     // Check if student belongs to the selected group
     if (student.group_id !== selectedGroupId) {
       const studentGroup = groups.find(g => g.id === student.group_id);
-      const groupName = studentGroup ? studentGroup.name : "مجموعة أخرى";
+      let groupName = "مجموعة أخرى";
+      if (studentGroup) {
+        groupName = `${studentGroup.name} (${studentGroup.day_of_week} - ${formatTimeTo12H(studentGroup.time)})`;
+      }
       setCrossGroupConfirm({ student, originalGroupName: groupName });
       return; // Wait for confirm before adding to scannedIdsRef
     }
