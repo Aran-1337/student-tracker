@@ -326,31 +326,31 @@ export default function AttendancePage() {
               {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
-        </div>
         
-        {/* Add Session Date (only if group selected) */}
-        {selectedGroupId !== "all" && (
-          <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" htmlFor="newSessionDate">إضافة حصة بتاريخ:</label>
-              <input
-                id="newSessionDate"
-                type="date"
-                className="form-input"
-                value={newSessionDate}
-                onChange={e => setNewSessionDate(e.target.value)}
-                style={{ padding: "0.6rem 0.75rem" }}
-              />
+          {/* Add Session Date (only if group selected) */}
+          {selectedGroupId !== "all" && (
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" htmlFor="newSessionDate">إضافة حصة بتاريخ:</label>
+                <input
+                  id="newSessionDate"
+                  type="date"
+                  className="form-input"
+                  value={newSessionDate}
+                  onChange={e => setNewSessionDate(e.target.value)}
+                  style={{ padding: "0.6rem 0.75rem" }}
+                />
+              </div>
+              <button
+                onClick={handleAddSessionDate}
+                className="btn btn-primary"
+                style={{ padding: "0.6rem 1rem", height: "42px" }}
+              >
+                + إضافة
+              </button>
             </div>
-            <button
-              onClick={handleAddSessionDate}
-              className="btn btn-primary"
-              style={{ padding: "0.6rem 1rem", height: "42px" }}
-            >
-              + إضافة
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Attendance Table */}
