@@ -64,6 +64,7 @@ export default function QRScanPage() {
   const [isStarting, setIsStarting] = useState(false);
   const [scannedToday, setScannedToday] = useState<ScannedEntry[]>([]);
   const [lastScan, setLastScan] = useState<{ name: string; success: boolean } | null>(null);
+  const [crossGroupConfirm, setCrossGroupConfirm] = useState<{ student: any; originalGroupName: string } | null>(null);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannedIdsRef = useRef<Set<string>>(new Set());
@@ -99,6 +100,35 @@ export default function QRScanPage() {
 
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
 
+  const processAttendance = async (student: any, overrideGroupId?: string) => {
+    const { error } = await supabase
+      .from("attendance_records")
+      .upsert([{
+        teacher_id: userId,
+        student_id: student.id,
+        group_id: overrideGroupId || student.group_id,
+        session_date: todayDateStr,
+        month: selectedMonth,
+        year: selectedYear,
+        status: "present"
+      }], { onConflict: "student_id,session_date" });
+
+    if (error) {
+      setLastScan({ name: `خطأ: ${error.message}`, success: false });
+      return;
+    }
+
+    const entry: ScannedEntry = {
+      studentId: student.id,
+      studentName: student.name,
+      time: new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
+    };
+    setScannedToday(prev => [entry, ...prev]);
+    setLastScan({ name: student.name, success: true });
+
+    setTimeout(() => setLastScan(null), 2500);
+  };
+
   const handleQRSuccess = async (decodedText: string) => {
     if (!userId) return;
 
@@ -119,14 +149,8 @@ export default function QRScanPage() {
     if (student.group_id !== selectedGroupId) {
       const studentGroup = groups.find(g => g.id === student.group_id);
       const groupName = studentGroup ? studentGroup.name : "مجموعة أخرى";
-      setLastScan({ name: `تحذير: ${student.name} ينتمي لـ (${groupName})!`, success: false });
-      
-      // Remove from scannedIdsRef so they can be scanned again if the teacher switches to the correct group
-      scannedIdsRef.current.delete(decodedText);
-      
-      // Clear last scan feedback after 3.5s
-      setTimeout(() => setLastScan(null), 3500);
-      return;
+      setCrossGroupConfirm({ student, originalGroupName: groupName });
+      return; // Wait for confirm before adding to scannedIdsRef
     }
 
     // Mark as scanned immediately to prevent concurrent duplicate API calls
@@ -138,34 +162,7 @@ export default function QRScanPage() {
       return;
     }
 
-    // Insert attendance record
-    const { error } = await supabase
-      .from("attendance_records")
-      .upsert([{
-        teacher_id: userId,
-        student_id: student.id,
-        group_id: student.group_id,
-        session_date: todayDateStr,
-        month: selectedMonth,
-        year: selectedYear,
-        status: "present"
-      }], { onConflict: "student_id,session_date" });
-
-    if (error) {
-      setLastScan({ name: `خطأ: ${error.message}`, success: false });
-      return;
-    }
-
-    const entry: ScannedEntry = {
-      studentId: student.id,
-      studentName: student.name,
-      time: new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
-    };
-    setScannedToday(prev => [entry, ...prev]);
-    setLastScan({ name: student.name, success: true });
-
-    // Clear last scan feedback after 2.5s
-    setTimeout(() => setLastScan(null), 2500);
+    await processAttendance(student);
   };
 
   const startScanner = async () => {
@@ -381,16 +378,51 @@ export default function QRScanPage() {
           )}
 
           {/* QR Reader container */}
-          <div
-            id={scannerDivId}
-            style={{
-              width: "100%",
-              maxWidth: "480px",
-              borderRadius: "16px",
-              overflow: "hidden",
-              minHeight: scanning ? "300px" : "0"
-            }}
-          />
+          <div style={{ position: "relative", width: "100%", maxWidth: "480px" }}>
+            <div
+              id={scannerDivId}
+              style={{
+                width: "100%",
+                borderRadius: "16px",
+                overflow: "hidden",
+                minHeight: scanning ? "300px" : "0"
+              }}
+            />
+            {crossGroupConfirm && (
+              <div style={{
+                position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+                background: "rgba(0,0,0,0.85)", zIndex: 50,
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                padding: "2rem", textAlign: "center", borderRadius: "16px",
+                backdropFilter: "blur(4px)"
+              }}>
+                <AlertCircle size={48} style={{ color: "#f59e0b", marginBottom: "1rem" }} />
+                <h3 style={{ color: "white", marginBottom: "0.5rem" }}>تأكيد حضور طالب استضافة</h3>
+                <p style={{ color: "#d1d5db", marginBottom: "1.5rem", fontSize: "0.95rem", lineHeight: 1.5 }}>
+                  الطالب <strong style={{ color: "white" }}>{crossGroupConfirm.student.name}</strong> 
+                  <br/>ينتمي لـ <strong style={{ color: "#f59e0b" }}>{crossGroupConfirm.originalGroupName}</strong>
+                  <br/>هل ترغب في تسجيل حضوره في هذه الحصة؟
+                </p>
+                <div style={{ display: "flex", gap: "1rem", width: "100%" }}>
+                  <button className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }}
+                    onClick={async () => {
+                      const st = crossGroupConfirm.student;
+                      scannedIdsRef.current.add(st.id);
+                      setCrossGroupConfirm(null);
+                      await processAttendance(st, selectedGroupId);
+                    }}
+                  >
+                    تأكيد الحضور
+                  </button>
+                  <button className="btn" style={{ flex: 1, justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "none" }}
+                    onClick={() => setCrossGroupConfirm(null)}
+                  >
+                    إلغاء
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </section>
       </div>
     </div>
