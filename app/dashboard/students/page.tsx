@@ -132,6 +132,10 @@ export default function StudentsManagement() {
       showToast("يرجى إدخال اسم الطالب.", "error");
       return;
     }
+    if (!studentGradeId) {
+      showToast("يرجى اختيار السنة الدراسية.", "error");
+      return;
+    }
 
     setActionLoading(true);
     try {
@@ -340,9 +344,10 @@ export default function StudentsManagement() {
                 />
               </div>
               <div className="form-group">
-                <label className="form-label" htmlFor="sGrade">السنة الدراسية (اختياري)</label>
+                <label className="form-label" htmlFor="sGrade">السنة الدراسية</label>
                 <select
                   id="sGrade"
+                  required
                   className="form-input"
                   value={studentGradeId}
                   onChange={(e) => {
@@ -351,7 +356,7 @@ export default function StudentsManagement() {
                   }}
                   style={{ padding: "0.7rem 0.5rem" }}
                 >
-                  <option value="">-- بدون سنة دراسية --</option>
+                  <option value="">-- اختر السنة الدراسية --</option>
                   {grades.map(grade => (
                     <option key={grade.id} value={grade.id}>{grade.name}</option>
                   ))}
