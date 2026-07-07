@@ -61,6 +61,7 @@ export default function QRScanPage() {
 
   // Scanner state
   const [scanning, setScanning] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [scannedToday, setScannedToday] = useState<ScannedEntry[]>([]);
   const [lastScan, setLastScan] = useState<{ name: string; success: boolean } | null>(null);
 
@@ -147,10 +148,19 @@ export default function QRScanPage() {
     if (!selectedGroupId) return;
     try {
       const config = { fps: 6, qrbox: { width: 220, height: 220 } };
-      let cameraConfig: any = { facingMode: "environment" };
+      const qr = new Html5Qrcode(scannerDivId);
+      scannerRef.current = qr;
 
-      // Try to get specific cameras first
       try {
+        await qr.start({ facingMode: "environment" }, config, handleQRSuccess, () => {});
+        setScanning(true);
+      } catch (envError: any) {
+        console.warn("environment mode failed:", envError);
+        
+        // If the error is NotReadableError, the camera is in use. Don't fallback, just throw.
+        if (envError?.name === "NotReadableError") throw envError;
+
+        // Try fallback to specific camera
         const cameras = await Html5Qrcode.getCameras();
         if (cameras && cameras.length > 0) {
           const backCamera = cameras.find(c => 
@@ -158,19 +168,17 @@ export default function QRScanPage() {
             c.label.toLowerCase().includes("rear") || 
             c.label.toLowerCase().includes("environment")
           );
-          cameraConfig = backCamera ? backCamera.id : cameras[cameras.length - 1].id;
+          const cameraId = backCamera ? backCamera.id : cameras[cameras.length - 1].id;
+          
+          await qr.start(cameraId, config, handleQRSuccess, () => {});
+          setScanning(true);
+        } else {
+          throw envError;
         }
-      } catch (camErr) {
-        console.warn("Failed to get cameras array, using fallback config:", camErr);
       }
-
-      const qr = new Html5Qrcode(scannerDivId);
-      scannerRef.current = qr;
-      
-      await qr.start(cameraConfig, config, handleQRSuccess, () => {});
-      setScanning(true);
     } catch (err: any) {
-      alert(`تعذّر تشغيل الكاميرا: ${err?.message || err}\nتأكد من إعطاء صلاحيات الكاميرا وإيقاف أي تطبيق يستخدمها حالياً.`);
+      const errName = err?.name ? `[${err.name}] ` : "";
+      alert(`تعذّر تشغيل الكاميرا: ${errName}${err?.message || err}\n\nتأكد من إعطاء صلاحيات الكاميرا للمتصفح، وتأكد أن الكاميرا غير مستخدمة في تطبيق آخر (مثل Zoom أو واتساب).`);
     }
   };
 
@@ -246,11 +254,16 @@ export default function QRScanPage() {
               <button
                 className="btn btn-primary"
                 style={{ width: "100%", justifyContent: "center" }}
-                onClick={startScanner}
-                disabled={!selectedGroupId}
+                onClick={async () => {
+                  if (isStarting) return;
+                  setIsStarting(true);
+                  await startScanner();
+                  setIsStarting(false);
+                }}
+                disabled={!selectedGroupId || isStarting}
               >
-                <Camera size={18} />
-                <span>تشغيل الكاميرا</span>
+                {isStarting ? <div className="spinner" style={{ width: "18px", height: "18px", borderWidth: "2px" }} /> : <Camera size={18} />}
+                <span>{isStarting ? "جاري التشغيل..." : "تشغيل الكاميرا"}</span>
               </button>
             ) : (
               <button
