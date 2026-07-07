@@ -66,6 +66,7 @@ export default function QRScanPage() {
   const [lastScan, setLastScan] = useState<{ name: string; success: boolean } | null>(null);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const scannedIdsRef = useRef<Set<string>>(new Set());
   const scannerDivId = "qr-reader";
 
   useEffect(() => {
@@ -90,7 +91,8 @@ export default function QRScanPage() {
   useEffect(() => {
     return () => {
       if (scannerRef.current && scanning) {
-        scannerRef.current.stop().catch(() => {});
+        try { scannerRef.current.stop(); } catch(e) {}
+        try { scannerRef.current.clear(); } catch(e) {}
       }
     };
   }, [scanning]);
@@ -100,12 +102,20 @@ export default function QRScanPage() {
   const handleQRSuccess = async (decodedText: string) => {
     if (!userId) return;
 
+    // Prevent spam scanning the same QR code by maintaining a Set in a Ref
+    if (scannedIdsRef.current.has(decodedText)) {
+      return;
+    }
+
     // Find student by id
     const student = students.find(s => s.id === decodedText);
     if (!student) {
       setLastScan({ name: "طالب غير معروف!", success: false });
       return;
     }
+
+    // Mark as scanned immediately to prevent concurrent duplicate API calls
+    scannedIdsRef.current.add(decodedText);
 
     // Check if already scanned this session
     if (scannedToday.some(e => e.studentId === student.id)) {
@@ -226,7 +236,12 @@ export default function QRScanPage() {
               <select
                 className="form-input"
                 value={selectedGroupId}
-                onChange={e => { setSelectedGroupId(e.target.value); if (scanning) stopScanner(); }}
+                onChange={e => { 
+                  setSelectedGroupId(e.target.value); 
+                  if (scanning) stopScanner(); 
+                  setScannedToday([]);
+                  scannedIdsRef.current.clear();
+                }}
                 style={{ padding: "0.7rem 0.5rem" }}
                 disabled={scanning}
               >
