@@ -323,6 +323,7 @@ export default function AttendancePage() {
             <table className="students-table">
               <thead>
                 <tr>
+                  <th style={{ width: "40px", textAlign: "center" }}>#</th>
                   <th style={{ minWidth: "160px" }}>الطالب</th>
                   {/* Session columns */}
                   {Array.from({ length: sessionsCount }, (_, i) => (
@@ -354,11 +355,14 @@ export default function AttendancePage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredStudents.map(student => {
+                {filteredStudents.map((student, index) => {
                   const percent = getAttendancePercent(student.id);
                   const percentColor = percent >= 75 ? "#10b981" : percent >= 50 ? "#f59e0b" : "#ef4444";
                   return (
                     <tr key={student.id}>
+                      <td style={{ textAlign: "center", fontWeight: 600, color: "var(--text-muted)" }}>
+                        {index + 1}
+                      </td>
                       <td>
                         <span style={{ fontWeight: 600, color: "#fff" }}>{student.name}</span>
                       </td>
