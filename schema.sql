@@ -143,6 +143,7 @@ create table if not exists public.attendance_records (
 -- تفعيل Row Level Security
 -- ============================================================
 alter table public.teachers enable row level security;
+alter table public.grades enable row level security;
 alter table public.groups enable row level security;
 alter table public.students enable row level security;
 alter table public.bills enable row level security;
@@ -152,6 +153,12 @@ alter table public.attendance_records enable row level security;
 -- ============================================================
 -- سياسات الأمان (RLS Policies)
 -- ============================================================
+
+-- Grades
+drop policy if exists "Teachers can manage their own grades or admin manage" on public.grades;
+create policy "Teachers can manage their own grades or admin manage" on public.grades
+    for all using (teacher_id = auth.uid() or public.is_admin(auth.uid()))
+    with check (teacher_id = auth.uid() or public.is_admin(auth.uid()));
 
 -- Teachers
 drop policy if exists "Allow select own profile or admin view" on public.teachers;
