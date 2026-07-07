@@ -20,6 +20,7 @@ interface Group {
   name: string;
   day_of_week: string;
   time: string;
+  grade_id?: string | null;
 }
 
 interface Student {
@@ -27,6 +28,12 @@ interface Student {
   name: string;
   group_id: string | null;
   code?: string;
+  grade_id?: string | null;
+}
+
+interface Grade {
+  id: string;
+  name: string;
 }
 
 interface ScannedEntry {
@@ -41,6 +48,7 @@ export default function QRScanPage() {
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
 
   const formatTimeTo12H = (timeStr: string) => {
     if (!timeStr) return "";
@@ -55,6 +63,7 @@ export default function QRScanPage() {
 
   // Session config
   const now = new Date();
+  const [selectedGradeId, setSelectedGradeId] = useState<string>("all");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const todayDateStr = now.toISOString().split("T")[0];
   const [selectedMonth] = useState(now.getMonth() + 1);
@@ -78,13 +87,15 @@ export default function QRScanPage() {
       if (!session) return;
       setUserId(session.user.id);
 
-      const [{ data: grpData }, { data: stData }] = await Promise.all([
-        supabase.from("groups").select("id, name, day_of_week, time"),
-        supabase.from("students").select("id, name, group_id, code")
+      const [{ data: grpData }, { data: stData }, { data: grdData }] = await Promise.all([
+        supabase.from("groups").select("id, name, day_of_week, time, grade_id"),
+        supabase.from("students").select("id, name, group_id, code, grade_id"),
+        supabase.from("grades").select("id, name").order("created_at")
       ]);
 
       setGroups(grpData || []);
       setStudents(stData || []);
+      setGrades(grdData || []);
       setLoading(false);
     }
     load();
@@ -264,6 +275,28 @@ export default function QRScanPage() {
             </h2>
 
             <div className="form-group">
+              <label className="form-label">السنة الدراسية</label>
+              <select
+                className="form-input"
+                value={selectedGradeId}
+                onChange={e => { 
+                  setSelectedGradeId(e.target.value); 
+                  setSelectedGroupId(""); 
+                  if (scanning) stopScanner(); 
+                  setScannedToday([]);
+                  scannedIdsRef.current.clear();
+                }}
+                style={{ padding: "0.7rem 0.5rem" }}
+                disabled={scanning}
+              >
+                <option value="all">-- كل السنين الدراسية --</option>
+                {grades.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
               <label className="form-label">المجموعة</label>
               <select
                 className="form-input"
@@ -278,7 +311,9 @@ export default function QRScanPage() {
                 disabled={scanning}
               >
                 <option value="">اختر المجموعة...</option>
-                {groups.map(g => (
+                {groups
+                  .filter(g => selectedGradeId === "all" || g.grade_id === selectedGradeId)
+                  .map(g => (
                   <option key={g.id} value={g.id}>{g.name} ({g.day_of_week} - {formatTimeTo12H(g.time)})</option>
                 ))}
               </select>

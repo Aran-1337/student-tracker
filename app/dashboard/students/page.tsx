@@ -77,6 +77,7 @@ export default function StudentsManagement() {
 
   // Filters state
   const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [filterGradeId, setFilterGradeId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -285,6 +286,9 @@ export default function StudentsManagement() {
 
   // Filter students
   const filteredStudents = students.filter(student => {
+    const studentEffectiveGradeId = student.grade_id || groups.find(g => g.id === student.group_id)?.grade_id;
+    const matchesGrade = filterGradeId === "all" || studentEffectiveGradeId === filterGradeId;
+
     const matchesGroup = activeFilter === "all" 
       ? true 
       : activeFilter === "none" 
@@ -292,7 +296,7 @@ export default function StudentsManagement() {
         : student.group_id === activeFilter;
     const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (student.code && student.code.includes(searchQuery));
-    return matchesGroup && matchesSearch;
+    return matchesGrade && matchesGroup && matchesSearch;
   });
 
   const allSelected = filteredStudents.length > 0 && selectedStudentIds.size === filteredStudents.length;
@@ -387,11 +391,25 @@ export default function StudentsManagement() {
 
         {/* Left Side: Students List */}
         <section className="glass-panel panel-content">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
             <h2 className="panel-title" style={{ margin: 0 }}>
               <Users size={18} style={{ color: "var(--color-info)" }} />
               <span>قائمة الطلاب ({filteredStudents.length})</span>
             </h2>
+            
+            <select
+              value={filterGradeId}
+              onChange={(e) => {
+                setFilterGradeId(e.target.value);
+                setActiveFilter("all");
+                setSelectedStudentIds(new Set());
+              }}
+              className="form-input"
+              style={{ maxWidth: "250px", padding: "0.5rem", background: "rgba(255,255,255,0.05)" }}
+            >
+              <option value="all">-- جميع السنين الدراسية --</option>
+              {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
           </div>
 
           {/* Group Filter Chips */}
@@ -408,7 +426,9 @@ export default function StudentsManagement() {
             >
               بدون مجموعة
             </button>
-            {groups.map(group => (
+            {groups
+              .filter(g => filterGradeId === "all" || g.grade_id === filterGradeId)
+              .map(group => (
               <button 
                 key={group.id}
                 className={`chip ${group.is_private ? "private" : ""} ${activeFilter === group.id ? "active" : ""}`}

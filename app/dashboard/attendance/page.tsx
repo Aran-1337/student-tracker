@@ -24,12 +24,19 @@ interface Group {
   day_of_week: string;
   time: string;
   sessions_per_month?: number;
+  grade_id?: string | null;
 }
 
 interface Student {
   id: string;
   name: string;
   group_id: string | null;
+  grade_id?: string | null;
+}
+
+interface Grade {
+  id: string;
+  name: string;
 }
 
 interface AttendanceRecord {
@@ -65,9 +72,11 @@ export default function AttendancePage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
 
   // Filters
   const now = new Date();
+  const [selectedGradeId, setSelectedGradeId] = useState<string>("all");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
@@ -91,12 +100,15 @@ export default function AttendancePage() {
       setUserId(session.user.id);
 
       // Fallback for older schemas missing sessions_per_month
-      let { data: grpData, error: grpError } = await supabase.from("groups").select("id, name, day_of_week, time").order("created_at");
+      let { data: grpData } = await supabase.from("groups").select("id, name, day_of_week, time, grade_id").order("created_at");
 
-      const { data: stData } = await supabase.from("students").select("id, name, group_id").order("name");
+      const { data: stData } = await supabase.from("students").select("id, name, group_id, grade_id").order("name");
+
+      const { data: grdData } = await supabase.from("grades").select("id, name").order("created_at");
 
       setGroups(grpData || []);
       setStudents(stData || []);
+      setGrades(grdData || []);
       setLoading(false);
     }
     load();
@@ -125,8 +137,14 @@ export default function AttendancePage() {
   const sessionsCount = allDates.length;
 
   const filteredStudents = students.filter(s => {
-    if (selectedGroupId === "all") return true;
-    return s.group_id === selectedGroupId;
+    // Grade filter
+    const effectiveGradeId = s.grade_id || groups.find(g => g.id === s.group_id)?.grade_id;
+    if (selectedGradeId !== "all" && effectiveGradeId !== selectedGradeId) return false;
+    
+    // Group filter
+    if (selectedGroupId !== "all" && s.group_id !== selectedGroupId) return false;
+    
+    return true;
   });
 
   const isPresent = (studentId: string, dateStr: string) =>
@@ -282,6 +300,25 @@ export default function AttendancePage() {
       {/* Filters */}
       <div className="glass-panel panel-content" style={{ marginBottom: "1.5rem" }}>
         <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", alignItems: "flex-end" }}>
+          {/* Grade selector */}
+          <div className="form-group" style={{ margin: 0, flex: 1, minWidth: "180px" }}>
+            <label className="form-label">السنة الدراسية</label>
+            <select
+              className="form-input"
+              value={selectedGradeId}
+              onChange={e => {
+                setSelectedGradeId(e.target.value);
+                setSelectedGroupId("all");
+              }}
+              style={{ padding: "0.6rem 0.75rem" }}
+            >
+              <option value="all">كل السنين الدراسية</option>
+              {grades.map(g => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Group selector */}
           <div className="form-group" style={{ margin: 0, flex: 1, minWidth: "180px" }}>
             <label className="form-label">المجموعة</label>
@@ -291,8 +328,10 @@ export default function AttendancePage() {
               onChange={e => setSelectedGroupId(e.target.value)}
               style={{ padding: "0.6rem 0.75rem" }}
             >
-              <option value="all">كل الطلاب</option>
-              {groups.map(g => (
+              <option value="all">كل المجموعات</option>
+              {groups
+                .filter(g => selectedGradeId === "all" || g.grade_id === selectedGradeId)
+                .map(g => (
                 <option key={g.id} value={g.id}>{g.name} ({g.day_of_week} - {formatTimeTo12H(g.time)})</option>
               ))}
             </select>
