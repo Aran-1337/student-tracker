@@ -21,6 +21,13 @@ interface Group {
   time: string;
   is_private?: boolean;
   sub_teacher_id?: string | null;
+  grade_id?: string | null;
+}
+
+interface Grade {
+  id: string;
+  name: string;
+  start_code: number;
 }
 
 interface Student {
@@ -59,9 +66,11 @@ export default function DashboardOverview() {
   // App data state
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
 
   // Form state
   const [groupName, setGroupName] = useState("");
+  const [groupGradeId, setGroupGradeId] = useState("");
   const [groupDays, setGroupDays] = useState<string[]>(["السبت"]);
   const [groupTime, setGroupTime] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
@@ -97,8 +106,11 @@ export default function DashboardOverview() {
           setSubTeachers(subs || []);
         }
 
+        const { data: gradesData } = await supabase.from("grades").select("*").order("created_at", { ascending: true });
+        setGrades(gradesData || []);
+
         // Fetch groups
-        let { data: grpData, error: grpError } = await supabase.from("groups").select("id, name, day_of_week, time, is_private, teacher_id, sub_teacher_id").order("created_at", { ascending: false });
+        let { data: grpData, error: grpError } = await supabase.from("groups").select("id, name, day_of_week, time, is_private, teacher_id, sub_teacher_id, grade_id").order("created_at", { ascending: false });
 
         setGroups(grpData || []);
 
@@ -170,6 +182,7 @@ export default function DashboardOverview() {
           day_of_week: groupDays.join(" ، "), 
           time: groupTime,
           is_private: isPrivate,
+          grade_id: groupGradeId || null,
           teacher_id: userId,
           sub_teacher_id: hasCenterMode && groupSubTeacherId ? groupSubTeacherId : null
         }])
@@ -184,7 +197,8 @@ export default function DashboardOverview() {
             name: groupName,
             day_of_week: groupDays.join(" ، "),
             time: groupTime,
-            is_private: isPrivate
+            is_private: isPrivate,
+            grade_id: groupGradeId || null
           }])
           .select();
 
@@ -208,6 +222,7 @@ export default function DashboardOverview() {
       }
       setGroupName("");
       setGroupDays(["السبت"]);
+      setGroupGradeId("");
       setGroupTime("");
       setIsPrivate(false);
       setGroupSubTeacherId("");
@@ -324,6 +339,23 @@ export default function DashboardOverview() {
                   onChange={(e) => setGroupName(e.target.value)}
                 />
               </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="gGrade">السنة الدراسية</label>
+                <select
+                  id="gGrade"
+                  className="form-input"
+                  value={groupGradeId}
+                  onChange={(e) => setGroupGradeId(e.target.value)}
+                  style={{ padding: "0.7rem 0.5rem" }}
+                >
+                  <option value="">-- بدون سنة دراسية --</option>
+                  {grades.map(g => (
+                    <option key={g.id} value={g.name}>{g.name}</option>
+                  ))}
+                </select>
+              </div>
+              
               <div className="form-row">
                 <div className="form-group" style={{ gridColumn: "1 / -1", marginBottom: "0.5rem" }}>
                   <label className="form-label">أيام المجموعة (اختر يوم أو أكثر)</label>
@@ -416,63 +448,133 @@ export default function DashboardOverview() {
         </aside>
 
         {/* Left side: Groups List */}
-        <section className="glass-panel panel-content">
-          <h2 className="panel-title">
-            <Calendar size={18} style={{ color: "var(--color-info)" }} />
-            <span>المجموعات الحالية ({groups.length})</span>
-          </h2>
+        <section style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+          <div className="glass-panel panel-content" style={{ padding: "1rem 1.5rem" }}>
+            <h2 className="panel-title" style={{ margin: 0 }}>
+              <Calendar size={18} style={{ color: "var(--color-info)" }} />
+              <span>إجمالي المجموعات الحالية ({groups.length})</span>
+            </h2>
+          </div>
 
           {groups.length === 0 ? (
-            <div className="empty-state">
+            <div className="glass-panel panel-content empty-state">
               <AlertCircle size={48} className="empty-state-icon" />
               <p>لا توجد أي مجموعات حالياً. أضف أول مجموعة لبدء تنظيم طلابك.</p>
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
-              {groups.map(group => {
-                const groupStudentCount = students.filter(s => s.group_id === group.id).length;
-                const subTeacher = subTeachers.find(t => t.id === group.sub_teacher_id);
+            <>
+              {grades.map(grade => {
+                const gradeGroups = groups.filter(g => g.grade_id === grade.id);
+                if (gradeGroups.length === 0) return null;
+                
                 return (
-                  <div key={group.id} className={`glass-panel panel-content ${group.is_private ? "group-card-private" : ""}`} style={{ background: "rgba(255,255,255,0.02)", position: "relative" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <h3 style={{ fontSize: "1.1rem" }}>{group.name}</h3>
-                        {group.is_private && <span className="private-badge">خاصة</span>}
-                      </div>
-                      <button
-                        className="btn btn-secondary btn-icon"
-                        onClick={() => handleDeleteGroup(group.id)}
-                        style={{ border: "none", background: "none", width: "1.75rem", height: "1.75rem" }}
-                        title="حذف المجموعة"
-                      >
-                        <Trash2 size={15} className="color-danger" />
-                      </button>
-                    </div>
-                    
-                    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                      {hasCenterMode && subTeacher && (
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--color-teal)" }}>
-                          <Users size={14} />
-                          <span>المعلم: {subTeacher.name}</span>
-                        </div>
-                      )}
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <Calendar size={14} />
-                        <span>اليوم: {group.day_of_week}</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                        <Clock size={14} />
-                        <span>الوقت: {formatTimeTo12H(group.time)}</span>
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
-                        <Users size={14} style={{ color: "var(--color-teal)" }} />
-                        <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>عدد الطلاب: {groupStudentCount} طالب</span>
-                      </div>
+                  <div key={grade.id} className="glass-panel panel-content" style={{ padding: "1.5rem" }}>
+                    <h3 style={{ fontSize: "1.3rem", color: "var(--color-teal)", marginBottom: "1rem", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "0.5rem" }}>
+                      {grade.name}
+                    </h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
+                      {gradeGroups.map(group => {
+                        const groupStudentCount = students.filter(s => s.group_id === group.id).length;
+                        const subTeacher = subTeachers.find(t => t.id === group.sub_teacher_id);
+                        return (
+                          <div key={group.id} className={`glass-panel panel-content ${group.is_private ? "group-card-private" : ""}`} style={{ background: "rgba(255,255,255,0.02)", position: "relative" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <h3 style={{ fontSize: "1.1rem", margin: 0 }}>{group.name}</h3>
+                                {group.is_private && <span className="private-badge">خاصة</span>}
+                              </div>
+                              <button
+                                className="btn btn-secondary btn-icon"
+                                onClick={() => handleDeleteGroup(group.id)}
+                                style={{ border: "none", background: "none", width: "1.75rem", height: "1.75rem", padding: 0 }}
+                                title="حذف المجموعة"
+                              >
+                                <Trash2 size={15} className="color-danger" />
+                              </button>
+                            </div>
+                            
+                            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
+                              {hasCenterMode && subTeacher && (
+                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--color-teal)" }}>
+                                  <Users size={14} />
+                                  <span>المعلم: {subTeacher.name}</span>
+                                </div>
+                              )}
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <Calendar size={14} />
+                                <span>اليوم: {group.day_of_week}</span>
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                <Clock size={14} />
+                                <span>الوقت: {formatTimeTo12H(group.time)}</span>
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
+                                <Users size={14} style={{ color: "var(--color-teal)" }} />
+                                <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>عدد الطلاب: {groupStudentCount} طالب</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
               })}
-            </div>
+
+              {/* Ungrouped Groups (No Grade) */}
+              {groups.filter(g => !g.grade_id).length > 0 && (
+                <div className="glass-panel panel-content" style={{ padding: "1.5rem" }}>
+                  <h3 style={{ fontSize: "1.3rem", color: "var(--text-muted)", marginBottom: "1rem", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "0.5rem" }}>
+                    مجموعات أخرى (بدون سنة دراسية)
+                  </h3>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
+                    {groups.filter(g => !g.grade_id).map(group => {
+                      const groupStudentCount = students.filter(s => s.group_id === group.id).length;
+                      const subTeacher = subTeachers.find(t => t.id === group.sub_teacher_id);
+                      return (
+                        <div key={group.id} className={`glass-panel panel-content ${group.is_private ? "group-card-private" : ""}`} style={{ background: "rgba(255,255,255,0.02)", position: "relative" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <h3 style={{ fontSize: "1.1rem", margin: 0 }}>{group.name}</h3>
+                              {group.is_private && <span className="private-badge">خاصة</span>}
+                            </div>
+                            <button
+                              className="btn btn-secondary btn-icon"
+                              onClick={() => handleDeleteGroup(group.id)}
+                              style={{ border: "none", background: "none", width: "1.75rem", height: "1.75rem", padding: 0 }}
+                              title="حذف المجموعة"
+                            >
+                              <Trash2 size={15} className="color-danger" />
+                            </button>
+                          </div>
+                          
+                          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
+                            {hasCenterMode && subTeacher && (
+                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--color-teal)" }}>
+                                <Users size={14} />
+                                <span>المعلم: {subTeacher.name}</span>
+                              </div>
+                            )}
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <Calendar size={14} />
+                              <span>اليوم: {group.day_of_week}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                              <Clock size={14} />
+                              <span>الوقت: {formatTimeTo12H(group.time)}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
+                              <Users size={14} style={{ color: "var(--color-teal)" }} />
+                              <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>عدد الطلاب: {groupStudentCount} طالب</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </section>
       </div>

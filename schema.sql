@@ -30,10 +30,20 @@ begin
 end;
 $$ language plpgsql security definer;
 
--- 2. جدول المجموعات
+-- 3. جدول السنين الدراسية (Grades)
+create table if not exists public.grades (
+    id uuid primary key default gen_random_uuid(),
+    teacher_id uuid references public.teachers(id) on delete cascade not null,
+    name text not null,
+    start_code integer not null default 1,
+    created_at timestamp with time zone default now() not null
+);
+
+-- 4. جدول المجموعات
 create table if not exists public.groups (
     id uuid primary key default gen_random_uuid(),
     teacher_id uuid references public.teachers(id) on delete cascade not null,
+    grade_id uuid references public.grades(id) on delete set null,
     name text not null,
     day_of_week text not null check (day_of_week in ('السبت', 'الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة')),
     time time not null,
@@ -42,7 +52,7 @@ create table if not exists public.groups (
     created_at timestamp with time zone default now() not null
 );
 
--- 3. جدول الطلاب
+-- 5. جدول الطلاب
 create sequence if not exists public.student_code_seq start 1;
 
 create table if not exists public.students (
@@ -50,12 +60,49 @@ create table if not exists public.students (
     teacher_id uuid references public.teachers(id) on delete cascade not null,
     group_id uuid references public.groups(id) on delete set null,
     name text not null,
-    code text unique default nextval('public.student_code_seq')::text,
+    code text unique,
     months jsonb not null default '[false, false, false, false, false, false, false, false, false, false, false, false]'::jsonb,
     book_1 boolean not null default false,
     book_2 boolean not null default false,
     created_at timestamp with time zone default now() not null
 );
+
+-- دالة التوليد التلقائي للكود بناءً على السنة الدراسية
+create or replace function public.generate_student_code_by_grade()
+returns trigger as $$
+declare
+    v_grade_id uuid;
+    v_start_code integer;
+    v_max_code integer;
+begin
+    if new.code is null then
+        select grade_id into v_grade_id from public.groups where id = new.group_id;
+        if v_grade_id is not null then
+            select start_code into v_start_code from public.grades where id = v_grade_id;
+            
+            select max(cast(nullif(regexp_replace(s.code, '\D', '', 'g'), '') as integer))
+            into v_max_code
+            from public.students s
+            join public.groups g on s.group_id = g.id
+            where g.grade_id = v_grade_id;
+            
+            if v_max_code is null or v_max_code < v_start_code then
+                new.code := v_start_code::text;
+            else
+                new.code := (v_max_code + 1)::text;
+            end if;
+        else
+            new.code := (nextval('public.student_code_seq'))::text;
+        end if;
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger trg_generate_student_code
+before insert on public.students
+for each row
+execute function public.generate_student_code_by_grade();
 
 -- 4. جدول الفواتير والمصروفات
 create table if not exists public.bills (

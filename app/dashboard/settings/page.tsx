@@ -9,8 +9,17 @@ import {
   BookOpen, 
   Save, 
   AlertCircle,
-  Check
+  Check,
+  Plus,
+  Trash2,
+  GraduationCap
 } from "lucide-react";
+
+interface Grade {
+  id: string;
+  name: string;
+  start_code: number;
+}
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -22,6 +31,10 @@ export default function SettingsPage() {
   const [monthlyPrice, setMonthlyPrice] = useState("100");
   const [book1Price, setBook1Price] = useState("50");
   const [book2Price, setBook2Price] = useState("50");
+
+  const [grades, setGrades] = useState<Grade[]>([]);
+  const [newGradeName, setNewGradeName] = useState("");
+  const [newGradeStartCode, setNewGradeStartCode] = useState("");
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -51,6 +64,12 @@ export default function SettingsPage() {
           setBook1Price(String(teacher.book_1_price ?? 50));
           setBook2Price(String(teacher.book_2_price ?? 50));
         }
+
+        const { data: gradesData } = await supabase
+          .from("grades")
+          .select("*")
+          .order("created_at", { ascending: true });
+        setGrades(gradesData || []);
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل الإعدادات.", "error");
       } finally {
@@ -219,6 +238,88 @@ export default function SettingsPage() {
             </button>
           </div>
         </form>
+
+        {/* Grades Settings Section */}
+        <div className="glass-panel panel-content" style={{ marginTop: "2rem" }}>
+          <h2 className="panel-title">
+            <GraduationCap size={18} style={{ color: "var(--color-teal)" }} />
+            السنين الدراسية والأكواد
+          </h2>
+          <p className="settings-description" style={{ marginBottom: "1.5rem" }}>
+            أضف السنين الدراسية التي تُدرّس لها لتتمكن من إنشاء مجموعات لكل سنة بأكواد منفصلة.
+          </p>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {grades.map(grade => (
+              <div key={grade.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{grade.name}</h3>
+                  <p style={{ margin: "0.2rem 0 0 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>بداية الأكواد: <strong style={{ color: "var(--color-teal)" }}>{grade.start_code}</strong></p>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (confirm("هل أنت متأكد من حذف هذه السنة الدراسية؟ (المجموعات التابعة لها ستصبح بدون سنة)")) {
+                      await supabase.from("grades").delete().eq("id", grade.id);
+                      setGrades(grades.filter(g => g.id !== grade.id));
+                      showToast("تم الحذف بنجاح");
+                    }
+                  }}
+                  className="btn btn-danger"
+                  style={{ padding: "0.5rem" }}
+                  title="حذف"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+
+            <div style={{ display: "flex", gap: "1rem", marginTop: "1rem", flexWrap: "wrap" }}>
+              <input
+                type="text"
+                placeholder="اسم السنة (مثال: الصف الأول الثانوي)"
+                className="form-input"
+                style={{ flex: 2, minWidth: "200px" }}
+                value={newGradeName}
+                onChange={(e) => setNewGradeName(e.target.value)}
+              />
+              <input
+                type="number"
+                placeholder="بداية الأكواد (مثال: 10000)"
+                className="form-input"
+                style={{ flex: 1, minWidth: "150px" }}
+                value={newGradeStartCode}
+                onChange={(e) => setNewGradeStartCode(e.target.value)}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  if (!newGradeName || !newGradeStartCode) {
+                    showToast("يرجى إدخال اسم السنة وبداية الأكواد", "error");
+                    return;
+                  }
+                  if (!userId) return;
+                  const { data, error } = await supabase.from("grades").insert([{
+                    name: newGradeName,
+                    start_code: parseInt(newGradeStartCode),
+                    teacher_id: userId
+                  }]).select().single();
+
+                  if (error) {
+                    showToast("فشل إضافة السنة الدراسية", "error");
+                  } else if (data) {
+                    setGrades([...grades, data]);
+                    setNewGradeName("");
+                    setNewGradeStartCode("");
+                    showToast("تم إضافة السنة الدراسية بنجاح");
+                  }
+                }}
+              >
+                <Plus size={18} />
+                إضافة سنة
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Toast Alert */}
