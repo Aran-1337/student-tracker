@@ -111,6 +111,21 @@ export default function QRScanPage() {
     const student = students.find(s => s.id === decodedText);
     if (!student) {
       setLastScan({ name: "طالب غير معروف!", success: false });
+      scannedIdsRef.current.delete(decodedText);
+      return;
+    }
+
+    // Check if student belongs to the selected group
+    if (student.group_id !== selectedGroupId) {
+      const studentGroup = groups.find(g => g.id === student.group_id);
+      const groupName = studentGroup ? studentGroup.name : "مجموعة أخرى";
+      setLastScan({ name: `تحذير: ${student.name} ينتمي لـ (${groupName})!`, success: false });
+      
+      // Remove from scannedIdsRef so they can be scanned again if the teacher switches to the correct group
+      scannedIdsRef.current.delete(decodedText);
+      
+      // Clear last scan feedback after 3.5s
+      setTimeout(() => setLastScan(null), 3500);
       return;
     }
 
