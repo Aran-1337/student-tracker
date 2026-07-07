@@ -47,6 +47,17 @@ const arabicMonths = [
   "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
 ];
 
+const formatTimeTo12H = (timeStr: string) => {
+  if (!timeStr) return "";
+  let [hours, minutes] = timeStr.split(":").map(Number);
+  const ampm = hours >= 12 ? "م" : "ص";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const strHours = String(hours).padStart(2, "0");
+  const strMinutes = String(minutes).padStart(2, "0");
+  return `${strHours}:${strMinutes} ${ampm}`;
+};
+
 export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -285,7 +296,7 @@ export default function AttendancePage() {
             >
               <option value="all">كل الطلاب</option>
               {groups.map(g => (
-                <option key={g.id} value={g.id}>{g.name} ({g.sessions_per_month} حصص/شهر)</option>
+                <option key={g.id} value={g.id}>{g.name} ({g.day_of_week} - {formatTimeTo12H(g.time)})</option>
               ))}
             </select>
           </div>

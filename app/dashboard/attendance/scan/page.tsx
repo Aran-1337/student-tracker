@@ -18,6 +18,8 @@ import Link from "next/link";
 interface Group {
   id: string;
   name: string;
+  day_of_week: string;
+  time: string;
 }
 
 interface Student {
@@ -38,6 +40,17 @@ export default function QRScanPage() {
 
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+
+  const formatTimeTo12H = (timeStr: string) => {
+    if (!timeStr) return "";
+    let [hours, minutes] = timeStr.split(":").map(Number);
+    const ampm = hours >= 12 ? "م" : "ص";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strHours = String(hours).padStart(2, "0");
+    const strMinutes = String(minutes).padStart(2, "0");
+    return `${strHours}:${strMinutes} ${ampm}`;
+  };
 
   // Session config
   const now = new Date();
@@ -61,7 +74,7 @@ export default function QRScanPage() {
       setUserId(session.user.id);
 
       const [{ data: grpData }, { data: stData }] = await Promise.all([
-        supabase.from("groups").select("id, name"),
+        supabase.from("groups").select("id, name, day_of_week, time"),
         supabase.from("students").select("id, name, group_id")
       ]);
 
@@ -197,7 +210,7 @@ export default function QRScanPage() {
               >
                 <option value="">اختر المجموعة...</option>
                 {groups.map(g => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
+                  <option key={g.id} value={g.id}>{g.name} ({g.day_of_week} - {formatTimeTo12H(g.time)})</option>
                 ))}
               </select>
             </div>
