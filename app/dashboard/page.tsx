@@ -449,21 +449,18 @@ export default function DashboardOverview() {
 
         {/* Left side: Groups List */}
         <section style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
-          <div className="glass-panel panel-content" style={{ padding: "1rem 1.5rem" }}>
-            <h2 className="panel-title" style={{ margin: 0 }}>
+          <div className="glass-panel panel-content" style={{ padding: "1.5rem" }}>
+            <h2 className="panel-title" style={{ margin: 0, marginBottom: "1.5rem" }}>
               <Calendar size={18} style={{ color: "var(--color-info)" }} />
               <span>إجمالي المجموعات الحالية ({groups.length})</span>
             </h2>
-          </div>
 
-          {groups.length === 0 ? (
-            <div className="glass-panel panel-content empty-state">
-              <AlertCircle size={48} className="empty-state-icon" />
-              <p>لا توجد أي مجموعات حالياً. أضف أول مجموعة لبدء تنظيم طلابك.</p>
-            </div>
-          ) : (
-            <>
-              {/* All Groups Section */}
+            {groups.length === 0 ? (
+              <div className="empty-state">
+                <AlertCircle size={48} className="empty-state-icon" />
+                <p>لا توجد أي مجموعات حالياً. أضف أول مجموعة لبدء تنظيم طلابك.</p>
+              </div>
+            ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
                 {groups.map(group => {
                   const groupStudentCount = students.filter(s => s.group_id === group.id).length;
@@ -509,10 +506,12 @@ export default function DashboardOverview() {
                   );
                 })}
               </div>
+            )}
+          </div>
 
-              {/* Divider for Grades Section */}
-              {grades.length > 0 && (
-                <div style={{ marginTop: "1rem", marginBottom: "0.5rem" }}>
+          {/* Divider for Grades Section */}
+          {grades.length > 0 && (
+            <div style={{ marginTop: "1rem", marginBottom: "0.5rem" }}>
                   <h2 style={{ fontSize: "1.5rem", color: "var(--text-primary)" }}>تقسيم السنين الدراسية</h2>
                 </div>
               )}
@@ -626,10 +625,9 @@ export default function DashboardOverview() {
                       );
                     })}
                   </div>
+                  </div>
                 </div>
               )}
-            </>
-          )}
         </section>
       </div>
 
