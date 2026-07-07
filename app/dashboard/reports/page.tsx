@@ -339,7 +339,7 @@ export default function ReportsPage() {
             <thead>
               <tr>
                 <th>الشهر</th>
-                <th>عدد الاشتراكات المدفوعة</th>
+                <th>عدد المدفوعات</th>
                 <th>إيراد الاشتراك</th>
                 <th>المصروفات والفواتير</th>
                 <th>صافي الربح</th>

@@ -251,7 +251,7 @@ export default function DashboardOverview() {
             <CheckCircle2 size={24} />
           </div>
           <div className="stat-info">
-            <span className="stat-label">الاشتراكات المدفوعة ({currentMonthName})</span>
+            <span className="stat-label">مدفوعات شهر ({currentMonthName})</span>
             <span className="stat-value monospace">{paidThisMonthCount}</span>
           </div>
         </div>
