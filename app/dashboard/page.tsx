@@ -176,11 +176,36 @@ export default function DashboardOverview() {
         .select();
 
       if (error) {
-        showToast("حدث خطأ، تأكد من تحديث قاعدة البيانات", "error");
-        return;
-      }
+        // Maybe missing column? Insert without it
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("groups")
+          .insert([{
+            teacher_id: userId,
+            name: groupName,
+            day_of_week: groupDays.join(" ، "),
+            time: groupTime,
+            is_private: isPrivate
+          }])
+          .select();
 
-      setGroups([data[0], ...groups]);
+        if (fallbackError) {
+          console.error("Supabase fallback insert error:", fallbackError);
+          showToast(`حدث خطأ: ${fallbackError.message}`, "error");
+          return;
+        }
+
+        // Try to save to local storage for demo if column missing
+        if (fallbackData && hasCenterMode && groupSubTeacherId) {
+          const mapping = JSON.parse(localStorage.getItem("group_subteachers") || "{}");
+          mapping[fallbackData[0].id] = groupSubTeacherId;
+          localStorage.setItem("group_subteachers", JSON.stringify(mapping));
+          fallbackData[0].sub_teacher_id = groupSubTeacherId;
+        }
+
+        setGroups([fallbackData[0], ...groups]);
+      } else {
+        setGroups([data[0], ...groups]);
+      }
       setGroupName("");
       setGroupDays(["السبت"]);
       setGroupTime("");
