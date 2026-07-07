@@ -351,7 +351,7 @@ export default function DashboardOverview() {
                 >
                   <option value="">-- بدون سنة دراسية --</option>
                   {grades.map(g => (
-                    <option key={g.id} value={g.name}>{g.name}</option>
+                    <option key={g.id} value={g.id}>{g.name}</option>
                   ))}
                 </select>
               </div>
