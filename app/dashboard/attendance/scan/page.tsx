@@ -18,7 +18,6 @@ import Link from "next/link";
 interface Group {
   id: string;
   name: string;
-  sessions_per_month: number;
 }
 
 interface Student {
@@ -43,7 +42,7 @@ export default function QRScanPage() {
   // Session config
   const now = new Date();
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
-  const [selectedSession, setSelectedSession] = useState<number>(1);
+  const todayDateStr = now.toISOString().split("T")[0];
   const [selectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear] = useState(now.getFullYear());
 
@@ -62,11 +61,11 @@ export default function QRScanPage() {
       setUserId(session.user.id);
 
       const [{ data: grpData }, { data: stData }] = await Promise.all([
-        supabase.from("groups").select("id, name, sessions_per_month"),
+        supabase.from("groups").select("id, name"),
         supabase.from("students").select("id, name, group_id")
       ]);
 
-      setGroups((grpData || []).map(g => ({ ...g, sessions_per_month: g.sessions_per_month ?? 8 })));
+      setGroups(grpData || []);
       setStudents(stData || []);
       setLoading(false);
     }
@@ -107,12 +106,12 @@ export default function QRScanPage() {
         teacher_id: userId,
         student_id: student.id,
         group_id: student.group_id,
-        session_number: selectedSession,
+        session_date: todayDateStr,
         month: selectedMonth,
         year: selectedYear,
         status: "present",
         scanned_by_qr: true
-      }], { onConflict: "student_id,session_number,month,year" });
+      }], { onConflict: "student_id,session_date" });
 
     if (error) {
       setLastScan({ name: `خطأ: ${error.message}`, success: false });
@@ -203,21 +202,6 @@ export default function QRScanPage() {
               </select>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">رقم الحصة الحالية</label>
-              <select
-                className="form-input"
-                value={selectedSession}
-                onChange={e => setSelectedSession(Number(e.target.value))}
-                style={{ padding: "0.7rem 0.5rem" }}
-                disabled={scanning}
-              >
-                {Array.from({ length: selectedGroup?.sessions_per_month ?? 8 }, (_, i) => (
-                  <option key={i} value={i + 1}>الحصة {i + 1}</option>
-                ))}
-              </select>
-            </div>
-
             <div style={{
               padding: "0.65rem 0.75rem",
               borderRadius: "8px",
@@ -227,7 +211,7 @@ export default function QRScanPage() {
               color: "var(--text-secondary)",
               marginBottom: "1rem"
             }}>
-              📅 {arabicMonths[selectedMonth - 1]} {selectedYear} — الحصة {selectedSession}
+              📅 {arabicMonths[selectedMonth - 1]} {selectedYear} — تاريخ اليوم: {todayDateStr}
             </div>
 
             {!scanning ? (

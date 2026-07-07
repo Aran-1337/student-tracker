@@ -35,7 +35,7 @@ interface Student {
 interface AttendanceRecord {
   id: string;
   student_id: string;
-  session_number: number;
+  session_date: string;
   month: number;
   year: number;
   status: string;
@@ -61,6 +61,8 @@ export default function AttendancePage() {
   const [selectedGroupId, setSelectedGroupId] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [manualDates, setManualDates] = useState<string[]>([]);
+  const [newSessionDate, setNewSessionDate] = useState(now.toISOString().split("T")[0]);
 
   // QR Modal
   const [qrStudent, setQrStudent] = useState<Student | null>(null);
@@ -107,34 +109,33 @@ export default function AttendancePage() {
 
   // ── Helpers ──────────────────────────────────────────────────────
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
-  const sessionsCount = 12;
+  
+  const dbDates = Array.from(new Set(attendance.map(a => a.session_date)));
+  const allDates = Array.from(new Set([...dbDates, ...manualDates])).sort();
+  const sessionsCount = allDates.length;
 
   const filteredStudents = students.filter(s => {
     if (selectedGroupId === "all") return true;
     return s.group_id === selectedGroupId;
   });
 
-  const isPresent = (studentId: string, sessionNum: number) =>
+  const isPresent = (studentId: string, dateStr: string) =>
     attendance.some(
       a => a.student_id === studentId &&
-        a.session_number === sessionNum &&
-        a.month === selectedMonth &&
-        a.year === selectedYear &&
+        a.session_date === dateStr &&
         a.status === "present"
     );
 
-  const getAttendanceRecord = (studentId: string, sessionNum: number) =>
+  const getAttendanceRecord = (studentId: string, dateStr: string) =>
     attendance.find(
       a => a.student_id === studentId &&
-        a.session_number === sessionNum &&
-        a.month === selectedMonth &&
-        a.year === selectedYear
+        a.session_date === dateStr
     );
 
   // ── Toggle single session attendance ────────────────────────────
-  const handleToggle = async (student: Student, sessionNum: number) => {
+  const handleToggle = async (student: Student, dateStr: string) => {
     if (!userId) return;
-    const existing = getAttendanceRecord(student.id, sessionNum);
+    const existing = getAttendanceRecord(student.id, dateStr);
 
     if (existing) {
       // Delete (remove attendance)
@@ -144,15 +145,17 @@ export default function AttendancePage() {
       if (error) { setAttendance(attendance); showToast("فشل حذف الحضور", "error"); }
     } else {
       // Insert (mark present)
+      const sessionMonth = parseInt(dateStr.split("-")[1], 10);
+      const sessionYear = parseInt(dateStr.split("-")[0], 10);
       const { data, error } = await supabase
         .from("attendance_records")
         .insert([{
           teacher_id: userId,
           student_id: student.id,
           group_id: student.group_id,
-          session_number: sessionNum,
-          month: selectedMonth,
-          year: selectedYear,
+          session_date: dateStr,
+          month: sessionMonth,
+          year: sessionYear,
           status: "present",
           scanned_by_qr: false
         }])
@@ -164,19 +167,21 @@ export default function AttendancePage() {
   };
 
   // ── Mark entire session (all students present) ───────────────────
-  const handleMarkAllSession = async (sessionNum: number) => {
+  const handleMarkAllSession = async (dateStr: string) => {
     if (!userId) return;
     setSaving(true);
     try {
+      const sessionMonth = parseInt(dateStr.split("-")[1], 10);
+      const sessionYear = parseInt(dateStr.split("-")[0], 10);
       const toInsert = filteredStudents
-        .filter(s => !isPresent(s.id, sessionNum))
+        .filter(s => !isPresent(s.id, dateStr))
         .map(s => ({
           teacher_id: userId,
           student_id: s.id,
           group_id: s.group_id,
-          session_number: sessionNum,
-          month: selectedMonth,
-          year: selectedYear,
+          session_date: dateStr,
+          month: sessionMonth,
+          year: sessionYear,
           status: "present",
           scanned_by_qr: false
         }));
@@ -193,7 +198,7 @@ export default function AttendancePage() {
 
       if (error) throw error;
       setAttendance([...attendance, ...(data || [])]);
-      showToast(`✓ تم تحضير ${toInsert.length} طالب في الحصة ${sessionNum}`);
+      showToast(`✓ تم تحضير ${toInsert.length} طالب بتاريخ ${dateStr}`);
     } catch (err: any) {
       showToast(err.message || "فشل التحضير الجماعي", "error");
     } finally {
@@ -227,10 +232,25 @@ export default function AttendancePage() {
     img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgStr)));
   };
 
+  // ── Add new session date column ──────────────────────────────────
+  const handleAddSessionDate = () => {
+    if (selectedGroupId === "all") {
+      showToast("يرجى اختيار مجموعة محددة قبل إضافة حصة.", "error");
+      return;
+    }
+    if (!newSessionDate) return;
+    if (allDates.includes(newSessionDate)) {
+      showToast("هذا التاريخ موجود بالفعل في الجدول.");
+      return;
+    }
+    setManualDates([...manualDates, newSessionDate]);
+    showToast(`تم فتح عمود لتاريخ ${newSessionDate.split("-").reverse().join("/")}`);
+  };
+
   // ── Attendance percentage per student ────────────────────────────
   const getAttendancePercent = (studentId: string) => {
     const present = attendance.filter(
-      a => a.student_id === studentId && a.month === selectedMonth && a.year === selectedYear && a.status === "present"
+      a => a.student_id === studentId && a.status === "present"
     ).length;
     return sessionsCount > 0 ? Math.round((present / sessionsCount) * 100) : 0;
   };
@@ -296,6 +316,30 @@ export default function AttendancePage() {
             </select>
           </div>
         </div>
+        
+        {/* Add Session Date (only if group selected) */}
+        {selectedGroupId !== "all" && (
+          <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-end" }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label" htmlFor="newSessionDate">إضافة حصة بتاريخ:</label>
+              <input
+                id="newSessionDate"
+                type="date"
+                className="form-input"
+                value={newSessionDate}
+                onChange={e => setNewSessionDate(e.target.value)}
+                style={{ padding: "0.6rem 0.75rem" }}
+              />
+            </div>
+            <button
+              onClick={handleAddSessionDate}
+              className="btn btn-primary"
+              style={{ padding: "0.6rem 1rem", height: "42px" }}
+            >
+              + إضافة
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Attendance Table */}
@@ -326,12 +370,12 @@ export default function AttendancePage() {
                   <th style={{ width: "40px", textAlign: "center" }}>#</th>
                   <th style={{ minWidth: "160px" }}>الطالب</th>
                   {/* Session columns */}
-                  {Array.from({ length: sessionsCount }, (_, i) => (
-                    <th key={i} style={{ textAlign: "center", padding: "0.75rem 0.35rem", minWidth: "52px" }}>
+                  {allDates.map((dateStr, i) => (
+                    <th key={dateStr} style={{ textAlign: "center", padding: "0.75rem 0.35rem", minWidth: "52px" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
-                        <span style={{ fontSize: "0.75rem" }}>ح{i + 1}</span>
+                        <span style={{ fontSize: "0.75rem" }}>{dateStr.split("-").slice(1).reverse().join("/")}</span>
                         <button
-                          onClick={() => handleMarkAllSession(i + 1)}
+                          onClick={() => handleMarkAllSession(dateStr)}
                           disabled={saving}
                           style={{
                             fontSize: "0.6rem",
@@ -343,7 +387,7 @@ export default function AttendancePage() {
                             cursor: "pointer",
                             whiteSpace: "nowrap"
                           }}
-                          title={`تحضير الكل في الحصة ${i + 1}`}
+                          title={`تحضير الكل بتاريخ ${dateStr}`}
                         >
                           الكل ✓
                         </button>
@@ -367,14 +411,13 @@ export default function AttendancePage() {
                         <span style={{ fontWeight: 600, color: "#fff" }}>{student.name}</span>
                       </td>
                       {/* Session squares */}
-                      {Array.from({ length: sessionsCount }, (_, i) => {
-                        const sessionNum = i + 1;
-                        const present = isPresent(student.id, sessionNum);
+                      {allDates.map((dateStr, i) => {
+                        const present = isPresent(student.id, dateStr);
                         return (
-                          <td key={i} style={{ textAlign: "center", padding: "0.5rem 0.25rem" }}>
+                          <td key={dateStr} style={{ textAlign: "center", padding: "0.5rem 0.25rem" }}>
                             <button
-                              onClick={() => handleToggle(student, sessionNum)}
-                              title={present ? `إلغاء حضور الحصة ${sessionNum}` : `تسجيل حضور الحصة ${sessionNum}`}
+                              onClick={() => handleToggle(student, dateStr)}
+                              title={present ? `إلغاء حضور يوم ${dateStr}` : `تسجيل حضور يوم ${dateStr}`}
                               style={{
                                 width: "36px",
                                 height: "36px",
