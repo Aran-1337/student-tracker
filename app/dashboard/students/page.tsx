@@ -25,6 +25,7 @@ interface Group {
 interface Student {
   id: string;
   name: string;
+  code?: string;
   group_id: string | null;
   months: boolean[];
   book_1: boolean;
@@ -272,7 +273,8 @@ export default function StudentsManagement() {
       : activeFilter === "none" 
         ? student.group_id === null 
         : student.group_id === activeFilter;
-    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          (student.code && student.code.includes(searchQuery));
     return matchesGroup && matchesSearch;
   });
 
@@ -386,7 +388,7 @@ export default function StudentsManagement() {
               <Search className="search-icon" size={18} />
               <input
                 type="text"
-                placeholder="بحث سريع باسم الطالب..."
+                placeholder="بحث سريع باسم الطالب أو الكود..."
                 className="search-input"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -416,6 +418,7 @@ export default function StudentsManagement() {
                       </button>
                     </th>
                     <th style={{ width: "40px", textAlign: "center" }}>#</th>
+                    <th>الكود</th>
                     <th>اسم الطالب</th>
                     <th>الشهور المدفوعة (١ - ١٢)</th>
                     <th>الكتب المستلمة</th>
@@ -446,6 +449,9 @@ export default function StudentsManagement() {
                         </td>
                         <td data-label="#" style={{ textAlign: "center", fontWeight: 600, color: "var(--text-muted)" }}>
                           {index + 1}
+                        </td>
+                        <td data-label="الكود" style={{ fontWeight: 700, color: "var(--color-teal)" }}>
+                          {student.code || "-"}
                         </td>
                         <td data-label="اسم الطالب">
                           <div className="student-name-cell">

@@ -65,6 +65,7 @@ export default function QRScanPage() {
   const [scannedToday, setScannedToday] = useState<ScannedEntry[]>([]);
   const [lastScan, setLastScan] = useState<{ name: string; success: boolean } | null>(null);
   const [crossGroupConfirm, setCrossGroupConfirm] = useState<{ student: any; originalGroupName: string } | null>(null);
+  const [manualCode, setManualCode] = useState("");
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannedIdsRef = useRef<Set<string>>(new Set());
@@ -78,7 +79,7 @@ export default function QRScanPage() {
 
       const [{ data: grpData }, { data: stData }] = await Promise.all([
         supabase.from("groups").select("id, name, day_of_week, time"),
-        supabase.from("students").select("id, name, group_id")
+        supabase.from("students").select("id, name, group_id, code")
       ]);
 
       setGroups(grpData || []);
@@ -215,6 +216,21 @@ export default function QRScanPage() {
     setScanning(false);
   };
 
+  const handleManualCodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!manualCode.trim()) return;
+    
+    const student = students.find(s => s.code === manualCode.trim());
+    if (!student) {
+      setLastScan({ name: "كود غير صحيح!", success: false });
+      setTimeout(() => setLastScan(null), 2500);
+      return;
+    }
+    
+    handleQRSuccess(student.id);
+    setManualCode("");
+  };
+
   if (loading) return <div className="loading-wrapper"><div className="spinner" /></div>;
 
   const arabicMonths = [
@@ -304,6 +320,31 @@ export default function QRScanPage() {
                 <span>إيقاف الكاميرا</span>
               </button>
             )}
+
+            <div style={{ marginTop: "1.5rem" }}>
+              <p style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "0.5rem" }}>
+                أو تسجيل الدخول بالكود يدوياً:
+              </p>
+              <form onSubmit={handleManualCodeSubmit} style={{ display: "flex", gap: "0.5rem" }}>
+                <input
+                  type="text"
+                  placeholder="مثال: 10001"
+                  className="form-input"
+                  style={{ flex: 1 }}
+                  value={manualCode}
+                  onChange={(e) => setManualCode(e.target.value)}
+                  disabled={!selectedGroupId}
+                />
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  disabled={!selectedGroupId || !manualCode.trim()}
+                  style={{ padding: "0.5rem 1rem" }}
+                >
+                  تسجيل
+                </button>
+              </form>
+            </div>
 
             {/* Scanned students list */}
             {scannedToday.length > 0 && (

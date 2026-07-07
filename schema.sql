@@ -43,11 +43,14 @@ create table if not exists public.groups (
 );
 
 -- 3. جدول الطلاب
+create sequence if not exists public.student_code_seq start 1;
+
 create table if not exists public.students (
     id uuid primary key default gen_random_uuid(),
     teacher_id uuid references public.teachers(id) on delete cascade not null,
     group_id uuid references public.groups(id) on delete set null,
     name text not null,
+    code text unique default nextval('public.student_code_seq')::text,
     months jsonb not null default '[false, false, false, false, false, false, false, false, false, false, false, false]'::jsonb,
     book_1 boolean not null default false,
     book_2 boolean not null default false,
