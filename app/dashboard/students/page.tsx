@@ -20,6 +20,13 @@ interface Group {
   day_of_week: string;
   time: string;
   is_private?: boolean;
+  grade_id?: string | null;
+}
+
+interface Grade {
+  id: string;
+  name: string;
+  start_code: number;
 }
 
 interface Student {
@@ -27,6 +34,7 @@ interface Student {
   name: string;
   code?: string;
   group_id: string | null;
+  grade_id?: string | null;
   months: boolean[];
   book_1: boolean;
   book_2: boolean;
@@ -57,10 +65,12 @@ export default function StudentsManagement() {
   // App data state
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
 
   // Form state
   const [studentName, setStudentName] = useState("");
   const [studentGroupId, setStudentGroupId] = useState("");
+  const [studentGradeId, setStudentGradeId] = useState("");
 
   // Bulk selection state
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
@@ -100,6 +110,12 @@ export default function StudentsManagement() {
             : Array(12).fill(false)
         }));
         setStudents(validatedStudents);
+
+        const { data: gradesData } = await supabase
+          .from("grades")
+          .select("*")
+          .order("created_at", { ascending: true });
+        setGrades(gradesData || []);
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل البيانات.", "error");
       } finally {
@@ -128,6 +144,7 @@ export default function StudentsManagement() {
             teacher_id: userId,
             name: studentName,
             group_id: selectedGroupIdVal,
+            grade_id: studentGradeId || null,
             months: initialMonths,
             book_1: false,
             book_2: false
@@ -319,6 +336,24 @@ export default function StudentsManagement() {
                 />
               </div>
               <div className="form-group">
+                <label className="form-label" htmlFor="sGrade">السنة الدراسية (اختياري)</label>
+                <select
+                  id="sGrade"
+                  className="form-input"
+                  value={studentGradeId}
+                  onChange={(e) => {
+                    setStudentGradeId(e.target.value);
+                    setStudentGroupId(""); // Reset group when grade changes
+                  }}
+                  style={{ padding: "0.7rem 0.5rem" }}
+                >
+                  <option value="">-- بدون سنة دراسية --</option>
+                  {grades.map(grade => (
+                    <option key={grade.id} value={grade.id}>{grade.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
                 <label className="form-label" htmlFor="sGroup">المجموعة (اختياري)</label>
                 <select
                   id="sGroup"
@@ -328,7 +363,9 @@ export default function StudentsManagement() {
                   style={{ padding: "0.7rem 0.5rem" }}
                 >
                   <option value="">بدون مجموعة</option>
-                  {groups.map(group => (
+                  {groups
+                    .filter(g => !studentGradeId || g.grade_id === studentGradeId)
+                    .map(group => (
                     <option key={group.id} value={group.id}>
                       {group.name} {group.is_private ? "(خاصة) " : ""}({group.day_of_week} - {formatTimeTo12H(group.time)})
                     </option>
