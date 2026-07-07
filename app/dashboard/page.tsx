@@ -437,7 +437,7 @@ export default function DashboardOverview() {
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                         <Clock size={14} />
-                        <span className="monospace">الوقت: {formatTimeTo12H(group.time)}</span>
+                        <span>الوقت: {formatTimeTo12H(group.time)}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
                         <Users size={14} style={{ color: "var(--color-teal)" }} />
