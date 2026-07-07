@@ -231,6 +231,23 @@ export default function StudentsManagement() {
     }
   };
 
+  const handleChangeGroup = async (student: Student, newGroupId: string) => {
+    try {
+      const targetGroupId = newGroupId === "" ? null : newGroupId;
+      const { error } = await supabase
+        .from("students")
+        .update({ group_id: targetGroupId })
+        .eq("id", student.id);
+
+      if (error) throw error;
+
+      setStudents(students.map(s => s.id === student.id ? { ...s, group_id: targetGroupId } : s));
+      showToast(`تم تغيير مجموعة "${student.name}" بنجاح.`);
+    } catch (err: any) {
+      showToast("فشل نقل الطالب.", "error");
+    }
+  };
+
   // Selection helpers
   const toggleSelectStudent = (id: string) => {
     setSelectedStudentIds(prev => {
@@ -398,6 +415,7 @@ export default function StudentsManagement() {
                         {allSelected ? <CheckSquare size={18} /> : <Square size={18} />}
                       </button>
                     </th>
+                    <th style={{ width: "40px", textAlign: "center" }}>#</th>
                     <th>اسم الطالب</th>
                     <th>الشهور المدفوعة (١ - ١٢)</th>
                     <th>الكتب المستلمة</th>
@@ -405,7 +423,7 @@ export default function StudentsManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredStudents.map(student => {
+                  {filteredStudents.map((student, index) => {
                     const studentGroup = groups.find(g => g.id === student.group_id);
                     const isSelected = selectedStudentIds.has(student.id);
                     return (
@@ -426,14 +444,31 @@ export default function StudentsManagement() {
                             {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
                           </button>
                         </td>
+                        <td style={{ textAlign: "center", fontWeight: 600, color: "var(--text-muted)" }}>
+                          {index + 1}
+                        </td>
                         <td>
                           <div className="student-name-cell">
                             <span className="student-name">{student.name}</span>
-                            {activeFilter === "all" && (
-                              <span className={`student-group-badge ${studentGroup?.is_private ? "private" : ""}`}>
-                                {studentGroup ? studentGroup.name : "بدون مجموعة"}
-                              </span>
-                            )}
+                            <select
+                              value={student.group_id || ""}
+                              onChange={(e) => handleChangeGroup(student, e.target.value)}
+                              className={`student-group-badge ${studentGroup?.is_private ? "private" : ""}`}
+                              style={{ 
+                                background: "rgba(0,0,0,0.2)", 
+                                border: "1px solid var(--border-color)", 
+                                color: studentGroup?.is_private ? "var(--color-warning)" : "var(--color-teal)",
+                                cursor: "pointer",
+                                padding: "2px 6px"
+                              }}
+                            >
+                              <option value="" style={{ background: "#0f172a" }}>بدون مجموعة</option>
+                              {groups.map(g => (
+                                <option key={g.id} value={g.id} style={{ background: "#0f172a" }}>
+                                  {g.name}
+                                </option>
+                              ))}
+                            </select>
                           </div>
                         </td>
                         <td>
