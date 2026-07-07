@@ -62,7 +62,7 @@ export default function DashboardOverview() {
 
   // Form state
   const [groupName, setGroupName] = useState("");
-  const [groupDay, setGroupDay] = useState("السبت");
+  const [groupDays, setGroupDays] = useState<string[]>(["السبت"]);
   const [groupTime, setGroupTime] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [groupSubTeacherId, setGroupSubTeacherId] = useState("");
@@ -128,7 +128,7 @@ export default function DashboardOverview() {
 
   const handleCreateGroup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!groupName || !groupDay || !groupTime || !userId) {
+    if (!groupName || groupDays.length === 0 || !groupTime || !userId) {
       showToast("يرجى ملء جميع الحقول المطلوبة.", "error");
       return;
     }
@@ -144,15 +144,19 @@ export default function DashboardOverview() {
 
     const targetMinutes = timeToMinutes(groupTime);
     const conflictingGroup = groups.find(g => {
-      if (g.day_of_week !== groupDay) return false;
+      // g.day_of_week might be a comma-separated string like "السبت ، الإثنين"
+      const existingDays = g.day_of_week.split(" ، ");
+      const hasOverlappingDay = existingDays.some(d => groupDays.includes(d));
+      if (!hasOverlappingDay) return false;
       const existMinutes = timeToMinutes(g.time);
       return Math.abs(targetMinutes - existMinutes) < 60; // Overlaps if difference is less than 60 mins
     });
 
     if (conflictingGroup) {
       const conflictStart = formatTimeTo12H(conflictingGroup.time);
+      const overlappingDays = groupDays.filter(d => conflictingGroup.day_of_week.includes(d)).join(" و ");
       alert(
-        `عذراً، لا يمكن إنشاء المجموعة! يوجد تعارض في المواعيد مع مجموعة "${conflictingGroup.name}" المسجلة في نفس اليوم (${groupDay}) الساعة (${conflictStart}). يجب أن يكون الفرق بين مواعيد المجموعات ساعة كاملة على الأقل.`
+        `عذراً، لا يمكن إنشاء المجموعة! يوجد تعارض في المواعيد مع مجموعة "${conflictingGroup.name}" المسجلة في يوم (${overlappingDays}) الساعة (${conflictStart}). يجب أن يكون الفرق بين مواعيد المجموعات ساعة كاملة على الأقل.`
       );
       return; // Stop execution (Strict block)
     }
@@ -161,16 +165,14 @@ export default function DashboardOverview() {
     try {
       const { data, error } = await supabase
         .from("groups")
-        .insert([
-          {
-            teacher_id: userId,
-            name: groupName,
-            day_of_week: groupDay,
-            time: groupTime,
-            is_private: isPrivate,
-            sub_teacher_id: hasCenterMode && groupSubTeacherId ? groupSubTeacherId : null
-          }
-        ])
+        .insert([{ 
+          name: groupName, 
+          day_of_week: groupDays.join(" ، "), 
+          time: groupTime,
+          is_private: isPrivate,
+          teacher_id: userId,
+          sub_teacher_id: hasCenterMode && groupSubTeacherId ? groupSubTeacherId : null
+        }])
         .select();
 
       if (error) {
@@ -179,8 +181,8 @@ export default function DashboardOverview() {
       }
 
       setGroups([data[0], ...groups]);
-
       setGroupName("");
+      setGroupDays(["السبت"]);
       setGroupTime("");
       setIsPrivate(false);
       setGroupSubTeacherId("");
@@ -298,19 +300,38 @@ export default function DashboardOverview() {
                 />
               </div>
               <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="gDay">اليوم</label>
-                  <select
-                    id="gDay"
-                    className="form-input"
-                    value={groupDay}
-                    onChange={(e) => setGroupDay(e.target.value)}
-                    style={{ padding: "0.7rem 0.5rem" }}
-                  >
-                    {arabicDays.map(day => (
-                      <option key={day} value={day}>{day}</option>
-                    ))}
-                  </select>
+                <div className="form-group" style={{ gridColumn: "1 / -1", marginBottom: "0.5rem" }}>
+                  <label className="form-label">أيام المجموعة (اختر يوم أو أكثر)</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                    {arabicDays.map(day => {
+                      const isSelected = groupDays.includes(day);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              setGroupDays(groupDays.filter(d => d !== day));
+                            } else {
+                              setGroupDays([...groupDays, day]);
+                            }
+                          }}
+                          style={{
+                            padding: "0.4rem 0.8rem",
+                            borderRadius: "6px",
+                            border: isSelected ? "1px solid var(--color-teal)" : "1px solid rgba(255,255,255,0.1)",
+                            background: isSelected ? "rgba(20,184,166,0.15)" : "rgba(255,255,255,0.03)",
+                            color: isSelected ? "var(--color-teal)" : "var(--text-secondary)",
+                            cursor: "pointer",
+                            fontSize: "0.85rem",
+                            transition: "all 0.2s"
+                          }}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div className="form-group">
                   <label className="form-label" htmlFor="gTime">الوقت</label>
