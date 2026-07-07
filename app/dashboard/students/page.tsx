@@ -465,7 +465,7 @@ export default function StudentsManagement() {
                               <option value="" style={{ background: "#0f172a" }}>بدون مجموعة</option>
                               {groups.map(g => (
                                 <option key={g.id} value={g.id} style={{ background: "#0f172a" }}>
-                                  {g.name}
+                                  {g.name} ({g.day_of_week} - {formatTimeTo12H(g.time)})
                                 </option>
                               ))}
                             </select>
