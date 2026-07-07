@@ -176,7 +176,8 @@ export default function QRScanPage() {
 
   const stopScanner = async () => {
     if (scannerRef.current) {
-      await scannerRef.current.stop().catch(() => {});
+      try { await scannerRef.current.stop(); } catch (e) {}
+      try { scannerRef.current.clear(); } catch (e) {}
       scannerRef.current = null;
     }
     setScanning(false);
@@ -345,7 +346,7 @@ export default function QRScanPage() {
               maxWidth: "480px",
               borderRadius: "16px",
               overflow: "hidden",
-              display: scanning ? "block" : "none"
+              minHeight: scanning ? "300px" : "0"
             }}
           />
         </section>
