@@ -26,6 +26,7 @@ interface Student {
   id: string;
   name: string;
   group_id: string | null;
+  code?: string;
 }
 
 interface ScannedEntry {
