@@ -334,36 +334,8 @@ export default function QRScanPage() {
           </div>
         </aside>
 
-        {/* Scanner area */}
-        <section className="glass-panel panel-content" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "400px" }}>
-
-          {/* Last scan feedback */}
-          {lastScan && (
-            <div style={{
-              position: "absolute",
-              top: "1rem",
-              left: "50%",
-              transform: "translateX(-50%)",
-              padding: "0.85rem 1.75rem",
-              borderRadius: "12px",
-              background: lastScan.success ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
-              border: `1px solid ${lastScan.success ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.4)"}`,
-              color: lastScan.success ? "#10b981" : "#ef4444",
-              fontWeight: 700,
-              fontSize: "1.05rem",
-              zIndex: 10,
-              whiteSpace: "nowrap",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.5rem",
-              animation: "slideUp 0.3s ease"
-            }}>
-              {lastScan.success
-                ? <><CheckCircle2 size={20} /> حضر: {lastScan.name}</>
-                : <><AlertCircle size={20} /> {lastScan.name}</>
-              }
-            </div>
-          )}
+          {/* Scanner area */}
+          <section className="glass-panel panel-content" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "400px", position: "relative" }}>
 
           {!scanning && (
             <div style={{ textAlign: "center", color: "var(--text-muted)" }}>
@@ -388,6 +360,36 @@ export default function QRScanPage() {
                 minHeight: scanning ? "300px" : "0"
               }}
             />
+
+            {/* Last scan feedback inside scanner container */}
+            {lastScan && (
+              <div style={{
+                position: "absolute",
+                bottom: "1.5rem",
+                left: "50%",
+                transform: "translateX(-50%)",
+                padding: "0.85rem 1.75rem",
+                borderRadius: "12px",
+                background: lastScan.success ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
+                border: `1px solid ${lastScan.success ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.4)"}`,
+                color: lastScan.success ? "#10b981" : "#ef4444",
+                fontWeight: 700,
+                fontSize: "1.05rem",
+                zIndex: 10,
+                whiteSpace: "nowrap",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+                backdropFilter: "blur(12px)",
+                boxShadow: "0 4px 15px rgba(0,0,0,0.3)",
+                animation: "slideUp 0.3s ease"
+              }}>
+                {lastScan.success
+                  ? <><CheckCircle2 size={20} /> حضر: {lastScan.name}</>
+                  : <><AlertCircle size={20} /> {lastScan.name}</>
+                }
+              </div>
+            )}
             {crossGroupConfirm && (
               <div style={{
                 position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
