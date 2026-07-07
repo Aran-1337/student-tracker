@@ -146,28 +146,31 @@ export default function QRScanPage() {
   const startScanner = async () => {
     if (!selectedGroupId) return;
     try {
-      const qr = new Html5Qrcode(scannerDivId);
-      scannerRef.current = qr;
       const config = { fps: 6, qrbox: { width: 220, height: 220 } };
-      
+      let cameraConfig: any = { facingMode: "environment" };
+
+      // Try to get specific cameras first
       try {
-        await qr.start({ facingMode: "environment" }, config, handleQRSuccess, () => {});
-        setScanning(true);
-      } catch (envError) {
-        // Fallback to specific camera IDs if environment mode fails (common on some mobile browsers)
         const cameras = await Html5Qrcode.getCameras();
         if (cameras && cameras.length > 0) {
-          const backCamera = cameras.find(c => c.label.toLowerCase().includes("back") || c.label.toLowerCase().includes("rear") || c.label.toLowerCase().includes("environment"));
-          const cameraId = backCamera ? backCamera.id : cameras[cameras.length - 1].id;
-          
-          await qr.start(cameraId, config, handleQRSuccess, () => {});
-          setScanning(true);
-        } else {
-          throw envError;
+          const backCamera = cameras.find(c => 
+            c.label.toLowerCase().includes("back") || 
+            c.label.toLowerCase().includes("rear") || 
+            c.label.toLowerCase().includes("environment")
+          );
+          cameraConfig = backCamera ? backCamera.id : cameras[cameras.length - 1].id;
         }
+      } catch (camErr) {
+        console.warn("Failed to get cameras array, using fallback config:", camErr);
       }
+
+      const qr = new Html5Qrcode(scannerDivId);
+      scannerRef.current = qr;
+      
+      await qr.start(cameraConfig, config, handleQRSuccess, () => {});
+      setScanning(true);
     } catch (err: any) {
-      alert(`تعذّر تشغيل الكاميرا: ${err?.message || err}\nتأكد من إعطاء صلاحيات الكاميرا للمتصفح.`);
+      alert(`تعذّر تشغيل الكاميرا: ${err?.message || err}\nتأكد من إعطاء صلاحيات الكاميرا وإيقاف أي تطبيق يستخدمها حالياً.`);
     }
   };
 
