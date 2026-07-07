@@ -402,7 +402,7 @@ export default function StudentsManagement() {
                 <p>لا يوجد طلاب يطابقون خيارات التصفية أو البحث الحالية.</p>
               </div>
             ) : (
-              <table className="students-table">
+              <table className="students-table mobile-card-table">
                 <thead>
                   <tr>
                     {/* Select All Checkbox */}
@@ -436,7 +436,7 @@ export default function StudentsManagement() {
                         }}
                       >
                         {/* Row Checkbox */}
-                        <td style={{ textAlign: "center" }}>
+                        <td data-label="تحديد" style={{ textAlign: "center" }}>
                           <button
                             onClick={() => toggleSelectStudent(student.id)}
                             style={{ background: "none", border: "none", cursor: "pointer", color: isSelected ? "var(--color-teal)" : "var(--text-muted)", display: "flex", alignItems: "center", margin: "0 auto" }}
@@ -444,10 +444,10 @@ export default function StudentsManagement() {
                             {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
                           </button>
                         </td>
-                        <td style={{ textAlign: "center", fontWeight: 600, color: "var(--text-muted)" }}>
+                        <td data-label="#" style={{ textAlign: "center", fontWeight: 600, color: "var(--text-muted)" }}>
                           {index + 1}
                         </td>
-                        <td>
+                        <td data-label="اسم الطالب">
                           <div className="student-name-cell">
                             <span className="student-name">{student.name}</span>
                             <select
@@ -471,7 +471,7 @@ export default function StudentsManagement() {
                             </select>
                           </div>
                         </td>
-                        <td>
+                        <td data-label="الشهور المدفوعة (١ - ١٢)">
                           <div className="months-grid">
                             {student.months.map((isPaid, idx) => (
                               <button
@@ -485,7 +485,7 @@ export default function StudentsManagement() {
                             ))}
                           </div>
                         </td>
-                        <td>
+                        <td data-label="الكتب المستلمة">
                           <div className="book-toggles">
                             <button
                               className={`book-toggle ${student.book_1 ? "active" : ""}`}
@@ -501,7 +501,7 @@ export default function StudentsManagement() {
                             </button>
                           </div>
                         </td>
-                        <td>
+                        <td data-label="إجراءات">
                           <button 
                             className="btn btn-secondary btn-icon"
                             onClick={() => handleDeleteStudent(student.id)}

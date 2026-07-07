@@ -375,7 +375,7 @@ export default function AttendancePage() {
           </div>
         ) : (
           <div className="table-container">
-            <table className="students-table">
+            <table className="students-table mobile-card-table">
               <thead>
                 <tr>
                   <th style={{ width: "40px", textAlign: "center" }}>#</th>
@@ -415,17 +415,17 @@ export default function AttendancePage() {
                   const percentColor = percent >= 75 ? "#10b981" : percent >= 50 ? "#f59e0b" : "#ef4444";
                   return (
                     <tr key={student.id}>
-                      <td style={{ textAlign: "center", fontWeight: 600, color: "var(--text-muted)" }}>
+                      <td data-label="#" style={{ textAlign: "center", fontWeight: 600, color: "var(--text-muted)" }}>
                         {index + 1}
                       </td>
-                      <td>
+                      <td data-label="الطالب">
                         <span style={{ fontWeight: 600, color: "#fff" }}>{student.name}</span>
                       </td>
                       {/* Session squares */}
                       {allDates.map((dateStr, i) => {
                         const present = isPresent(student.id, dateStr);
                         return (
-                          <td key={dateStr} style={{ textAlign: "center", padding: "0.5rem 0.25rem" }}>
+                          <td key={dateStr} data-label={dateStr} style={{ textAlign: "center", padding: "0.5rem 0.25rem" }}>
                             <button
                               onClick={() => handleToggle(student, dateStr)}
                               title={present ? `إلغاء حضور يوم ${dateStr}` : `تسجيل حضور يوم ${dateStr}`}
@@ -453,7 +453,7 @@ export default function AttendancePage() {
                         );
                       })}
                       {/* Attendance % */}
-                      <td style={{ textAlign: "center" }}>
+                      <td data-label="النسبة" style={{ textAlign: "center" }}>
                         <span style={{
                           fontFamily: "JetBrains Mono, monospace",
                           fontWeight: 700,
@@ -464,7 +464,7 @@ export default function AttendancePage() {
                         </span>
                       </td>
                       {/* QR button */}
-                      <td style={{ textAlign: "center" }}>
+                      <td data-label="QR" style={{ textAlign: "center" }}>
                         <button
                           onClick={() => setQrStudent(student)}
                           style={{

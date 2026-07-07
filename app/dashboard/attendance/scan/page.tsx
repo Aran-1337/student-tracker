@@ -148,15 +148,26 @@ export default function QRScanPage() {
     try {
       const qr = new Html5Qrcode(scannerDivId);
       scannerRef.current = qr;
-      await qr.start(
-        { facingMode: "environment" },
-        { fps: 6, qrbox: { width: 220, height: 220 } },
-        handleQRSuccess,
-        () => {} // ignore errors silently
-      );
-      setScanning(true);
-    } catch (err) {
-      alert("تعذّر الوصول إلى الكاميرا. تأكد من منح الإذن.");
+      const config = { fps: 6, qrbox: { width: 220, height: 220 } };
+      
+      try {
+        await qr.start({ facingMode: "environment" }, config, handleQRSuccess, () => {});
+        setScanning(true);
+      } catch (envError) {
+        // Fallback to specific camera IDs if environment mode fails (common on some mobile browsers)
+        const cameras = await Html5Qrcode.getCameras();
+        if (cameras && cameras.length > 0) {
+          const backCamera = cameras.find(c => c.label.toLowerCase().includes("back") || c.label.toLowerCase().includes("rear") || c.label.toLowerCase().includes("environment"));
+          const cameraId = backCamera ? backCamera.id : cameras[cameras.length - 1].id;
+          
+          await qr.start(cameraId, config, handleQRSuccess, () => {});
+          setScanning(true);
+        } else {
+          throw envError;
+        }
+      }
+    } catch (err: any) {
+      alert(`تعذّر تشغيل الكاميرا: ${err?.message || err}\nتأكد من إعطاء صلاحيات الكاميرا للمتصفح.`);
     }
   };
 

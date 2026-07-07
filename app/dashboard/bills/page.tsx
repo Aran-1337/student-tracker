@@ -606,7 +606,7 @@ export default function BillsManagement() {
                 <p>لا توجد أي فواتير مسجلة لشهر التصفية الحالي.</p>
               </div>
             ) : (
-              <table className="students-table">
+              <table className="students-table mobile-card-table">
                 <thead>
                   <tr>
                     <th style={{ width: "40px", textAlign: "center" }}>
@@ -637,7 +637,7 @@ export default function BillsManagement() {
                         transition: "background 0.15s ease"
                       }}
                     >
-                      <td style={{ textAlign: "center" }}>
+                      <td data-label="تحديد" style={{ textAlign: "center" }}>
                         <input
                           type="checkbox"
                           checked={selectedBillIds.has(bill.id)}
@@ -645,7 +645,7 @@ export default function BillsManagement() {
                           style={{ cursor: "pointer", width: "16px", height: "16px", accentColor: "#3b82f6" }}
                         />
                       </td>
-                      <td>
+                      <td data-label="بيان الفاتورة">
                         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                           {bill.is_recurring && (
                             <span title="فاتورة متكررة">
@@ -655,7 +655,7 @@ export default function BillsManagement() {
                           <span style={{ fontWeight: 600, color: "#ffffff" }}>{bill.title}</span>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="التصنيف">
                         <span 
                           style={{ 
                             display: "inline-block", 
@@ -668,18 +668,18 @@ export default function BillsManagement() {
                           {bill.category}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="الشهر المالي">
                         <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
                           <Calendar size={14} style={{ color: "var(--text-muted)" }} />
                           <span>{arabicMonths[bill.billing_month - 1]}</span>
                         </div>
                       </td>
-                      <td>
+                      <td data-label="القيمة المالية">
                         <span className="monospace" style={{ fontWeight: 700, color: "#f87171" }}>
                           -{bill.amount} ج.م
                         </span>
                       </td>
-                      <td>
+                      <td data-label="إجراءات">
                         <button 
                           className="btn btn-secondary btn-icon"
                           onClick={() => handleDeleteBill(bill.id)}
