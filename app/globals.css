@@ -169,6 +169,11 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 0 0 2px var(--color-teal-glow);
 }
 
+select.form-input option {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
 .form-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
