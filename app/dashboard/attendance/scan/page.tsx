@@ -317,7 +317,7 @@ export default function QRScanPage() {
               <p style={{ fontSize: "1.05rem", marginBottom: "0.5rem" }}>
                 {selectedGroupId
                   ? "اضغط «تشغيل الكاميرا» لبدء السكان"
-                  : "اختر المجموعة ورقم الحصة أولاً"}
+                  : "اختر المجموعة أولاً"}
               </p>
               <p style={{ fontSize: "0.85rem" }}>وجّه الكاميرا نحو QR الطالب وسيتم تسجيله تلقائياً</p>
             </div>
