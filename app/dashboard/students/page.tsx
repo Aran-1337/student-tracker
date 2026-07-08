@@ -362,7 +362,6 @@ export default function StudentsManagement() {
                   setFilterGradeId(e.target.value);
                   setActiveFilter("all"); // Reset group filter
                 }}
-                style={{ height: "42px" }}
               >
                 <option value="all">كل السنين الدراسية</option>
                 {grades.map(grade => (
@@ -377,7 +376,6 @@ export default function StudentsManagement() {
                 className="form-input"
                 value={activeFilter}
                 onChange={(e) => setActiveFilter(e.target.value)}
-                style={{ height: "42px" }}
               >
                 <option value="all">جميع المجموعات</option>
                 <option value="none">بدون مجموعة</option>

@@ -52,6 +52,8 @@ export function StudentTableRow({
             style={{ 
               paddingRight: "10px", 
               paddingLeft: "30px", 
+              paddingTop: "0",
+              paddingBottom: "0",
               height: "32px",
               fontSize: "0.85rem",
               minWidth: "160px",
