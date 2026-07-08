@@ -41,9 +41,9 @@ export function StudentTableRow({
           {isSelected ? <CheckSquare size={18} className="color-teal" /> : <Square size={18} />}
         </button>
       </td>
-      <td data-label="الكود">{student.code || "-"}</td>
+      <td data-label="الكود" style={{ textAlign: "center" }}>{student.code || "-"}</td>
       <td data-label="الاسم" style={{ fontWeight: 600 }}>{student.name}</td>
-      <td data-label="المجموعة">
+      <td data-label="المجموعة" style={{ textAlign: "center" }}>
         <div style={{ display: "inline-block", position: "relative" }}>
           <select
             className="form-input"
@@ -57,6 +57,7 @@ export function StudentTableRow({
               minWidth: "160px",
               background: "rgba(255,255,255,0.05)",
               border: "1px solid rgba(255,255,255,0.1)",
+              color: "#ffffff",
               cursor: "pointer"
             }}
           >
@@ -69,8 +70,8 @@ export function StudentTableRow({
           </select>
         </div>
       </td>
-      <td data-label="الشهور المدفوعة (١ - ١٢)">
-        <div className="months-grid">
+      <td data-label="الشهور المدفوعة (١ - ١٢)" style={{ textAlign: "center" }}>
+        <div className="months-grid" style={{ justifyContent: "center" }}>
           {student.months?.map((isPaid, idx) => (
             <button
               key={idx}
@@ -83,8 +84,8 @@ export function StudentTableRow({
           ))}
         </div>
       </td>
-      <td data-label="الكتب المستلمة">
-        <div className="book-toggles">
+      <td data-label="الكتب المستلمة" style={{ textAlign: "center" }}>
+        <div className="book-toggles" style={{ justifyContent: "center" }}>
           <button
             className={`book-toggle ${student.book_1 ? "active" : ""}`}
             onClick={() => onToggleBook(student, "book_1")}
@@ -99,13 +100,13 @@ export function StudentTableRow({
           </button>
         </div>
       </td>
-      <td data-label="إجراءات">
+      <td data-label="إجراءات" style={{ textAlign: "center" }}>
         <Button
           variant="secondary"
           size="sm"
           onClick={() => onDelete(student.id)}
           title="حذف الطالب"
-          style={{ border: "none", background: "none" }}
+          style={{ border: "none", background: "none", margin: "0 auto" }}
         >
           <Trash2 size={16} className="color-danger" />
         </Button>

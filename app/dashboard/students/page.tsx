@@ -423,21 +423,21 @@ export default function StudentsManagement() {
             <table className="students-table">
               <thead>
                 <tr>
-                  <th style={{ width: "40px" }}>
+                  <th style={{ width: "40px", textAlign: "center" }}>
                     <button 
                       onClick={toggleSelectAll} 
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)", display: "flex" }}
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)", display: "flex", margin: "0 auto" }}
                       title="تحديد الكل / إلغاء"
                     >
                       {allSelected ? <CheckSquare size={18} className="color-teal" /> : <Square size={18} />}
                     </button>
                   </th>
-                  <th style={{ minWidth: "100px" }}>الكود</th>
+                  <th style={{ minWidth: "80px", textAlign: "center" }}>الكود</th>
                   <th style={{ minWidth: "200px" }}>الاسم</th>
-                  <th style={{ minWidth: "150px" }}>المجموعة</th>
-                  <th style={{ minWidth: "300px" }}>الشهور المدفوعة (١ - ١٢)</th>
-                  <th style={{ minWidth: "200px" }}>الكتب المستلمة</th>
-                  <th style={{ minWidth: "80px" }}>إجراءات</th>
+                  <th style={{ minWidth: "150px", textAlign: "center" }}>المجموعة</th>
+                  <th style={{ minWidth: "250px", textAlign: "center" }}>الشهور المدفوعة (١ - ١٢)</th>
+                  <th style={{ minWidth: "150px", textAlign: "center" }}>الكتب المستلمة</th>
+                  <th style={{ minWidth: "80px", textAlign: "center" }}>إجراءات</th>
                 </tr>
               </thead>
               <tbody>
