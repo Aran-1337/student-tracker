@@ -22,11 +22,28 @@ export const BillsRepository = {
     return data;
   },
 
+  async addBills(bills: Omit<Bill, "id" | "created_at">[]): Promise<Bill[]> {
+    const { data, error } = await supabase
+      .from("bills")
+      .insert(bills)
+      .select();
+    if (error) throw error;
+    return data || [];
+  },
+
   async deleteBill(id: string): Promise<void> {
     const { error } = await supabase
       .from("bills")
       .delete()
       .eq("id", id);
+    if (error) throw error;
+  },
+
+  async deleteBills(ids: string[]): Promise<void> {
+    const { error } = await supabase
+      .from("bills")
+      .delete()
+      .in("id", ids);
     if (error) throw error;
   }
 };

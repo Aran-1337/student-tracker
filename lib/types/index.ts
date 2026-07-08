@@ -70,12 +70,12 @@ export interface AttendanceRecord {
 
 export interface Bill {
   id: string;
-  teacher_id: string;
-  student_id: string;
-  month: number;
-  year: number;
+  title: string;
   amount: number;
-  type: string;
+  category: "إيجار" | "رواتب سكرتارية" | "أخرى";
+  billing_month: number;
+  is_recurring: boolean;
+  teacher_id?: string;
   created_at?: string;
 }
 
