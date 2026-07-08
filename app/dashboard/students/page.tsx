@@ -175,7 +175,7 @@ export default function StudentsManagement() {
 
       if (error) throw error;
 
-      setStudents([data[0], ...students]);
+      setStudents([...students, data[0]]);
       setStudentName("");
       setStudentGroupId("");
       showToast("تم إضافة الطالب بنجاح.");
