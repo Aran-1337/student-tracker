@@ -496,7 +496,7 @@ export default function BillsManagement() {
               <div style={{ textAlign: "center", padding: "1rem 0", color: "var(--text-muted)", fontSize: "0.85rem" }}>
                 <Repeat size={32} style={{ opacity: 0.3, display: "block", margin: "0 auto 0.5rem auto" }} />
                 لا توجد فواتير متكررة بعد.<br/>
-                سجل فاتورة وفعّل خيار "متكررة شهرياً"
+                سجل فاتورة وفعّل خيار &quot;متكررة شهرياً&quot;
               </div>
             ) : (
               <>
