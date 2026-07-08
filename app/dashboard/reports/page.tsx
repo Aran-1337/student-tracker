@@ -147,6 +147,7 @@ export default function ReportsPage() {
   const totalSubscriptionEarnings = totalPaidMonthsCount * monthlyPrice;
 
   // 2. Books
+  // 2. Books
   let totalBookEarnings = 0;
   const booksStats = teacherBooks.map(book => {
     const count = filteredStudents.filter(s => s.received_books && s.received_books.includes(book.id)).length;

@@ -15,7 +15,7 @@ import {
 
 import { TeachersService } from "@/lib/services/teachersService";
 import { GradesService } from "@/lib/services/gradesService";
-import { Grade } from "@/lib/types";
+import { Grade, BookDef } from "@/lib/types";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -30,7 +30,7 @@ export default function SettingsPage() {
   // Form states
   const [name, setName] = useState("");
   const [monthlyPrice, setMonthlyPrice] = useState("100");
-  const [books, setBooks] = useState<{ id: string; name: string; price: number }[]>([]);
+  const [books, setBooks] = useState<BookDef[]>([]);
 
   const [grades, setGrades] = useState<Grade[]>([]);
   const [newGradeName, setNewGradeName] = useState("");
@@ -103,6 +103,7 @@ export default function SettingsPage() {
       setSaveLoading(false);
     }
   };
+
 
   const handleAddBook = () => {
     const newBook = {

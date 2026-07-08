@@ -51,5 +51,9 @@ export const StudentsService = {
 
   async deleteStudent(id: string): Promise<void> {
     return StudentsRepository.deleteStudent(id);
+  },
+
+  async deleteStudents(ids: string[]): Promise<void> {
+    return StudentsRepository.deleteStudents(ids);
   }
 };

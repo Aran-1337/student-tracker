@@ -45,5 +45,13 @@ export const StudentsRepository = {
       .delete()
       .eq("id", id);
     if (error) throw error;
+  },
+
+  async deleteStudents(ids: string[]): Promise<void> {
+    const { error } = await supabase
+      .from("students")
+      .delete()
+      .in("id", ids);
+    if (error) throw error;
   }
 };

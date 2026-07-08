@@ -33,7 +33,6 @@ export function StudentTableRow({
   onDelete,
   onUpdateGroup
 }: StudentTableRowProps) {
-  const receivedBooks = student.received_books || [];
 
   return (
     <tr className={isSelected ? "row-selected" : ""}>
@@ -91,24 +90,20 @@ export function StudentTableRow({
         </div>
       </td>
       <td data-label="الكتب المستلمة" style={{ textAlign: "center" }}>
-        <div className="book-toggles" style={{ justifyContent: "center", flexWrap: "wrap", gap: "6px" }}>
+        <div className="book-toggles" style={{ justifyContent: "center" }}>
           {teacherBooks.map(book => {
-            const isReceived = receivedBooks.includes(book.id);
+            const hasBook = student.received_books?.includes(book.id);
             return (
               <button
                 key={book.id}
-                className={`book-toggle ${isReceived ? "active" : ""}`}
+                className={`book-toggle ${hasBook ? "active" : ""}`}
                 onClick={() => onToggleBook(student, book.id)}
                 title={book.name}
-                style={{ minWidth: "70px", padding: "4px 8px", fontSize: "0.8rem", flex: "1 1 auto" }}
               >
-                {isReceived ? `✓ ${book.name}` : book.name}
+                {book.name}
               </button>
             );
           })}
-          {teacherBooks.length === 0 && (
-            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>لا توجد كتب</span>
-          )}
         </div>
       </td>
       <td data-label="إجراءات" style={{ textAlign: "center" }}>

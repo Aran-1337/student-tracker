@@ -30,11 +30,11 @@ export function Toast({
   if (!isVisible) return null;
 
   return (
-    <div className={`toast-notification ${type === 'error' ? 'toast-error' : ''}`}>
+    <div className={`alert-toast ${type === 'error' ? 'alert-error' : 'alert-success'}`}>
       {type === 'success' ? (
-        <CheckCircle2 size={18} style={{ color: "var(--color-teal)" }} />
+        <CheckCircle2 size={18} />
       ) : (
-        <AlertCircle size={18} style={{ color: "var(--color-danger)" }} />
+        <AlertCircle size={18} />
       )}
       <span>{message}</span>
     </div>
