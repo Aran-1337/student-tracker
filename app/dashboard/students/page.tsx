@@ -27,6 +27,7 @@ interface Grade {
   id: string;
   name: string;
   start_code: number;
+  prefix?: string;
 }
 
 interface Student {
@@ -145,17 +146,21 @@ export default function StudentsManagement() {
       // Generate code dynamically in frontend to bypass trigger issues
       const grade = grades.find(g => g.id === studentGradeId);
       const startCode = grade?.start_code || 0;
+      const prefix = grade?.prefix || '';
       
       const gradeStudents = students.filter(s => s.grade_id === studentGradeId);
       let maxCode = -1;
       gradeStudents.forEach(s => {
-        const num = parseInt(s.code?.replace(/\D/g, '') || '-1', 10);
+        let codeStr = s.code || '';
+        if (prefix && codeStr.startsWith(prefix)) {
+          codeStr = codeStr.substring(prefix.length);
+        }
+        const num = parseInt(codeStr.replace(/\D/g, '') || '-1', 10);
         if (!isNaN(num) && num > maxCode) maxCode = num;
       });
 
-      const generatedCode = (maxCode < startCode) 
-        ? String(startCode) 
-        : String(maxCode + 1);
+      const generatedNum = (maxCode < startCode) ? startCode : maxCode + 1;
+      const generatedCode = `${prefix}${generatedNum}`;
 
       const { data, error } = await supabase
         .from("students")

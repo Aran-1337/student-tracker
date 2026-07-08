@@ -19,6 +19,7 @@ interface Grade {
   id: string;
   name: string;
   start_code: number;
+  prefix?: string;
 }
 
 export default function SettingsPage() {
@@ -35,6 +36,7 @@ export default function SettingsPage() {
   const [grades, setGrades] = useState<Grade[]>([]);
   const [newGradeName, setNewGradeName] = useState("");
   const [newGradeStartCode, setNewGradeStartCode] = useState("");
+  const [newGradePrefix, setNewGradePrefix] = useState("");
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -254,7 +256,10 @@ export default function SettingsPage() {
               <div key={grade.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{grade.name}</h3>
-                  <p style={{ margin: "0.2rem 0 0 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>بداية الأكواد: <strong style={{ color: "var(--color-teal)" }}>{grade.start_code}</strong></p>
+                  <p style={{ margin: "0.2rem 0 0 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                    بداية الأكواد: <strong style={{ color: "var(--color-teal)" }}>{grade.start_code}</strong>
+                    {grade.prefix && <span style={{ marginLeft: "10px" }}> | البادئة: <strong style={{ color: "var(--color-teal)" }}>{grade.prefix}</strong></span>}
+                  </p>
                 </div>
                 <button
                   onClick={async () => {
@@ -283,6 +288,14 @@ export default function SettingsPage() {
                 onChange={(e) => setNewGradeName(e.target.value)}
               />
               <input
+                type="text"
+                placeholder="البادئة (اختياري) مثال: prep-"
+                className="form-input"
+                style={{ flex: 1, minWidth: "150px" }}
+                value={newGradePrefix}
+                onChange={(e) => setNewGradePrefix(e.target.value)}
+              />
+              <input
                 type="number"
                 placeholder="بداية الأكواد (مثال: 10000)"
                 className="form-input"
@@ -301,6 +314,7 @@ export default function SettingsPage() {
                   const { data, error } = await supabase.from("grades").insert([{
                     name: newGradeName,
                     start_code: parseInt(newGradeStartCode),
+                    prefix: newGradePrefix || '',
                     teacher_id: userId
                   }]).select().single();
 
@@ -310,6 +324,7 @@ export default function SettingsPage() {
                     setGrades([...grades, data]);
                     setNewGradeName("");
                     setNewGradeStartCode("");
+                    setNewGradePrefix("");
                     showToast("تم إضافة السنة الدراسية بنجاح");
                   }
                 }}
