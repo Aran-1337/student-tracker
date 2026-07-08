@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Check, X, Edit3 } from 'lucide-react';
+import { Trash2, CheckSquare, Square } from 'lucide-react';
 import { Student, Group } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 
@@ -11,6 +11,8 @@ export interface StudentTableRowProps {
   groups: Group[];
   arabicMonths: string[];
   formatTimeTo12H: (time: string) => string;
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
   onToggleMonth: (student: Student, monthIndex: number) => void;
   onToggleBook: (student: Student, bookField: "book_1" | "book_2") => void;
   onDelete: (id: string) => void;
@@ -22,13 +24,23 @@ export function StudentTableRow({
   groups,
   arabicMonths,
   formatTimeTo12H,
+  isSelected,
+  onToggleSelect,
   onToggleMonth,
   onToggleBook,
   onDelete,
   onUpdateGroup
 }: StudentTableRowProps) {
   return (
-    <tr>
+    <tr className={isSelected ? "row-selected" : ""}>
+      <td data-label="تحديد">
+        <button 
+          onClick={() => onToggleSelect(student.id)}
+          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)", display: "flex" }}
+        >
+          {isSelected ? <CheckSquare size={18} className="color-teal" /> : <Square size={18} />}
+        </button>
+      </td>
       <td data-label="الكود">{student.code || "-"}</td>
       <td data-label="الاسم" style={{ fontWeight: 600 }}>{student.name}</td>
       <td data-label="المجموعة">
