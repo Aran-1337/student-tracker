@@ -10,6 +10,10 @@ export const AttendanceService = {
     return AttendanceRepository.addAttendanceRecord(record);
   },
 
+  async addAttendanceRecords(records: Omit<AttendanceRecord, "id" | "created_at">[]): Promise<AttendanceRecord[]> {
+    return AttendanceRepository.addAttendanceRecords(records);
+  },
+
   async deleteAttendanceRecord(id: string): Promise<void> {
     return AttendanceRepository.deleteAttendanceRecord(id);
   },

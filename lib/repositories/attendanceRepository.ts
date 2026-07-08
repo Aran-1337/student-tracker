@@ -25,6 +25,15 @@ export const AttendanceRepository = {
     return data;
   },
 
+  async addAttendanceRecords(records: Omit<AttendanceRecord, "id" | "created_at">[]): Promise<AttendanceRecord[]> {
+    const { data, error } = await supabase
+      .from("attendance_records")
+      .insert(records)
+      .select();
+    if (error) throw error;
+    return data || [];
+  },
+
   async deleteAttendanceRecord(id: string): Promise<void> {
     const { error } = await supabase
       .from("attendance_records")

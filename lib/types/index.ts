@@ -65,6 +65,7 @@ export interface AttendanceRecord {
   year: number;
   status: "present" | "absent";
   group_id?: string | null;
+  teacher_id?: string;
   created_at?: string;
 }
 

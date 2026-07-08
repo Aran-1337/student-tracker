@@ -12,21 +12,43 @@ import {
   CheckCircle2,
   AlertCircle,
   Download,
-  ScanLine
+  ScanLine,
+  ChevronRight,
+  ChevronLeft
 } from "lucide-react";
 import Link from "next/link";
 
-import { Group, Student, Grade, AttendanceRecord } from "@/lib/types";
-import { GroupsService } from "@/lib/services/groupsService";
-import { StudentsService } from "@/lib/services/studentsService";
-import { GradesService } from "@/lib/services/gradesService";
-import { AttendanceService } from "@/lib/services/attendanceService";
+interface Group {
+  id: string;
+  name: string;
+  day_of_week: string;
+  time: string;
+  sessions_per_month?: number;
+  grade_id?: string | null;
+}
 
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Toast } from "@/components/ui/Toast";
-import { Spinner } from "@/components/ui/Spinner";
-import { Modal } from "@/components/ui/Modal";
+interface Student {
+  id: string;
+  name: string;
+  group_id: string | null;
+  grade_id?: string | null;
+}
+
+interface Grade {
+  id: string;
+  name: string;
+  start_code?: number;
+  prefix?: string;
+}
+
+interface AttendanceRecord {
+  id: string;
+  student_id: string;
+  session_date: string;
+  month: number;
+  year: number;
+  status: "present" | "absent";
+}
 
 const arabicMonths = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -69,30 +91,27 @@ export default function AttendancePage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
   };
 
   // ── Load initial data ────────────────────────────────────────────
   useEffect(() => {
     async function load() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-        setUserId(session.user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      setUserId(session.user.id);
 
-        const [grpData, stData, grdData] = await Promise.all([
-          GroupsService.getAllGroups(),
-          StudentsService.getAllStudents(),
-          GradesService.getAllGrades()
-        ]);
+      // Fallback for older schemas missing sessions_per_month
+      let { data: grpData } = await supabase.from("groups").select("id, name, day_of_week, time, grade_id").order("created_at");
 
-        setGroups(grpData);
-        setStudents(stData);
-        setGrades(grdData);
-      } catch (err: any) {
-        showToast("حدث خطأ أثناء تحميل البيانات.", "error");
-      } finally {
-        setLoading(false);
-      }
+      const { data: stData } = await supabase.from("students").select("id, name, group_id, grade_id").order("name");
+
+      const { data: grdData } = await supabase.from("grades").select("id, name").order("created_at");
+
+      setGroups(grpData || []);
+      setStudents(stData || []);
+      setGrades(grdData || []);
+      setLoading(false);
     }
     load();
   }, []);
@@ -100,12 +119,12 @@ export default function AttendancePage() {
   // ── Load attendance for selected month/year ──────────────────────
   const loadAttendance = useCallback(async () => {
     if (!userId) return;
-    try {
-      const records = await AttendanceService.getAttendanceRecords(selectedMonth, selectedYear);
-      setAttendance(records);
-    } catch (err) {
-      // ignore
-    }
+    const { data, error } = await supabase
+      .from("attendance_records")
+      .select("*")
+      .eq("month", selectedMonth)
+      .eq("year", selectedYear);
+    if (!error) setAttendance(data || []);
   }, [userId, selectedMonth, selectedYear]);
 
   useEffect(() => {
@@ -152,18 +171,15 @@ export default function AttendancePage() {
       // Delete (remove attendance)
       const optimistic = attendance.filter(a => a.id !== existing.id);
       setAttendance(optimistic);
-      try {
-        await AttendanceService.deleteAttendanceRecord(existing.id);
-      } catch (error) {
-        setAttendance(attendance);
-        showToast("فشل حذف الحضور", "error");
-      }
+      const { error } = await supabase.from("attendance_records").delete().eq("id", existing.id);
+      if (error) { setAttendance(attendance); showToast("فشل حذف الحضور", "error"); }
     } else {
       // Insert (mark present)
       const sessionMonth = parseInt(dateStr.split("-")[1], 10);
       const currentYear = parseInt(dateStr.split("-")[0], 10);
-      try {
-        const newRecord = await AttendanceService.addAttendanceRecord({
+      const { data, error } = await supabase
+        .from("attendance_records")
+        .insert([{
           teacher_id: userId,
           student_id: student.id,
           group_id: student.group_id,
@@ -171,11 +187,11 @@ export default function AttendancePage() {
           month: sessionMonth,
           year: currentYear,
           status: "present"
-        });
-        setAttendance([...attendance, newRecord]);
-      } catch (error) {
-        showToast("فشل تسجيل الحضور", "error");
-      }
+        }])
+        .select()
+        .single();
+      if (error) { showToast("فشل تسجيل الحضور", "error"); return; }
+      setAttendance([...attendance, data]);
     }
   };
 
@@ -195,7 +211,7 @@ export default function AttendancePage() {
           session_date: dateStr,
           month: sessionMonth,
           year: sessionYear,
-          status: "present" as "present" | "absent"
+          status: "present"
         }));
 
       if (toInsert.length === 0) {
@@ -203,9 +219,13 @@ export default function AttendancePage() {
         return;
       }
 
-      const newRecords = await AttendanceService.addAttendanceRecords(toInsert);
+      const { data, error } = await supabase
+        .from("attendance_records")
+        .insert(toInsert)
+        .select();
 
-      setAttendance([...attendance, ...newRecords]);
+      if (error) throw error;
+      setAttendance([...attendance, ...(data || [])]);
       showToast(`✓ تم تحضير ${toInsert.length} طالب بتاريخ ${dateStr}`);
     } catch (err: any) {
       showToast(err.message || "فشل التحضير الجماعي", "error");
@@ -263,7 +283,7 @@ export default function AttendancePage() {
     return sessionsCount > 0 ? Math.round((present / sessionsCount) * 100) : 0;
   };
 
-  if (loading) return <Spinner fullScreen />;
+  if (loading) return <div className="loading-wrapper"><div className="spinner" /></div>;
 
   return (
     <div>
@@ -359,13 +379,13 @@ export default function AttendancePage() {
                   style={{ padding: "0.6rem 0.75rem" }}
                 />
               </div>
-              <Button
-                variant="primary"
+              <button
                 onClick={handleAddSessionDate}
+                className="btn btn-primary"
                 style={{ padding: "0.6rem 1rem", height: "42px" }}
               >
                 + إضافة
-              </Button>
+              </button>
             </div>
           )}
         </div>
@@ -520,14 +540,33 @@ export default function AttendancePage() {
       </div>
 
       {/* QR Modal */}
-      <Modal
-        isOpen={!!qrStudent}
-        onClose={() => setQrStudent(null)}
-        title={`QR Code — ${qrStudent?.name}`}
-        maxWidth="360px"
-      >
-        {qrStudent && (
-          <div style={{ textAlign: "center" }}>
+      {qrStudent && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 200,
+            background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "1rem"
+          }}
+          onClick={() => setQrStudent(null)}
+        >
+          <div
+            style={{
+              background: "var(--bg-secondary)", borderRadius: "20px",
+              border: "1px solid var(--border-color)", padding: "2rem",
+              maxWidth: "360px", width: "100%", textAlign: "center",
+              boxShadow: "0 25px 60px rgba(0,0,0,0.5)"
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <h3 style={{ fontSize: "1.15rem" }}>QR Code — {qrStudent.name}</h3>
+              <button onClick={() => setQrStudent(null)} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* QR Code */}
             <div style={{
               background: "#ffffff", borderRadius: "16px", padding: "1.5rem",
               display: "inline-block", marginBottom: "1.5rem"
@@ -544,25 +583,24 @@ export default function AttendancePage() {
               السكرتارية تسكان هذا الكود عند دخول الطالب
             </p>
 
-            <Button
-              variant="primary"
+            <button
+              className="btn btn-primary"
               style={{ width: "100%", justifyContent: "center" }}
               onClick={() => handleDownloadQR(qrStudent)}
-              leftIcon={<Download size={16} />}
             >
-              تحميل QR كصورة
-            </Button>
+              <Download size={16} />
+              <span>تحميل QR كصورة</span>
+            </button>
           </div>
-        )}
-      </Modal>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onClose={() => setToast(null)}
-        />
+        <div className={`alert-toast ${toast.type === "success" ? "alert-success" : "alert-error"}`}>
+          {toast.type === "error" ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+          <span>{toast.message}</span>
+        </div>
       )}
     </div>
   );
