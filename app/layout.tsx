@@ -12,6 +12,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
+import { Analytics } from "@vercel/analytics/next";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -19,7 +21,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
