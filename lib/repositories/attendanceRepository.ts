@@ -25,6 +25,13 @@ export const AttendanceRepository = {
     return data;
   },
 
+  async upsertAttendanceRecord(record: Omit<AttendanceRecord, "id" | "created_at">): Promise<void> {
+    const { error } = await supabase
+      .from("attendance_records")
+      .upsert([record], { onConflict: "student_id,session_date" });
+    if (error) throw error;
+  },
+
   async addAttendanceRecords(records: Omit<AttendanceRecord, "id" | "created_at">[]): Promise<AttendanceRecord[]> {
     const { data, error } = await supabase
       .from("attendance_records")
