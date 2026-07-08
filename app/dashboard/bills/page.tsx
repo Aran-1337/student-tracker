@@ -279,6 +279,42 @@ export default function BillsManagement() {
     }
   };
 
+  const handleAddTestBills = async () => {
+    if (!userId) return;
+    setActionLoading(true);
+    try {
+      const testBills = [
+        { teacher_id: userId, title: "إيجار قاعة عشوائي", amount: 1500, category: "إيجار", billing_month: new Date().getMonth() + 1, is_recurring: true },
+        { teacher_id: userId, title: "راتب مساعدة", amount: 800, category: "رواتب سكرتارية", billing_month: new Date().getMonth() + 1, is_recurring: false },
+        { teacher_id: userId, title: "تصوير ورق عشوائي", amount: 300, category: "أخرى", billing_month: new Date().getMonth() + 1, is_recurring: false },
+      ];
+      const { data, error } = await supabase.from("bills").insert(testBills).select();
+      if (error) throw error;
+      setBills([...(data || []), ...bills]);
+      showToast("تم إضافة فواتير اختبارية بنجاح.");
+    } catch (error: any) {
+      showToast("فشل إضافة الفواتير الاختبارية.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteAllBills = async () => {
+    if (!confirm("تحذير: هل أنت متأكد من حذف كافة الفواتير من قاعدة البيانات؟ (هذا الإجراء لأغراض الاختبار)")) return;
+    setActionLoading(true);
+    try {
+      const { error } = await supabase.from("bills").delete().neq("id", "00000000-0000-0000-0000-000000000000"); // trick to delete all rows
+      if (error) throw error;
+      setBills([]);
+      setSelectedBillIds(new Set());
+      showToast("تم حذف جميع الفواتير بنجاح.");
+    } catch (error: any) {
+      showToast("فشل حذف الفواتير.", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Fix: UNIQUE recurring templates keyed by title|category|amount
   const recurringTemplatesMap = new Map<string, Bill>();
   for (const b of bills) {
@@ -563,6 +599,33 @@ export default function BillsManagement() {
                 </div>
               </>
             )}
+
+            {/* Test Actions Panel */}
+            <div style={{ marginTop: "2rem", borderTop: "1px dashed var(--border-color)", paddingTop: "1.5rem" }}>
+              <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "1rem", fontWeight: 600, display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <Zap size={14} style={{ color: "var(--color-amber)" }} />
+                قائمة أكشنز للاختبار
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleAddTestBills}
+                  disabled={actionLoading}
+                  style={{ width: "100%", justifyContent: "center", fontSize: "0.85rem" }}
+                >
+                  إضافة فواتير عشوائية للاختبار
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={handleDeleteAllBills}
+                  disabled={actionLoading}
+                  style={{ width: "100%", justifyContent: "center", fontSize: "0.85rem", color: "var(--color-danger)", borderColor: "rgba(239, 68, 68, 0.3)" }}
+                >
+                  <Trash2 size={14} style={{ marginRight: "0.25rem" }} />
+                  حذف جميع الفواتير
+                </button>
+              </div>
+            </div>
           </div>
         </aside>
 
