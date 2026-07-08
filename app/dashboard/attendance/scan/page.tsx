@@ -92,7 +92,7 @@ export default function QRScanPage() {
       const [{ data: grpData }, { data: stData }, { data: grdData }] = await Promise.all([
         supabase.from("groups").select("id, name, day_of_week, time, grade_id"),
         supabase.from("students").select("id, name, group_id, code, grade_id"),
-        supabase.from("grades").select("id, name").order("created_at")
+        supabase.from("grades").select("id, name, prefix").order("created_at")
       ]);
 
       setGroups(grpData || []);
@@ -232,9 +232,21 @@ export default function QRScanPage() {
 
   const handleManualCodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!manualCode.trim()) return;
+    let code = manualCode.trim();
+    if (!code) return;
     
-    const student = students.find(s => s.code === manualCode.trim());
+    // Auto-inject prefix if it matches the selected grade
+    if (selectedGradeId && selectedGradeId !== "all") {
+      const grade = grades.find(g => g.id === selectedGradeId);
+      if (grade?.prefix && !code.startsWith(grade.prefix)) {
+        code = `${grade.prefix}${code}`;
+      }
+    }
+    
+    let student = students.find(s => s.code === code);
+    // fallback if they typed the prefix themselves but we somehow messed it up
+    if (!student) student = students.find(s => s.code === manualCode.trim());
+
     if (!student) {
       setLastScan({ name: "كود غير صحيح!", success: false });
       setTimeout(() => setLastScan(null), 2500);
@@ -251,6 +263,14 @@ export default function QRScanPage() {
     "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
     "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
   ];
+
+  let manualPlaceholder = "مثال: 10001";
+  if (selectedGradeId && selectedGradeId !== "all") {
+    const grade = grades.find(g => g.id === selectedGradeId);
+    if (grade?.prefix) {
+      manualPlaceholder = `مثال: ${grade.prefix}1001`;
+    }
+  }
 
   return (
     <div>
@@ -366,7 +386,7 @@ export default function QRScanPage() {
               <form onSubmit={handleManualCodeSubmit} style={{ display: "flex", gap: "0.5rem" }}>
                 <input
                   type="text"
-                  placeholder="مثال: 10001"
+                  placeholder={manualPlaceholder}
                   className="form-input"
                   style={{ flex: 1 }}
                   value={manualCode}
