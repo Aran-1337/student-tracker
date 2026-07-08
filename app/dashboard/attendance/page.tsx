@@ -37,7 +37,7 @@ interface Student {
 interface Grade {
   id: string;
   name: string;
-  start_code: number;
+  start_code?: number;
   prefix?: string;
 }
 
