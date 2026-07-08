@@ -15,7 +15,8 @@ import {
 
 import { TeachersService } from "@/lib/services/teachersService";
 import { GradesService } from "@/lib/services/gradesService";
-import { Grade, BookDef } from "@/lib/types";
+import { StudentsService } from "@/lib/services/studentsService";
+import { Grade, BookDef, Student } from "@/lib/types";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -31,6 +32,8 @@ export default function SettingsPage() {
   const [name, setName] = useState("");
   const [monthlyPrice, setMonthlyPrice] = useState("100");
   const [books, setBooks] = useState<BookDef[]>([]);
+  const [deletedBookIds, setDeletedBookIds] = useState<string[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
 
   const [grades, setGrades] = useState<Grade[]>([]);
   const [newGradeName, setNewGradeName] = useState("");
@@ -50,9 +53,10 @@ export default function SettingsPage() {
         if (!session) return;
         setUserId(session.user.id);
 
-        const [teacher, gradesData] = await Promise.all([
+        const [teacher, gradesData, studentsData] = await Promise.all([
           TeachersService.getTeacherProfile(session.user.id),
-          GradesService.getGradesByTeacherId(session.user.id)
+          GradesService.getGradesByTeacherId(session.user.id),
+          StudentsService.getStudentsByTeacherId(session.user.id)
         ]);
 
         if (teacher) {
@@ -63,6 +67,7 @@ export default function SettingsPage() {
 
         const allGrades = await GradesService.getAllGrades();
         setGrades(allGrades);
+        setStudents(studentsData);
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل الإعدادات.", "error");
       } finally {
@@ -96,6 +101,25 @@ export default function SettingsPage() {
         books: books
       });
 
+      if (deletedBookIds.length > 0) {
+        const affectedStudents = students.filter(s => s.received_books?.some(bId => deletedBookIds.includes(bId)));
+        const updatePromises = affectedStudents.map(student => {
+          const newBooks = student.received_books?.filter(bId => !deletedBookIds.includes(bId)) || [];
+          return StudentsService.updateStudent(student.id, { received_books: newBooks });
+        });
+        await Promise.all(updatePromises);
+        setDeletedBookIds([]);
+        
+        // Update local students state
+        setStudents(students.map(s => {
+          if (affectedStudents.some(a => a.id === s.id)) {
+            const newBooks = s.received_books?.filter(bId => !deletedBookIds.includes(bId)) || [];
+            return { ...s, received_books: newBooks };
+          }
+          return s;
+        }));
+      }
+
       showToast("تم حفظ الإعدادات بنجاح.");
     } catch (err: any) {
       showToast(err.message || "فشل حفظ الإعدادات.", "error");
@@ -119,7 +143,14 @@ export default function SettingsPage() {
   };
 
   const handleRemoveBook = (id: string) => {
+    const affectedCount = students.filter(s => s.received_books?.includes(id)).length;
+    if (affectedCount > 0) {
+      if (!confirm(`سيتم حذف هذا الكتاب من سجلات ${affectedCount} طالب مستلمين له عند حفظ الإعدادات، هل أنت متأكد؟`)) {
+        return;
+      }
+    }
     setBooks(books.filter(b => b.id !== id));
+    setDeletedBookIds([...deletedBookIds, id]);
   };
 
   const handleAddGrade = async () => {
