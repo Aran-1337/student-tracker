@@ -147,13 +147,13 @@ export default function StudentsManagement() {
       const startCode = grade?.start_code || 0;
       
       const gradeStudents = students.filter(s => s.grade_id === studentGradeId);
-      let maxCode = 0;
+      let maxCode = -1;
       gradeStudents.forEach(s => {
-        const num = parseInt(s.code?.replace(/\D/g, '') || '0', 10);
+        const num = parseInt(s.code?.replace(/\D/g, '') || '-1', 10);
         if (!isNaN(num) && num > maxCode) maxCode = num;
       });
 
-      const generatedCode = (maxCode === 0 || maxCode < startCode) 
+      const generatedCode = (maxCode < startCode) 
         ? String(startCode) 
         : String(maxCode + 1);
 
