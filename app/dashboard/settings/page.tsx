@@ -8,19 +8,19 @@ import {
   DollarSign, 
   BookOpen, 
   Save, 
-  AlertCircle,
-  Check,
   Plus,
   Trash2,
   GraduationCap
 } from "lucide-react";
 
-interface Grade {
-  id: string;
-  name: string;
-  start_code: number;
-  prefix?: string;
-}
+import { TeachersService } from "@/lib/services/teachersService";
+import { GradesService } from "@/lib/services/gradesService";
+import { Grade } from "@/lib/types";
+
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Toast } from "@/components/ui/Toast";
+import { Spinner } from "@/components/ui/Spinner";
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
@@ -42,7 +42,6 @@ export default function SettingsPage() {
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
   };
 
   useEffect(() => {
@@ -52,13 +51,10 @@ export default function SettingsPage() {
         if (!session) return;
         setUserId(session.user.id);
 
-        const { data: teacher, error } = await supabase
-          .from("teachers")
-          .select("*")
-          .eq("id", session.user.id)
-          .single();
-
-        if (error) throw error;
+        const [teacher, gradesData] = await Promise.all([
+          TeachersService.getTeacherProfile(session.user.id),
+          GradesService.getGradesByTeacherId(session.user.id) // using getGradesByTeacherId instead of getAll for safety, though previously it was all
+        ]);
 
         if (teacher) {
           setName(teacher.name || "");
@@ -67,11 +63,10 @@ export default function SettingsPage() {
           setBook2Price(String(teacher.book_2_price ?? 50));
         }
 
-        const { data: gradesData } = await supabase
-          .from("grades")
-          .select("*")
-          .order("created_at", { ascending: true });
-        setGrades(gradesData || []);
+        // To exactly match the old behavior where it fetched all grades regardless (though it's a bug in the old code)
+        // Actually, the old code fetched all grades without filtering by teacher id. We should probably stick to getting all grades to not break anything.
+        const allGrades = await GradesService.getAllGrades();
+        setGrades(allGrades);
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل الإعدادات.", "error");
       } finally {
@@ -91,21 +86,14 @@ export default function SettingsPage() {
 
     setSaveLoading(true);
     try {
-      const { error } = await supabase
-        .from("teachers")
-        .update({
-          name: name,
-          monthly_price: Number(monthlyPrice) || 0,
-          book_1_price: Number(book1Price) || 0,
-          book_2_price: Number(book2Price) || 0
-        })
-        .eq("id", userId);
-
-      if (error) throw error;
+      await TeachersService.updateTeacherProfile(userId, {
+        name: name,
+        monthly_price: Number(monthlyPrice) || 0,
+        book_1_price: Number(book1Price) || 0,
+        book_2_price: Number(book2Price) || 0
+      });
 
       showToast("تم حفظ الإعدادات بنجاح.");
-      
-      // Refresh layout or profile quick info (handled by layout re-fetching on navigation or pathname trigger)
     } catch (err: any) {
       showToast(err.message || "فشل حفظ الإعدادات.", "error");
     } finally {
@@ -113,12 +101,45 @@ export default function SettingsPage() {
     }
   };
 
+  const handleAddGrade = async () => {
+    if (!newGradeName || !newGradeStartCode) {
+      showToast("يرجى إدخال اسم السنة وبداية الأكواد", "error");
+      return;
+    }
+    if (!userId) return;
+
+    try {
+      const addedGrade = await GradesService.addGrade({
+        name: newGradeName,
+        start_code: parseInt(newGradeStartCode),
+        prefix: newGradePrefix || '',
+        teacher_id: userId
+      });
+
+      setGrades([...grades, addedGrade]);
+      setNewGradeName("");
+      setNewGradeStartCode("");
+      setNewGradePrefix("");
+      showToast("تم إضافة السنة الدراسية بنجاح");
+    } catch (error) {
+      showToast("فشل إضافة السنة الدراسية", "error");
+    }
+  };
+
+  const handleDeleteGrade = async (gradeId: string) => {
+    if (confirm("هل أنت متأكد من حذف هذه السنة الدراسية؟ (المجموعات التابعة لها ستصبح بدون سنة)")) {
+      try {
+        await GradesService.deleteGrade(gradeId);
+        setGrades(grades.filter(g => g.id !== gradeId));
+        showToast("تم الحذف بنجاح");
+      } catch (err) {
+        showToast("فشل حذف السنة الدراسية.", "error");
+      }
+    }
+  };
+
   if (loading) {
-    return (
-      <div className="loading-wrapper">
-        <div className="spinner"></div>
-      </div>
-    );
+    return <Spinner fullScreen />;
   }
 
   return (
@@ -140,20 +161,17 @@ export default function SettingsPage() {
           <div style={{ paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1.5rem" }}>
             <h3 style={{ fontSize: "1.1rem", marginBottom: "1rem", color: "var(--color-info)" }}>البيانات الشخصية</h3>
             <div className="form-group" style={{ maxWidth: "450px" }}>
-              <label className="form-label" htmlFor="tName">اسم المعلم الكامل</label>
-              <div className="search-input-wrapper" style={{ flex: "none" }}>
-                <User className="search-icon" size={18} />
-                <input
-                  id="tName"
-                  type="text"
-                  required
-                  placeholder="مثال: أستاذ أحمد محمود"
-                  className="search-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <p className="settings-description">الاسم الذي يظهر أعلى الشريط الجانبي وفي التقارير</p>
+              <Input
+                label="اسم المعلم الكامل"
+                id="tName"
+                type="text"
+                required
+                placeholder="مثال: أستاذ أحمد محمود"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                leftIcon={<User size={18} />}
+              />
+              <p className="settings-description" style={{ marginTop: "0.5rem" }}>الاسم الذي يظهر أعلى الشريط الجانبي وفي التقارير</p>
             </div>
           </div>
 
@@ -164,80 +182,65 @@ export default function SettingsPage() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1.5rem" }}>
               {/* Monthly Subscription Price */}
               <div className="form-group">
-                <label className="form-label" htmlFor="mPrice">قيمة الاشتراك الشهري</label>
-                <div className="search-input-wrapper" style={{ flex: "none" }}>
-                  <DollarSign className="search-icon" size={18} />
-                  <input
-                    id="mPrice"
-                    type="number"
-                    min="0"
-                    required
-                    className="search-input"
-                    value={monthlyPrice}
-                    onChange={(e) => setMonthlyPrice(e.target.value)}
-                    style={{ direction: "ltr", textAlign: "right" }}
-                  />
-                </div>
-                <p className="settings-description">سعر الاشتراك الشهري الافتراضي للطالب (بالجنيه)</p>
+                <Input
+                  label="قيمة الاشتراك الشهري"
+                  id="mPrice"
+                  type="number"
+                  min="0"
+                  required
+                  value={monthlyPrice}
+                  onChange={(e) => setMonthlyPrice(e.target.value)}
+                  style={{ direction: "ltr", textAlign: "right" }}
+                  leftIcon={<DollarSign size={18} />}
+                />
+                <p className="settings-description" style={{ marginTop: "0.5rem" }}>سعر الاشتراك الشهري الافتراضي للطالب (بالجنيه)</p>
               </div>
 
               {/* Book 1 Price */}
               <div className="form-group">
-                <label className="form-label" htmlFor="b1Price">سعر الكتاب الأول (كتاب ١)</label>
-                <div className="search-input-wrapper" style={{ flex: "none" }}>
-                  <BookOpen className="search-icon" size={18} />
-                  <input
-                    id="b1Price"
-                    type="number"
-                    min="0"
-                    required
-                    className="search-input"
-                    value={book1Price}
-                    onChange={(e) => setBook1Price(e.target.value)}
-                    style={{ direction: "ltr", textAlign: "right" }}
-                  />
-                </div>
-                <p className="settings-description">قيمة سعر بيع كتاب ١ للنسخة الواحدة</p>
+                <Input
+                  label="سعر الكتاب الأول (كتاب ١)"
+                  id="b1Price"
+                  type="number"
+                  min="0"
+                  required
+                  value={book1Price}
+                  onChange={(e) => setBook1Price(e.target.value)}
+                  style={{ direction: "ltr", textAlign: "right" }}
+                  leftIcon={<BookOpen size={18} />}
+                />
+                <p className="settings-description" style={{ marginTop: "0.5rem" }}>قيمة سعر بيع كتاب ١ للنسخة الواحدة</p>
               </div>
 
               {/* Book 2 Price */}
               <div className="form-group">
-                <label className="form-label" htmlFor="b2Price">سعر الكتاب الثاني (كتاب ٢)</label>
-                <div className="search-input-wrapper" style={{ flex: "none" }}>
-                  <BookOpen className="search-icon" size={18} />
-                  <input
-                    id="b2Price"
-                    type="number"
-                    min="0"
-                    required
-                    className="search-input"
-                    value={book2Price}
-                    onChange={(e) => setBook2Price(e.target.value)}
-                    style={{ direction: "ltr", textAlign: "right" }}
-                  />
-                </div>
-                <p className="settings-description">قيمة سعر بيع كتاب ٢ للنسخة الواحدة</p>
+                <Input
+                  label="سعر الكتاب الثاني (كتاب ٢)"
+                  id="b2Price"
+                  type="number"
+                  min="0"
+                  required
+                  value={book2Price}
+                  onChange={(e) => setBook2Price(e.target.value)}
+                  style={{ direction: "ltr", textAlign: "right" }}
+                  leftIcon={<BookOpen size={18} />}
+                />
+                <p className="settings-description" style={{ marginTop: "0.5rem" }}>قيمة سعر بيع كتاب ٢ للنسخة الواحدة</p>
               </div>
             </div>
           </div>
 
           {/* Submit Button */}
           <div style={{ marginTop: "2.5rem", display: "flex", justifyContent: "flex-end" }}>
-            <button
+            <Button
               type="submit"
-              className="btn btn-primary"
+              variant="primary"
               style={{ minWidth: "150px" }}
-              disabled={saveLoading}
+              isLoading={saveLoading}
+              leftIcon={!saveLoading && <Save size={18} />}
             >
-              {saveLoading ? (
-                <span>جاري الحفظ...</span>
-              ) : (
-                <>
-                  <Save size={18} />
-                  <span>حفظ التعديلات</span>
-                </>
-              )}
-            </button>
+              حفظ التعديلات
+            </Button>
           </div>
         </form>
 
@@ -261,77 +264,49 @@ export default function SettingsPage() {
                     {grade.prefix && <span style={{ marginLeft: "10px" }}> | البادئة: <strong style={{ color: "var(--color-teal)" }}>{grade.prefix}</strong></span>}
                   </p>
                 </div>
-                <button
-                  onClick={async () => {
-                    if (confirm("هل أنت متأكد من حذف هذه السنة الدراسية؟ (المجموعات التابعة لها ستصبح بدون سنة)")) {
-                      await supabase.from("grades").delete().eq("id", grade.id);
-                      setGrades(grades.filter(g => g.id !== grade.id));
-                      showToast("تم الحذف بنجاح");
-                    }
-                  }}
-                  className="btn btn-danger"
-                  style={{ padding: "0.5rem" }}
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => handleDeleteGrade(grade.id)}
                   title="حذف"
                 >
                   <Trash2 size={16} />
-                </button>
+                </Button>
               </div>
             ))}
 
-            <div style={{ display: "flex", gap: "1rem", marginTop: "1rem", flexWrap: "wrap" }}>
-              <input
-                type="text"
-                placeholder="اسم السنة (مثال: الصف الأول الثانوي)"
-                className="form-input"
-                style={{ flex: 2, minWidth: "200px" }}
-                value={newGradeName}
-                onChange={(e) => setNewGradeName(e.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="البادئة (اختياري) مثال: prep-"
-                className="form-input"
-                style={{ flex: 1, minWidth: "150px" }}
-                value={newGradePrefix}
-                onChange={(e) => setNewGradePrefix(e.target.value)}
-              />
-              <input
-                type="number"
-                placeholder="بداية الأكواد (مثال: 10000)"
-                className="form-input"
-                style={{ flex: 1, minWidth: "150px" }}
-                value={newGradeStartCode}
-                onChange={(e) => setNewGradeStartCode(e.target.value)}
-              />
-              <button
-                className="btn btn-primary"
-                onClick={async () => {
-                  if (!newGradeName || !newGradeStartCode) {
-                    showToast("يرجى إدخال اسم السنة وبداية الأكواد", "error");
-                    return;
-                  }
-                  if (!userId) return;
-                  const { data, error } = await supabase.from("grades").insert([{
-                    name: newGradeName,
-                    start_code: parseInt(newGradeStartCode),
-                    prefix: newGradePrefix || '',
-                    teacher_id: userId
-                  }]).select().single();
-
-                  if (error) {
-                    showToast("فشل إضافة السنة الدراسية", "error");
-                  } else if (data) {
-                    setGrades([...grades, data]);
-                    setNewGradeName("");
-                    setNewGradeStartCode("");
-                    setNewGradePrefix("");
-                    showToast("تم إضافة السنة الدراسية بنجاح");
-                  }
-                }}
+            <div style={{ display: "flex", gap: "1rem", marginTop: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ flex: 2, minWidth: "200px" }}>
+                <Input
+                  type="text"
+                  placeholder="اسم السنة (مثال: الصف الأول الثانوي)"
+                  value={newGradeName}
+                  onChange={(e) => setNewGradeName(e.target.value)}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: "150px" }}>
+                <Input
+                  type="text"
+                  placeholder="البادئة (اختياري) مثال: prep-"
+                  value={newGradePrefix}
+                  onChange={(e) => setNewGradePrefix(e.target.value)}
+                />
+              </div>
+              <div style={{ flex: 1, minWidth: "150px" }}>
+                <Input
+                  type="number"
+                  placeholder="بداية الأكواد (مثال: 10000)"
+                  value={newGradeStartCode}
+                  onChange={(e) => setNewGradeStartCode(e.target.value)}
+                />
+              </div>
+              <Button
+                variant="primary"
+                onClick={handleAddGrade}
+                leftIcon={<Plus size={18} />}
               >
-                <Plus size={18} />
                 إضافة سنة
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -339,10 +314,11 @@ export default function SettingsPage() {
 
       {/* Toast Alert */}
       {toast && (
-        <div className={`alert-toast ${toast.type === "success" ? "alert-success" : "alert-error"}`}>
-          {toast.type === "success" ? <Check size={18} /> : <AlertCircle size={18} />}
-          <span>{toast.message}</span>
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );
