@@ -342,53 +342,54 @@ export default function StudentsManagement() {
         {/* Main Content: Filters & Table */}
         <div className="glass-panel panel-content" style={{ display: "flex", flexDirection: "column", minHeight: "600px" }}>
           
-          {/* Action Bar & Filters */}
           <div className="action-bar" style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
             {/* Search */}
-            <div className="search-input-wrapper" style={{ flex: "1 1 300px" }}>
-              <Search className="search-icon" size={18} />
-              <input
-                type="text"
-                placeholder="ابحث بالاسم أو بالكود..."
-                className="search-input"
+            <div style={{ flex: "1 1 300px" }}>
+              <Input
+                leftIcon={<Search size={18} />}
+                placeholder="ابحث بالاسم أو الكود..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
 
             {/* Filter by Grade */}
-            <select
-              className="filter-select"
-              value={filterGradeId}
-              onChange={(e) => {
-                setFilterGradeId(e.target.value);
-                setActiveFilter("all"); // Reset group filter
-              }}
-              style={{ flex: "1 1 150px" }}
-            >
-              <option value="all">كل السنين الدراسية</option>
-              {grades.map(grade => (
-                <option key={grade.id} value={grade.id}>{grade.name}</option>
-              ))}
-            </select>
+            <div style={{ flex: "1 1 150px" }}>
+              <select
+                className="form-input"
+                value={filterGradeId}
+                onChange={(e) => {
+                  setFilterGradeId(e.target.value);
+                  setActiveFilter("all"); // Reset group filter
+                }}
+                style={{ height: "42px" }}
+              >
+                <option value="all">كل السنين الدراسية</option>
+                {grades.map(grade => (
+                  <option key={grade.id} value={grade.id}>{grade.name}</option>
+                ))}
+              </select>
+            </div>
 
             {/* Filter by Group */}
-            <select
-              className="filter-select"
-              value={activeFilter}
-              onChange={(e) => setActiveFilter(e.target.value)}
-              style={{ flex: "1 1 200px" }}
-            >
-              <option value="all">جميع المجموعات</option>
-              <option value="none">بدون مجموعة</option>
-              {groups
-                .filter(g => filterGradeId === "all" || g.grade_id === filterGradeId)
-                .map(group => (
-                <option key={group.id} value={group.id}>
-                  {group.name} {group.is_private ? "(خاصة)" : ""}
-                </option>
-              ))}
-            </select>
+            <div style={{ flex: "1 1 200px" }}>
+              <select
+                className="form-input"
+                value={activeFilter}
+                onChange={(e) => setActiveFilter(e.target.value)}
+                style={{ height: "42px" }}
+              >
+                <option value="all">جميع المجموعات</option>
+                <option value="none">بدون مجموعة</option>
+                {groups
+                  .filter(g => filterGradeId === "all" || g.grade_id === filterGradeId)
+                  .map(group => (
+                  <option key={group.id} value={group.id}>
+                    {group.name} {group.is_private ? "(خاصة)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Bulk Action Bar (Shows when items are selected) */}
@@ -419,7 +420,7 @@ export default function StudentsManagement() {
 
           {/* Students Table */}
           <div className="table-container" style={{ flex: 1 }}>
-            <table className="data-table">
+            <table className="students-table">
               <thead>
                 <tr>
                   <th style={{ width: "40px" }}>
