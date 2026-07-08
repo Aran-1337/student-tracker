@@ -102,7 +102,7 @@ export default function StudentsManagement() {
         const { data: studentsData } = await supabase
           .from("students")
           .select("*")
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: true });
 
         const validatedStudents = (studentsData || []).map(student => ({
           ...student,
