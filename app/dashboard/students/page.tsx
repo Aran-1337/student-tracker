@@ -142,12 +142,28 @@ export default function StudentsManagement() {
       const selectedGroupIdVal = studentGroupId === "" ? null : studentGroupId;
       const initialMonths = Array(12).fill(false);
 
+      // Generate code dynamically in frontend to bypass trigger issues
+      const grade = grades.find(g => g.id === studentGradeId);
+      const startCode = grade?.start_code || 0;
+      
+      const gradeStudents = students.filter(s => s.grade_id === studentGradeId);
+      let maxCode = 0;
+      gradeStudents.forEach(s => {
+        const num = parseInt(s.code?.replace(/\D/g, '') || '0', 10);
+        if (!isNaN(num) && num > maxCode) maxCode = num;
+      });
+
+      const generatedCode = (maxCode === 0 || maxCode < startCode) 
+        ? String(startCode) 
+        : String(maxCode + 1);
+
       const { data, error } = await supabase
         .from("students")
         .insert([
           {
             teacher_id: userId,
             name: studentName,
+            code: generatedCode,
             group_id: selectedGroupIdVal,
             grade_id: studentGradeId || null,
             months: initialMonths,
