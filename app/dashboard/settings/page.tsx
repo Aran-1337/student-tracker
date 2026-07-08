@@ -208,7 +208,7 @@ export default function SettingsPage() {
                 value={monthlyPrice}
                 onChange={(e) => setMonthlyPrice(e.target.value)}
                 style={{ direction: "ltr", textAlign: "right" }}
-                leftIcon={<DollarSign size={18} />}
+                leftIcon={<span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-secondary)" }}>ج.م</span>}
               />
               <p className="settings-description" style={{ marginTop: "0.5rem" }}>سعر الاشتراك الشهري الافتراضي للطالب (بالجنيه)</p>
             </div>
@@ -254,7 +254,7 @@ export default function SettingsPage() {
                         onChange={(e) => handleUpdateBook(book.id, "price", Number(e.target.value))}
                         required
                         style={{ direction: "ltr", textAlign: "right" }}
-                        leftIcon={<DollarSign size={18} />}
+                        leftIcon={<span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-secondary)" }}>ج.م</span>}
                       />
                     </div>
                     <div>
