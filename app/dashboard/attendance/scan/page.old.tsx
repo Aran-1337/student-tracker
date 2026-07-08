@@ -15,37 +15,34 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { Group, Student, Grade } from "@/lib/types";
-import { GroupsService } from "@/lib/services/groupsService";
-import { StudentsService } from "@/lib/services/studentsService";
-import { GradesService } from "@/lib/services/gradesService";
-import { AttendanceService } from "@/lib/services/attendanceService";
+interface Group {
+  id: string;
+  name: string;
+  day_of_week: string;
+  time: string;
+  grade_id?: string | null;
+}
 
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Spinner } from "@/components/ui/Spinner";
+interface Student {
+  id: string;
+  name: string;
+  group_id: string | null;
+  code?: string;
+  grade_id?: string | null;
+}
+
+interface Grade {
+  id: string;
+  name: string;
+  start_code?: number;
+  prefix?: string;
+}
 
 interface ScannedEntry {
   studentId: string;
   studentName: string;
   time: string;
 }
-
-const arabicMonths = [
-  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
-];
-
-const formatTimeTo12H = (timeStr: string) => {
-  if (!timeStr) return "";
-  let [hours, minutes] = timeStr.split(":").map(Number);
-  const ampm = hours >= 12 ? "م" : "ص";
-  hours = hours % 12;
-  hours = hours ? hours : 12;
-  const strHours = String(hours).padStart(2, "0");
-  const strMinutes = String(minutes).padStart(2, "0");
-  return `${strHours}:${strMinutes} ${ampm}`;
-};
 
 export default function QRScanPage() {
   const [loading, setLoading] = useState(true);
@@ -54,6 +51,17 @@ export default function QRScanPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
+
+  const formatTimeTo12H = (timeStr: string) => {
+    if (!timeStr) return "";
+    let [hours, minutes] = timeStr.split(":").map(Number);
+    const ampm = hours >= 12 ? "م" : "ص";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strHours = String(hours).padStart(2, "0");
+    const strMinutes = String(minutes).padStart(2, "0");
+    return `${strHours}:${strMinutes} ${ampm}`;
+  };
 
   // Session config
   const now = new Date();
@@ -68,7 +76,7 @@ export default function QRScanPage() {
   const [isStarting, setIsStarting] = useState(false);
   const [scannedToday, setScannedToday] = useState<ScannedEntry[]>([]);
   const [lastScan, setLastScan] = useState<{ name: string; success: boolean } | null>(null);
-  const [crossGroupConfirm, setCrossGroupConfirm] = useState<{ student: Student; originalGroupName: string } | null>(null);
+  const [crossGroupConfirm, setCrossGroupConfirm] = useState<{ student: any; originalGroupName: string } | null>(null);
   const [manualCode, setManualCode] = useState("");
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -77,25 +85,20 @@ export default function QRScanPage() {
 
   useEffect(() => {
     async function load() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-        setUserId(session.user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      setUserId(session.user.id);
 
-        const [grpData, stData, grdData] = await Promise.all([
-          GroupsService.getAllGroups(),
-          StudentsService.getAllStudents(),
-          GradesService.getAllGrades()
-        ]);
+      const [{ data: grpData }, { data: stData }, { data: grdData }] = await Promise.all([
+        supabase.from("groups").select("id, name, day_of_week, time, grade_id"),
+        supabase.from("students").select("id, name, group_id, code, grade_id"),
+        supabase.from("grades").select("id, name, prefix").order("created_at")
+      ]);
 
-        setGroups(grpData);
-        setStudents(stData);
-        setGrades(grdData);
-      } catch (err) {
-        // console.error(err)
-      } finally {
-        setLoading(false);
-      }
+      setGroups(grpData || []);
+      setStudents(stData || []);
+      setGrades(grdData || []);
+      setLoading(false);
     }
     load();
   }, []);
@@ -112,11 +115,10 @@ export default function QRScanPage() {
 
   const selectedGroup = groups.find(g => g.id === selectedGroupId);
 
-  const processAttendance = async (student: Student, overrideGroupId?: string) => {
-    if (!userId) return;
-
-    try {
-      await AttendanceService.upsertAttendanceRecord({
+  const processAttendance = async (student: any, overrideGroupId?: string) => {
+    const { error } = await supabase
+      .from("attendance_records")
+      .upsert([{
         teacher_id: userId,
         student_id: student.id,
         group_id: overrideGroupId || student.group_id,
@@ -124,20 +126,22 @@ export default function QRScanPage() {
         month: selectedMonth,
         year: selectedYear,
         status: "present"
-      });
+      }], { onConflict: "student_id,session_date" });
 
-      const entry: ScannedEntry = {
-        studentId: student.id,
-        studentName: student.name,
-        time: new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
-      };
-      setScannedToday(prev => [entry, ...prev]);
-      setLastScan({ name: student.name, success: true });
-  
-      setTimeout(() => setLastScan(null), 2500);
-    } catch (error: any) {
+    if (error) {
       setLastScan({ name: `خطأ: ${error.message}`, success: false });
+      return;
     }
+
+    const entry: ScannedEntry = {
+      studentId: student.id,
+      studentName: student.name,
+      time: new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
+    };
+    setScannedToday(prev => [entry, ...prev]);
+    setLastScan({ name: student.name, success: true });
+
+    setTimeout(() => setLastScan(null), 2500);
   };
 
   const handleQRSuccess = async (decodedText: string) => {
@@ -228,7 +232,20 @@ export default function QRScanPage() {
 
   const handleManualCodeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const student = AttendanceService.findStudentByCode(manualCode, selectedGradeId, students, grades);
+    let code = manualCode.trim();
+    if (!code) return;
+    
+    // Auto-inject prefix if it matches the selected grade
+    if (selectedGradeId && selectedGradeId !== "all") {
+      const grade = grades.find(g => g.id === selectedGradeId);
+      if (grade?.prefix && !code.startsWith(grade.prefix)) {
+        code = `${grade.prefix}${code}`;
+      }
+    }
+    
+    let student = students.find(s => s.code === code);
+    // fallback if they typed the prefix themselves but we somehow messed it up
+    if (!student) student = students.find(s => s.code === manualCode.trim());
 
     if (!student) {
       setLastScan({ name: "كود غير صحيح!", success: false });
@@ -240,7 +257,12 @@ export default function QRScanPage() {
     setManualCode("");
   };
 
-  if (loading) return <Spinner fullScreen />;
+  if (loading) return <div className="loading-wrapper"><div className="spinner" /></div>;
+
+  const arabicMonths = [
+    "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+    "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+  ];
 
   let manualPlaceholder = "مثال: 10001";
   if (selectedGradeId && selectedGradeId !== "all") {
@@ -332,8 +354,8 @@ export default function QRScanPage() {
             </div>
 
             {!scanning ? (
-              <Button
-                variant="primary"
+              <button
+                className="btn btn-primary"
                 style={{ width: "100%", justifyContent: "center" }}
                 onClick={async () => {
                   if (isStarting) return;
@@ -342,19 +364,19 @@ export default function QRScanPage() {
                   setIsStarting(false);
                 }}
                 disabled={!selectedGroupId || isStarting}
-                leftIcon={isStarting ? <div className="spinner" style={{ width: "18px", height: "18px", borderWidth: "2px" }} /> : <Camera size={18} />}
               >
-                {isStarting ? "جاري التشغيل..." : "تشغيل الكاميرا"}
-              </Button>
+                {isStarting ? <div className="spinner" style={{ width: "18px", height: "18px", borderWidth: "2px" }} /> : <Camera size={18} />}
+                <span>{isStarting ? "جاري التشغيل..." : "تشغيل الكاميرا"}</span>
+              </button>
             ) : (
-              <Button
-                variant="danger"
+              <button
+                className="btn btn-danger"
                 style={{ width: "100%", justifyContent: "center" }}
                 onClick={stopScanner}
-                leftIcon={<CameraOff size={18} />}
               >
-                إيقاف الكاميرا
-              </Button>
+                <CameraOff size={18} />
+                <span>إيقاف الكاميرا</span>
+              </button>
             )}
 
             <div style={{ marginTop: "1.5rem" }}>
@@ -371,14 +393,14 @@ export default function QRScanPage() {
                   onChange={(e) => setManualCode(e.target.value)}
                   disabled={!selectedGroupId}
                 />
-                <Button 
+                <button 
                   type="submit" 
-                  variant="primary" 
+                  className="btn btn-primary" 
                   disabled={!selectedGroupId || !manualCode.trim()}
                   style={{ padding: "0.5rem 1rem" }}
                 >
                   تسجيل
-                </Button>
+                </button>
               </form>
             </div>
 
@@ -486,7 +508,7 @@ export default function QRScanPage() {
                   <br/>هل ترغب في تسجيل حضوره في هذه الحصة؟
                 </p>
                 <div style={{ display: "flex", gap: "1rem", width: "100%" }}>
-                  <Button variant="primary" style={{ flex: 1, justifyContent: "center" }}
+                  <button className="btn btn-primary" style={{ flex: 1, justifyContent: "center" }}
                     onClick={async () => {
                       const st = crossGroupConfirm.student;
                       scannedIdsRef.current.add(st.id);
@@ -495,12 +517,12 @@ export default function QRScanPage() {
                     }}
                   >
                     تأكيد الحضور
-                  </Button>
-                  <Button style={{ flex: 1, justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "none" }}
+                  </button>
+                  <button className="btn" style={{ flex: 1, justifyContent: "center", background: "rgba(255,255,255,0.1)", border: "none" }}
                     onClick={() => setCrossGroupConfirm(null)}
                   >
                     إلغاء
-                  </Button>
+                  </button>
                 </div>
               </div>
             )}
