@@ -8,37 +8,27 @@ import {
   BookOpen, 
   Plus, 
   FolderPlus,
-  Trash2,
   AlertCircle,
-  Calendar,
-  Clock
+  Calendar
 } from "lucide-react";
 
-interface Group {
-  id: string;
-  name: string;
-  day_of_week: string;
-  time: string;
-  is_private?: boolean;
-  sub_teacher_id?: string | null;
-  grade_id?: string | null;
-}
+import { Group, Grade, Student } from "@/lib/types";
+import { GroupsService } from "@/lib/services/groupsService";
+import { StudentsService } from "@/lib/services/studentsService";
+import { GradesService } from "@/lib/services/gradesService";
+import { TeachersService } from "@/lib/services/teachersService";
 
-interface Grade {
-  id: string;
-  name: string;
-  start_code: number;
-  prefix?: string;
-}
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Toast } from "@/components/ui/Toast";
+import { Spinner } from "@/components/ui/Spinner";
+import { GroupCard } from "@/components/features/GroupCard";
 
-interface Student {
-  id: string;
-  name: string;
-  group_id: string | null;
-  months: boolean[];
-  book_1: boolean;
-  book_2: boolean;
-}
+const arabicDays = ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
+const arabicMonths = [
+  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+];
 
 const formatTimeTo12H = (timeStr: string) => {
   if (!timeStr) return "";
@@ -51,12 +41,6 @@ const formatTimeTo12H = (timeStr: string) => {
   const strHours = String(hours).padStart(2, "0");
   return `${strHours}:${minutes} ${ampm}`;
 };
-
-const arabicDays = ["السبت", "الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة"];
-const arabicMonths = [
-  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
-];
 
 export default function DashboardOverview() {
   // Loading states
@@ -84,7 +68,6 @@ export default function DashboardOverview() {
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
   };
 
   const currentMonthIndex = new Date().getMonth();
@@ -96,40 +79,35 @@ export default function DashboardOverview() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        setUserId(session.user.id);
+        const currentUserId = session.user.id;
+        setUserId(currentUserId);
 
-        const { data: teacher } = await supabase.from("teachers").select("is_center_mode").eq("id", session.user.id).single();
-        const centerMode = teacher?.is_center_mode || false;
+        const teacherInfo = await TeachersService.getTeacherProfile(currentUserId);
+        const centerMode = teacherInfo?.is_center_mode || false;
         setHasCenterMode(centerMode);
 
         if (centerMode) {
-          const { data: subs } = await supabase.from("sub_teachers").select("*").eq("center_id", session.user.id);
+          const { data: subs } = await supabase.from("sub_teachers").select("*").eq("center_id", currentUserId);
           setSubTeachers(subs || []);
         }
 
-        const { data: gradesData } = await supabase.from("grades").select("*").order("created_at", { ascending: true });
-        setGrades(gradesData || []);
+        const [gradesData, groupsData, studentsData] = await Promise.all([
+          GradesService.getAllGrades(),
+          GroupsService.getAllGroups(),
+          StudentsService.getAllStudents()
+        ]);
 
-        // Fetch groups
-        let { data: grpData, error: grpError } = await supabase.from("groups").select("id, name, day_of_week, time, is_private, teacher_id, sub_teacher_id, grade_id").order("created_at", { ascending: false });
-
-        setGroups(grpData || []);
-
-        // Fetch students
-        const { data: studentsData, error: studentsError } = await supabase
-          .from("students")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (studentsError) throw studentsError;
-
-        const validatedStudents = (studentsData || []).map(student => ({
+        setGrades(gradesData);
+        setGroups(groupsData);
+        
+        const validatedStudents = studentsData.map(student => ({
           ...student,
           months: Array.isArray(student.months) && student.months.length === 12
             ? student.months 
             : Array(12).fill(false)
         }));
         setStudents(validatedStudents);
+
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل البيانات.", "error");
       } finally {
@@ -157,8 +135,7 @@ export default function DashboardOverview() {
 
     const targetMinutes = timeToMinutes(groupTime);
     const conflictingGroup = groups.find(g => {
-      // g.day_of_week might be a comma-separated string like "السبت ، الإثنين"
-      const existingDays = g.day_of_week.split(" ، ");
+      const existingDays = (g.day_of_week || "").split(" ، ");
       const hasOverlappingDay = existingDays.some(d => groupDays.includes(d));
       if (!hasOverlappingDay) return false;
       const existMinutes = timeToMinutes(g.time);
@@ -167,60 +144,27 @@ export default function DashboardOverview() {
 
     if (conflictingGroup) {
       const conflictStart = formatTimeTo12H(conflictingGroup.time);
-      const overlappingDays = groupDays.filter(d => conflictingGroup.day_of_week.includes(d)).join(" و ");
+      const overlappingDays = groupDays.filter(d => conflictingGroup.day_of_week?.includes(d)).join(" و ");
       alert(
         `عذراً، لا يمكن إنشاء المجموعة! يوجد تعارض في المواعيد مع مجموعة "${conflictingGroup.name}" المسجلة في يوم (${overlappingDays}) الساعة (${conflictStart}). يجب أن يكون الفرق بين مواعيد المجموعات ساعة كاملة على الأقل.`
       );
-      return; // Stop execution (Strict block)
+      return;
     }
 
     setActionLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("groups")
-        .insert([{ 
-          name: groupName, 
-          day_of_week: groupDays.join(" ، "), 
-          time: groupTime,
-          is_private: isPrivate,
-          grade_id: groupGradeId || null,
-          teacher_id: userId,
-          sub_teacher_id: hasCenterMode && groupSubTeacherId ? groupSubTeacherId : null
-        }])
-        .select();
+      const newGroup = await GroupsService.addGroup({
+        name: groupName,
+        day_of_week: groupDays.join(" ، "),
+        time: groupTime,
+        is_private: isPrivate,
+        grade_id: groupGradeId || null,
+        teacher_id: userId,
+        sub_teacher_id: hasCenterMode && groupSubTeacherId ? groupSubTeacherId : null
+      });
 
-      if (error) {
-        // Maybe missing column? Insert without it
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from("groups")
-          .insert([{
-            teacher_id: userId,
-            name: groupName,
-            day_of_week: groupDays.join(" ، "),
-            time: groupTime,
-            is_private: isPrivate,
-            grade_id: groupGradeId || null
-          }])
-          .select();
-
-        if (fallbackError) {
-          console.error("Supabase fallback insert error:", fallbackError);
-          showToast(`حدث خطأ: ${fallbackError.message}`, "error");
-          return;
-        }
-
-        // Try to save to local storage for demo if column missing
-        if (fallbackData && hasCenterMode && groupSubTeacherId) {
-          const mapping = JSON.parse(localStorage.getItem("group_subteachers") || "{}");
-          mapping[fallbackData[0].id] = groupSubTeacherId;
-          localStorage.setItem("group_subteachers", JSON.stringify(mapping));
-          fallbackData[0].sub_teacher_id = groupSubTeacherId;
-        }
-
-        setGroups([fallbackData[0], ...groups]);
-      } else {
-        setGroups([data[0], ...groups]);
-      }
+      setGroups([newGroup, ...groups]);
+      
       setGroupName("");
       setGroupDays(["السبت"]);
       setGroupGradeId("");
@@ -241,12 +185,7 @@ export default function DashboardOverview() {
     }
 
     try {
-      const { error } = await supabase
-        .from("groups")
-        .delete()
-        .eq("id", groupId);
-
-      if (error) throw error;
+      await GroupsService.deleteGroup(groupId);
 
       setGroups(groups.filter(g => g.id !== groupId));
       setStudents(students.map(s => s.group_id === groupId ? { ...s, group_id: null } : s));
@@ -258,16 +197,12 @@ export default function DashboardOverview() {
 
   // Dynamic statistics
   const totalStudentsCount = students.length;
-  const paidThisMonthCount = students.filter(s => s.months[currentMonthIndex] === true).length;
+  const paidThisMonthCount = students.filter(s => s.months?.[currentMonthIndex] === true).length;
   const book1Count = students.filter(s => s.book_1 === true).length;
   const book2Count = students.filter(s => s.book_2 === true).length;
 
   if (loading) {
-    return (
-      <div className="loading-wrapper">
-        <div className="spinner"></div>
-      </div>
-    );
+    return <Spinner fullScreen />;
   }
 
   return (
@@ -329,13 +264,12 @@ export default function DashboardOverview() {
             </h2>
             <form onSubmit={handleCreateGroup}>
               <div className="form-group">
-                <label className="form-label" htmlFor="gName">اسم المجموعة</label>
-                <input
+                <Input
+                  label="اسم المجموعة"
                   id="gName"
                   type="text"
                   required
                   placeholder="مثال: مجموعة أ"
-                  className="form-input"
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
                 />
@@ -392,12 +326,11 @@ export default function DashboardOverview() {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label" htmlFor="gTime">الوقت</label>
-                  <input
+                  <Input
+                    label="الوقت"
                     id="gTime"
                     type="time"
                     required
-                    className="form-input"
                     value={groupTime}
                     onChange={(e) => setGroupTime(e.target.value)}
                     style={{ direction: "ltr", textAlign: "right" }}
@@ -435,15 +368,15 @@ export default function DashboardOverview() {
                 </div>
               )}
               
-              <button
+              <Button
                 type="submit"
-                className="btn btn-primary"
+                variant="primary"
+                isLoading={actionLoading}
+                leftIcon={<Plus size={18} />}
                 style={{ width: "100%", marginTop: "0.5rem" }}
-                disabled={actionLoading}
               >
-                <Plus size={18} />
-                <span>{actionLoading ? "جاري الإنشاء..." : "إنشاء مجموعة"}</span>
-              </button>
+                إنشاء مجموعة
+              </Button>
             </form>
           </div>
         </aside>
@@ -463,175 +396,75 @@ export default function DashboardOverview() {
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
-                {groups.map(group => {
-                  const groupStudentCount = students.filter(s => s.group_id === group.id).length;
-                  const subTeacher = subTeachers.find(t => t.id === group.sub_teacher_id);
-                  return (
-                    <div key={group.id} className={`glass-panel panel-content ${group.is_private ? "group-card-private" : ""}`} style={{ background: "rgba(255,255,255,0.02)", position: "relative" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <h3 style={{ fontSize: "1.1rem", margin: 0 }}>{group.name}</h3>
-                          {group.is_private && <span className="private-badge">خاصة</span>}
-                        </div>
-                        <button
-                          className="btn btn-secondary btn-icon"
-                          onClick={() => handleDeleteGroup(group.id)}
-                          style={{ border: "none", background: "none", width: "1.75rem", height: "1.75rem", padding: 0 }}
-                          title="حذف المجموعة"
-                        >
-                          <Trash2 size={15} className="color-danger" />
-                        </button>
-                      </div>
-                      
-                      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                        {hasCenterMode && subTeacher && (
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--color-teal)" }}>
-                            <Users size={14} />
-                            <span>المعلم: {subTeacher.name}</span>
-                          </div>
-                        )}
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <Calendar size={14} />
-                          <span>اليوم: {group.day_of_week}</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <Clock size={14} />
-                          <span>الوقت: {formatTimeTo12H(group.time)}</span>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
-                          <Users size={14} style={{ color: "var(--color-teal)" }} />
-                          <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>عدد الطلاب: {groupStudentCount} طالب</span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {groups.map(group => (
+                  <GroupCard
+                    key={group.id}
+                    group={group}
+                    students={students}
+                    subTeacher={subTeachers.find(t => t.id === group.sub_teacher_id)}
+                    hasCenterMode={hasCenterMode}
+                    onDelete={handleDeleteGroup}
+                  />
+                ))}
               </div>
             )}
           </div>
 
           {/* Divider for Grades Section */}
-
-              {grades.map(grade => {
-                const gradeGroups = groups.filter(g => g.grade_id === grade.id);
-                if (gradeGroups.length === 0) return null;
-                
-                return (
-                  <div key={grade.id} className="glass-panel panel-content" style={{ padding: "1.5rem" }}>
-                    <h3 style={{ fontSize: "1.3rem", color: "var(--color-teal)", marginBottom: "1rem", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "0.5rem" }}>
-                      {grade.name}
-                    </h3>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
-                      {gradeGroups.map(group => {
-                        const groupStudentCount = students.filter(s => s.group_id === group.id).length;
-                        const subTeacher = subTeachers.find(t => t.id === group.sub_teacher_id);
-                        return (
-                          <div key={group.id} className={`glass-panel panel-content ${group.is_private ? "group-card-private" : ""}`} style={{ background: "rgba(255,255,255,0.02)", position: "relative" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <h3 style={{ fontSize: "1.1rem", margin: 0 }}>{group.name}</h3>
-                                {group.is_private && <span className="private-badge">خاصة</span>}
-                              </div>
-                              <button
-                                className="btn btn-secondary btn-icon"
-                                onClick={() => handleDeleteGroup(group.id)}
-                                style={{ border: "none", background: "none", width: "1.75rem", height: "1.75rem", padding: 0 }}
-                                title="حذف المجموعة"
-                              >
-                                <Trash2 size={15} className="color-danger" />
-                              </button>
-                            </div>
-                            
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                              {hasCenterMode && subTeacher && (
-                                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--color-teal)" }}>
-                                  <Users size={14} />
-                                  <span>المعلم: {subTeacher.name}</span>
-                                </div>
-                              )}
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <Calendar size={14} />
-                                <span>اليوم: {group.day_of_week}</span>
-                              </div>
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                <Clock size={14} />
-                                <span>الوقت: {formatTimeTo12H(group.time)}</span>
-                              </div>
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
-                                <Users size={14} style={{ color: "var(--color-teal)" }} />
-                                <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>عدد الطلاب: {groupStudentCount} طالب</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Ungrouped Groups (No Grade) */}
-              {groups.filter(g => !g.grade_id).length > 0 && (
-                <div className="glass-panel panel-content" style={{ padding: "1.5rem" }}>
-                  <h3 style={{ fontSize: "1.3rem", color: "var(--text-muted)", marginBottom: "1rem", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "0.5rem" }}>
-                    مجموعات أخرى (بدون سنة دراسية)
-                  </h3>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
-                    {groups.filter(g => !g.grade_id).map(group => {
-                      const groupStudentCount = students.filter(s => s.group_id === group.id).length;
-                      const subTeacher = subTeachers.find(t => t.id === group.sub_teacher_id);
-                      return (
-                        <div key={group.id} className={`glass-panel panel-content ${group.is_private ? "group-card-private" : ""}`} style={{ background: "rgba(255,255,255,0.02)", position: "relative" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                              <h3 style={{ fontSize: "1.1rem", margin: 0 }}>{group.name}</h3>
-                              {group.is_private && <span className="private-badge">خاصة</span>}
-                            </div>
-                            <button
-                              className="btn btn-secondary btn-icon"
-                              onClick={() => handleDeleteGroup(group.id)}
-                              style={{ border: "none", background: "none", width: "1.75rem", height: "1.75rem", padding: 0 }}
-                              title="حذف المجموعة"
-                            >
-                              <Trash2 size={15} className="color-danger" />
-                            </button>
-                          </div>
-                          
-                          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
-                            {hasCenterMode && subTeacher && (
-                              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--color-teal)" }}>
-                                <Users size={14} />
-                                <span>المعلم: {subTeacher.name}</span>
-                              </div>
-                            )}
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                              <Calendar size={14} />
-                              <span>اليوم: {group.day_of_week}</span>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                              <Clock size={14} />
-                              <span>الوقت: {formatTimeTo12H(group.time)}</span>
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
-                              <Users size={14} style={{ color: "var(--color-teal)" }} />
-                              <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>عدد الطلاب: {groupStudentCount} طالب</span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+          {grades.map(grade => {
+            const gradeGroups = groups.filter(g => g.grade_id === grade.id);
+            if (gradeGroups.length === 0) return null;
+            
+            return (
+              <div key={grade.id} className="glass-panel panel-content" style={{ padding: "1.5rem" }}>
+                <h3 style={{ fontSize: "1.3rem", color: "var(--color-teal)", marginBottom: "1rem", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "0.5rem" }}>
+                  {grade.name}
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
+                  {gradeGroups.map(group => (
+                    <GroupCard
+                      key={group.id}
+                      group={group}
+                      students={students}
+                      subTeacher={subTeachers.find(t => t.id === group.sub_teacher_id)}
+                      hasCenterMode={hasCenterMode}
+                      onDelete={handleDeleteGroup}
+                    />
+                  ))}
                 </div>
-              )}
+              </div>
+            );
+          })}
+
+          {/* Ungrouped Groups (No Grade) */}
+          {groups.filter(g => !g.grade_id).length > 0 && (
+            <div className="glass-panel panel-content" style={{ padding: "1.5rem" }}>
+              <h3 style={{ fontSize: "1.3rem", color: "var(--text-muted)", marginBottom: "1rem", borderBottom: "1px solid rgba(255,255,255,0.05)", paddingBottom: "0.5rem" }}>
+                مجموعات أخرى (بدون سنة دراسية)
+              </h3>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "1rem" }}>
+                {groups.filter(g => !g.grade_id).map(group => (
+                  <GroupCard
+                    key={group.id}
+                    group={group}
+                    students={students}
+                    subTeacher={subTeachers.find(t => t.id === group.sub_teacher_id)}
+                    hasCenterMode={hasCenterMode}
+                    onDelete={handleDeleteGroup}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
         </section>
       </div>
 
-      {/* Toast Alert */}
       {toast && (
-        <div className={`alert-toast ${toast.type === "success" ? "alert-success" : "alert-error"}`}>
-          {toast.type === "error" && <AlertCircle size={18} />}
-          <span>{toast.message}</span>
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );
