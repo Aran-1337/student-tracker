@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Users, Plus, Search, UserPlus, CheckSquare, Square, AlertCircle } from "lucide-react";
-import { Student, Group, Grade } from "@/lib/types";
+import { Student, Group, Grade, BookDef } from "@/lib/types";
 import { StudentsService } from "@/lib/services/studentsService";
 import { GroupsService } from "@/lib/services/groupsService";
 import { GradesService } from "@/lib/services/gradesService";
+import { TeachersService } from "@/lib/services/teachersService";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -40,6 +41,7 @@ export default function StudentsManagement() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
+  const [teacherBooks, setTeacherBooks] = useState<BookDef[]>([]);
 
   // Form state
   const [studentName, setStudentName] = useState("");
@@ -66,20 +68,23 @@ export default function StudentsManagement() {
         if (!session) return;
         setUserId(session.user.id);
 
-        const [groupsData, studentsData, gradesData] = await Promise.all([
+        const [groupsData, studentsData, gradesData, teacherProfile] = await Promise.all([
           GroupsService.getAllGroups(),
           StudentsService.getAllStudents(),
-          GradesService.getAllGrades()
+          GradesService.getAllGrades(),
+          TeachersService.getTeacherProfile(session.user.id)
         ]);
 
         setGroups(groupsData);
         setGrades(gradesData);
+        setTeacherBooks(teacherProfile?.books || []);
 
         const validatedStudents = studentsData.map(student => ({
           ...student,
           months: Array.isArray(student.months) && student.months.length === 12
             ? student.months 
-            : Array(12).fill(false)
+            : Array(12).fill(false),
+          received_books: Array.isArray(student.received_books) ? student.received_books : []
         }));
         setStudents(validatedStudents);
       } catch (err: any) {
@@ -113,8 +118,7 @@ export default function StudentsManagement() {
         group_id: selectedGroupIdVal,
         grade_id: studentGradeId,
         months: initialMonths,
-        book_1: false,
-        book_2: false
+        received_books: []
       }, students);
 
       setStudents([...students, newStudent]);
@@ -185,14 +189,22 @@ export default function StudentsManagement() {
     }
   };
 
-  const handleToggleBook = async (student: Student, bookKey: "book_1" | "book_2") => {
-    const updatedVal = !student[bookKey];
+  const handleToggleBook = async (student: Student, bookId: string) => {
+    const receivedBooks = student.received_books || [];
+    const hasBook = receivedBooks.includes(bookId);
+    
+    let updatedBooks;
+    if (hasBook) {
+      updatedBooks = receivedBooks.filter(id => id !== bookId);
+    } else {
+      updatedBooks = [...receivedBooks, bookId];
+    }
 
     const prevStudents = [...students];
-    setStudents(students.map(s => s.id === student.id ? { ...s, [bookKey]: updatedVal } : s));
+    setStudents(students.map(s => s.id === student.id ? { ...s, received_books: updatedBooks } : s));
 
     try {
-      await StudentsService.updateStudent(student.id, { [bookKey]: updatedVal });
+      await StudentsService.updateStudent(student.id, { received_books: updatedBooks });
     } catch (err: any) {
       setStudents(prevStudents);
       showToast("حدث خطأ أثناء تعديل حالة الكتاب.", "error");
@@ -452,6 +464,7 @@ export default function StudentsManagement() {
                       key={student.id}
                       student={student}
                       groups={groups}
+                      teacherBooks={teacherBooks}
                       arabicMonths={arabicMonths}
                       formatTimeTo12H={formatTimeTo12H}
                       isSelected={selectedStudentIds.has(student.id)}

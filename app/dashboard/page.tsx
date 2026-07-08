@@ -198,8 +198,10 @@ export default function DashboardOverview() {
   // Dynamic statistics
   const totalStudentsCount = students.length;
   const paidThisMonthCount = students.filter(s => s.months?.[currentMonthIndex] === true).length;
-  const book1Count = students.filter(s => s.book_1 === true).length;
-  const book2Count = students.filter(s => s.book_2 === true).length;
+  const totalGroupsCount = groups.length;
+  const totalBooksDeliveredCount = students.reduce((acc, s) => {
+    return acc + (Array.isArray(s.received_books) ? s.received_books.length : 0);
+  }, 0);
 
   if (loading) {
     return <Spinner fullScreen />;
@@ -234,12 +236,12 @@ export default function DashboardOverview() {
           </div>
         </div>
         <div className="stat-card glass-panel">
-          <div className="stat-icon-wrapper stat-icon-amber">
-            <BookOpen size={24} />
+          <div className="stat-icon-wrapper stat-icon-blue" style={{ filter: "hue-rotate(45deg)" }}>
+            <Users size={24} />
           </div>
           <div className="stat-info">
-            <span className="stat-label">مستلمو كتاب ١</span>
-            <span className="stat-value monospace">{book1Count}</span>
+            <span className="stat-label">إجمالي المجموعات</span>
+            <span className="stat-value monospace">{totalGroupsCount}</span>
           </div>
         </div>
         <div className="stat-card glass-panel">
@@ -247,8 +249,8 @@ export default function DashboardOverview() {
             <BookOpen size={24} />
           </div>
           <div className="stat-info">
-            <span className="stat-label">مستلمو كتاب ٢</span>
-            <span className="stat-value monospace">{book2Count}</span>
+            <span className="stat-label">نسخ الكتب المسلمة</span>
+            <span className="stat-value monospace">{totalBooksDeliveredCount}</span>
           </div>
         </div>
       </section>

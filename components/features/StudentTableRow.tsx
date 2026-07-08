@@ -1,6 +1,6 @@
 import React from 'react';
 import { Trash2, CheckSquare, Square } from 'lucide-react';
-import { Student, Group } from '@/lib/types';
+import { Student, Group, BookDef } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 
 // Replaces the `<tr>` inside the students table in app/dashboard/students/page.tsx
@@ -9,12 +9,13 @@ import { Button } from '@/components/ui/Button';
 export interface StudentTableRowProps {
   student: Student;
   groups: Group[];
+  teacherBooks: BookDef[];
   arabicMonths: string[];
   formatTimeTo12H: (time: string) => string;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   onToggleMonth: (student: Student, monthIndex: number) => void;
-  onToggleBook: (student: Student, bookField: "book_1" | "book_2") => void;
+  onToggleBook: (student: Student, bookId: string) => void;
   onDelete: (id: string) => void;
   onUpdateGroup: (id: string, groupId: string) => void;
 }
@@ -22,6 +23,7 @@ export interface StudentTableRowProps {
 export function StudentTableRow({
   student,
   groups,
+  teacherBooks,
   arabicMonths,
   formatTimeTo12H,
   isSelected,
@@ -31,6 +33,8 @@ export function StudentTableRow({
   onDelete,
   onUpdateGroup
 }: StudentTableRowProps) {
+  const receivedBooks = student.received_books || [];
+
   return (
     <tr className={isSelected ? "row-selected" : ""}>
       <td data-label="تحديد">
@@ -87,19 +91,24 @@ export function StudentTableRow({
         </div>
       </td>
       <td data-label="الكتب المستلمة" style={{ textAlign: "center" }}>
-        <div className="book-toggles" style={{ justifyContent: "center" }}>
-          <button
-            className={`book-toggle ${student.book_1 ? "active" : ""}`}
-            onClick={() => onToggleBook(student, "book_1")}
-          >
-            {student.book_1 ? "✓ كتاب ١" : "كتاب ١"}
-          </button>
-          <button
-            className={`book-toggle ${student.book_2 ? "active" : ""}`}
-            onClick={() => onToggleBook(student, "book_2")}
-          >
-            {student.book_2 ? "✓ كتاب ٢" : "كتاب ٢"}
-          </button>
+        <div className="book-toggles" style={{ justifyContent: "center", flexWrap: "wrap", gap: "6px" }}>
+          {teacherBooks.map(book => {
+            const isReceived = receivedBooks.includes(book.id);
+            return (
+              <button
+                key={book.id}
+                className={`book-toggle ${isReceived ? "active" : ""}`}
+                onClick={() => onToggleBook(student, book.id)}
+                title={book.name}
+                style={{ minWidth: "70px", padding: "4px 8px", fontSize: "0.8rem", flex: "1 1 auto" }}
+              >
+                {isReceived ? `✓ ${book.name}` : book.name}
+              </button>
+            );
+          })}
+          {teacherBooks.length === 0 && (
+            <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>لا توجد كتب</span>
+          )}
         </div>
       </td>
       <td data-label="إجراءات" style={{ textAlign: "center" }}>

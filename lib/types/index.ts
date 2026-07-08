@@ -1,9 +1,14 @@
+export interface BookDef {
+  id: string;
+  name: string;
+  price: number;
+}
+
 export interface Teacher {
   id: string;
   name: string;
   monthly_price: number;
-  book_1_price: number;
-  book_2_price: number;
+  books?: BookDef[];
   is_admin: boolean;
   has_bills_feature: boolean;
   has_attendance_feature: boolean;
@@ -52,8 +57,7 @@ export interface Student {
   grade_id?: string | null;
   teacher_id?: string;
   months?: boolean[];
-  book_1?: boolean;
-  book_2?: boolean;
+  received_books?: string[];
   created_at?: string;
 }
 

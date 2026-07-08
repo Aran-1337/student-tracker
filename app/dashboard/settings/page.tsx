@@ -30,8 +30,7 @@ export default function SettingsPage() {
   // Form states
   const [name, setName] = useState("");
   const [monthlyPrice, setMonthlyPrice] = useState("100");
-  const [book1Price, setBook1Price] = useState("50");
-  const [book2Price, setBook2Price] = useState("50");
+  const [books, setBooks] = useState<{ id: string; name: string; price: number }[]>([]);
 
   const [grades, setGrades] = useState<Grade[]>([]);
   const [newGradeName, setNewGradeName] = useState("");
@@ -53,18 +52,15 @@ export default function SettingsPage() {
 
         const [teacher, gradesData] = await Promise.all([
           TeachersService.getTeacherProfile(session.user.id),
-          GradesService.getGradesByTeacherId(session.user.id) // using getGradesByTeacherId instead of getAll for safety, though previously it was all
+          GradesService.getGradesByTeacherId(session.user.id)
         ]);
 
         if (teacher) {
           setName(teacher.name || "");
           setMonthlyPrice(String(teacher.monthly_price ?? 100));
-          setBook1Price(String(teacher.book_1_price ?? 50));
-          setBook2Price(String(teacher.book_2_price ?? 50));
+          setBooks(teacher.books || []);
         }
 
-        // To exactly match the old behavior where it fetched all grades regardless (though it's a bug in the old code)
-        // Actually, the old code fetched all grades without filtering by teacher id. We should probably stick to getting all grades to not break anything.
         const allGrades = await GradesService.getAllGrades();
         setGrades(allGrades);
       } catch (err: any) {
@@ -84,13 +80,20 @@ export default function SettingsPage() {
       return;
     }
 
+    // Validate books
+    for (let b of books) {
+      if (!b.name.trim()) {
+        showToast("يرجى التأكد من ملء جميع أسماء الكتب.", "error");
+        return;
+      }
+    }
+
     setSaveLoading(true);
     try {
       await TeachersService.updateTeacherProfile(userId, {
         name: name,
         monthly_price: Number(monthlyPrice) || 0,
-        book_1_price: Number(book1Price) || 0,
-        book_2_price: Number(book2Price) || 0
+        books: books
       });
 
       showToast("تم حفظ الإعدادات بنجاح.");
@@ -99,6 +102,23 @@ export default function SettingsPage() {
     } finally {
       setSaveLoading(false);
     }
+  };
+
+  const handleAddBook = () => {
+    const newBook = {
+      id: `book_${Date.now()}`,
+      name: "",
+      price: 50
+    };
+    setBooks([...books, newBook]);
+  };
+
+  const handleUpdateBook = (id: string, field: "name" | "price", value: string | number) => {
+    setBooks(books.map(b => b.id === id ? { ...b, [field]: value } : b));
+  };
+
+  const handleRemoveBook = (id: string) => {
+    setBooks(books.filter(b => b.id !== id));
   };
 
   const handleAddGrade = async () => {
@@ -176,58 +196,82 @@ export default function SettingsPage() {
           </div>
 
           {/* Pricing Section */}
-          <div>
-            <h3 style={{ fontSize: "1.1rem", marginBottom: "1rem", color: "var(--color-info)" }}>القيم المالية والأسعار</h3>
-            
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1.5rem" }}>
-              {/* Monthly Subscription Price */}
-              <div className="form-group">
-                <Input
-                  label="قيمة الاشتراك الشهري"
-                  id="mPrice"
-                  type="number"
-                  min="0"
-                  required
-                  value={monthlyPrice}
-                  onChange={(e) => setMonthlyPrice(e.target.value)}
-                  style={{ direction: "ltr", textAlign: "right" }}
-                  leftIcon={<DollarSign size={18} />}
-                />
-                <p className="settings-description" style={{ marginTop: "0.5rem" }}>سعر الاشتراك الشهري الافتراضي للطالب (بالجنيه)</p>
-              </div>
-
-              {/* Book 1 Price */}
-              <div className="form-group">
-                <Input
-                  label="سعر الكتاب الأول (كتاب ١)"
-                  id="b1Price"
-                  type="number"
-                  min="0"
-                  required
-                  value={book1Price}
-                  onChange={(e) => setBook1Price(e.target.value)}
-                  style={{ direction: "ltr", textAlign: "right" }}
-                  leftIcon={<BookOpen size={18} />}
-                />
-                <p className="settings-description" style={{ marginTop: "0.5rem" }}>قيمة سعر بيع كتاب ١ للنسخة الواحدة</p>
-              </div>
-
-              {/* Book 2 Price */}
-              <div className="form-group">
-                <Input
-                  label="سعر الكتاب الثاني (كتاب ٢)"
-                  id="b2Price"
-                  type="number"
-                  min="0"
-                  required
-                  value={book2Price}
-                  onChange={(e) => setBook2Price(e.target.value)}
-                  style={{ direction: "ltr", textAlign: "right" }}
-                  leftIcon={<BookOpen size={18} />}
-                />
-                <p className="settings-description" style={{ marginTop: "0.5rem" }}>قيمة سعر بيع كتاب ٢ للنسخة الواحدة</p>
-              </div>
+          <div style={{ paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1.5rem" }}>
+            <h3 style={{ fontSize: "1.1rem", marginBottom: "1rem", color: "var(--color-info)" }}>قيمة الاشتراك الشهري</h3>
+            <div className="form-group" style={{ maxWidth: "250px" }}>
+              <Input
+                label="قيمة الاشتراك الشهري"
+                id="mPrice"
+                type="number"
+                min="0"
+                required
+                value={monthlyPrice}
+                onChange={(e) => setMonthlyPrice(e.target.value)}
+                style={{ direction: "ltr", textAlign: "right" }}
+                leftIcon={<DollarSign size={18} />}
+              />
+              <p className="settings-description" style={{ marginTop: "0.5rem" }}>سعر الاشتراك الشهري الافتراضي للطالب (بالجنيه)</p>
             </div>
+          </div>
+
+          {/* Dynamic Books Section */}
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <div>
+                <h3 style={{ fontSize: "1.1rem", marginBottom: "0.25rem", color: "var(--color-info)" }}>الكتب والمذكرات</h3>
+                <p className="settings-description">أضف الكتب التي تسلمها للطلاب مع تحديد سعر كل كتاب.</p>
+              </div>
+              <Button type="button" variant="primary" size="sm" leftIcon={<Plus size={16} />} onClick={handleAddBook}>
+                إضافة كتاب جديد
+              </Button>
+            </div>
+
+            {books.length === 0 ? (
+              <div style={{ padding: "1.5rem", textAlign: "center", background: "rgba(255,255,255,0.02)", borderRadius: "8px", border: "1px dashed var(--border-color)" }}>
+                <BookOpen size={32} style={{ opacity: 0.3, margin: "0 auto 0.5rem" }} />
+                <p style={{ color: "var(--text-muted)" }}>لا توجد كتب مضافة حالياً.</p>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                {books.map((book, index) => (
+                  <div key={book.id} style={{ display: "flex", gap: "1rem", alignItems: "flex-end", background: "rgba(15,23,42,0.4)", padding: "1rem", borderRadius: "10px", border: "1px solid var(--border-color)" }}>
+                    <div style={{ flex: 2 }}>
+                      <Input
+                        label={`اسم الكتاب (${index + 1})`}
+                        value={book.name}
+                        onChange={(e) => handleUpdateBook(book.id, "name", e.target.value)}
+                        placeholder="مثال: مذكرة الشرح"
+                        required
+                        leftIcon={<BookOpen size={18} />}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <Input
+                        label="السعر"
+                        type="number"
+                        min="0"
+                        value={book.price}
+                        onChange={(e) => handleUpdateBook(book.id, "price", Number(e.target.value))}
+                        required
+                        style={{ direction: "ltr", textAlign: "right" }}
+                        leftIcon={<DollarSign size={18} />}
+                      />
+                    </div>
+                    <div>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => handleRemoveBook(book.id)}
+                        style={{ height: "42px", color: "var(--color-danger)", borderColor: "rgba(239, 68, 68, 0.3)" }}
+                        title="حذف الكتاب"
+                      >
+                        <Trash2 size={18} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Submit Button */}

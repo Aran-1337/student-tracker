@@ -18,8 +18,7 @@ interface Student {
   name: string;
   group_id: string | null;
   months: boolean[];
-  book_1: boolean;
-  book_2: boolean;
+  received_books: string[];
 }
 
 interface Bill {
@@ -42,8 +41,7 @@ export default function ReportsPage() {
   
   // Pricing settings from teachers table
   const [monthlyPrice, setMonthlyPrice] = useState(100);
-  const [book1Price, setBook1Price] = useState(50);
-  const [book2Price, setBook2Price] = useState(50);
+  const [teacherBooks, setTeacherBooks] = useState<any[]>([]);
 
   // Center Mode settings
   const [hasCenterMode, setHasCenterMode] = useState(false);
@@ -67,14 +65,13 @@ export default function ReportsPage() {
         // 1. Fetch teacher settings
         const { data: teacher } = await supabase
           .from("teachers")
-          .select("monthly_price, book_1_price, book_2_price")
+          .select("monthly_price, books")
           .eq("id", session.user.id)
           .single();
 
         if (teacher) {
           setMonthlyPrice(Number(teacher.monthly_price) || 0);
-          setBook1Price(Number(teacher.book_1_price) || 0);
-          setBook2Price(Number(teacher.book_2_price) || 0);
+          setTeacherBooks(teacher.books || []);
         }
 
         // 2. Center Mode Check
@@ -103,7 +100,8 @@ export default function ReportsPage() {
           ...student,
           months: Array.isArray(student.months) && student.months.length === 12
             ? student.months 
-            : Array(12).fill(false)
+            : Array(12).fill(false),
+          received_books: Array.isArray(student.received_books) ? student.received_books : []
         }));
         setStudents(validatedStudents);
 
@@ -149,11 +147,13 @@ export default function ReportsPage() {
   const totalSubscriptionEarnings = totalPaidMonthsCount * monthlyPrice;
 
   // 2. Books
-  const book1Count = filteredStudents.filter(s => s.book_1).length;
-  const book2Count = filteredStudents.filter(s => s.book_2).length;
-  const book1Earnings = book1Count * book1Price;
-  const book2Earnings = book2Count * book2Price;
-  const totalBookEarnings = book1Earnings + book2Earnings;
+  let totalBookEarnings = 0;
+  const booksStats = teacherBooks.map(book => {
+    const count = filteredStudents.filter(s => s.received_books && s.received_books.includes(book.id)).length;
+    const earnings = count * book.price;
+    totalBookEarnings += earnings;
+    return { ...book, count, earnings };
+  });
 
   // 3. Gross Revenue
   const totalGrossEarnings = totalSubscriptionEarnings + totalBookEarnings;
@@ -308,20 +308,22 @@ export default function ReportsPage() {
               </div>
               <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700, color: "#f87171" }}>-{totalExpenses} ج.م</span>
             </div>
-            <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
-              <div>
-                <p style={{ fontWeight: 600 }}>إجمالي أرباح كتاب ١</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{book1Count} طالب استلموا الكتاب بسعر {book1Price} ج.م</p>
+            {booksStats.map((book, idx) => (
+              <div key={book.id} className="flex-between" style={{ borderBottom: idx !== booksStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: idx !== booksStats.length - 1 ? "1rem" : "0.5rem" }}>
+                <div>
+                  <p style={{ fontWeight: 600 }}>إجمالي أرباح {book.name}</p>
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{book.count} طالب استلموا الكتاب بسعر {book.price} ج.م</p>
+                </div>
+                <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{book.earnings} ج.م</span>
               </div>
-              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{book1Earnings} ج.م</span>
-            </div>
-            <div className="flex-between" style={{ paddingBottom: "0.5rem" }}>
-              <div>
-                <p style={{ fontWeight: 600 }}>إجمالي أرباح كتاب ٢</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{book2Count} طالب استلموا الكتاب بسعر {book2Price} ج.م</p>
+            ))}
+            {booksStats.length === 0 && (
+              <div className="flex-between" style={{ paddingBottom: "0.5rem" }}>
+                <div>
+                  <p style={{ fontWeight: 600, color: "var(--text-muted)" }}>لا يوجد كتب مضافة</p>
+                </div>
               </div>
-              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{book2Earnings} ج.م</span>
-            </div>
+            )}
           </div>
         </section>
 
