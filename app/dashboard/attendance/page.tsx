@@ -399,30 +399,34 @@ export default function AttendancePage() {
                   <th style={{ width: "40px", textAlign: "center" }}>#</th>
                   <th style={{ minWidth: "160px" }}>الطالب</th>
                   {/* Session columns */}
-                  {allDates.map((dateStr, i) => (
+                  {allDates.map((dateStr, i) => {
+                    const isPastDate = dateStr < new Date().toISOString().split("T")[0];
+                    return (
                     <th key={dateStr} style={{ textAlign: "center", padding: "0.75rem 0.35rem", minWidth: "52px" }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px" }}>
                         <span style={{ fontSize: "0.75rem" }}>{dateStr.split("-").slice(1).reverse().join("/")}</span>
                         <button
-                          onClick={() => handleMarkAllSession(dateStr)}
-                          disabled={saving}
+                          onClick={() => {
+                            if (!isPastDate) handleMarkAllSession(dateStr);
+                          }}
+                          disabled={saving || isPastDate}
                           style={{
                             fontSize: "0.6rem",
                             padding: "2px 5px",
                             borderRadius: "4px",
-                            background: "rgba(20,184,166,0.12)",
-                            border: "1px solid rgba(20,184,166,0.25)",
-                            color: "var(--color-teal)",
-                            cursor: "pointer",
+                            background: isPastDate ? "rgba(255,255,255,0.05)" : "rgba(20,184,166,0.12)",
+                            border: isPastDate ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(20,184,166,0.25)",
+                            color: isPastDate ? "var(--text-muted)" : "var(--color-teal)",
+                            cursor: isPastDate ? "not-allowed" : "pointer",
                             whiteSpace: "nowrap"
                           }}
-                          title={`تحضير الكل بتاريخ ${dateStr}`}
+                          title={isPastDate ? "لا يمكن تعديل حضور يوم سابق" : `تحضير الكل بتاريخ ${dateStr}`}
                         >
                           الكل ✓
                         </button>
                       </div>
                     </th>
-                  ))}
+                  )})}
                   <th style={{ textAlign: "center", minWidth: "70px" }}>النسبة</th>
                   <th style={{ textAlign: "center", minWidth: "60px" }}>QR</th>
                 </tr>
@@ -442,11 +446,15 @@ export default function AttendancePage() {
                       {/* Session squares */}
                       {allDates.map((dateStr, i) => {
                         const present = isPresent(student.id, dateStr);
+                        const isPastDate = dateStr < new Date().toISOString().split("T")[0];
                         return (
                           <td key={dateStr} data-label={dateStr} style={{ textAlign: "center", padding: "0.5rem 0.25rem" }}>
                             <button
-                              onClick={() => handleToggle(student, dateStr)}
-                              title={present ? `إلغاء حضور يوم ${dateStr}` : `تسجيل حضور يوم ${dateStr}`}
+                              onClick={() => {
+                                if (!isPastDate) handleToggle(student, dateStr);
+                              }}
+                              disabled={isPastDate}
+                              title={isPastDate ? "لا يمكن تعديل حضور يوم سابق" : present ? `إلغاء حضور يوم ${dateStr}` : `تسجيل حضور يوم ${dateStr}`}
                               style={{
                                 width: "36px",
                                 height: "36px",
@@ -457,7 +465,8 @@ export default function AttendancePage() {
                                 background: present
                                   ? "rgba(20,184,166,0.2)"
                                   : "rgba(255,255,255,0.03)",
-                                cursor: "pointer",
+                                cursor: isPastDate ? "not-allowed" : "pointer",
+                                opacity: isPastDate ? 0.6 : 1,
                                 display: "flex",
                                 alignItems: "center",
                                 justifyContent: "center",

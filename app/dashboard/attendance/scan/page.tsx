@@ -72,7 +72,7 @@ export default function QRScanPage() {
   const [manualCode, setManualCode] = useState("");
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const scannedIdsRef = useRef<Set<string>>(new Set());
+  const scannedIdsRef = useRef<Map<string, number>>(new Map());
   const scannerDivId = "qr-reader";
 
   useEffect(() => {
@@ -99,6 +99,36 @@ export default function QRScanPage() {
     }
     load();
   }, []);
+
+  // Fetch today's attendance for the selected group
+  useEffect(() => {
+    if (!userId || !selectedGroupId) return;
+
+    async function loadTodayAttendance() {
+      try {
+        const { data } = await supabase
+          .from("attendance_records")
+          .select("student_id, created_at")
+          .eq("teacher_id", userId)
+          .eq("group_id", selectedGroupId)
+          .eq("session_date", todayDateStr)
+          .eq("status", "present");
+
+        if (data) {
+          const preScanned: ScannedEntry[] = data.map(record => {
+            const st = students.find(s => s.id === record.student_id);
+            return {
+              studentId: record.student_id,
+              studentName: st?.name || "طالب غير معروف",
+              time: new Date(record.created_at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })
+            };
+          });
+          setScannedToday(preScanned);
+        }
+      } catch (err) {}
+    }
+    loadTodayAttendance();
+  }, [userId, selectedGroupId, todayDateStr, students]);
 
   // Cleanup scanner on unmount
   useEffect(() => {
@@ -143,16 +173,18 @@ export default function QRScanPage() {
   const handleQRSuccess = async (decodedText: string) => {
     if (!userId) return;
 
-    // Prevent spam scanning the same QR code by maintaining a Set in a Ref
-    if (scannedIdsRef.current.has(decodedText)) {
-      return;
+    // Prevent spam scanning the same QR code
+    const nowMs = Date.now();
+    const lastScanTime = scannedIdsRef.current.get(decodedText) || 0;
+    if (nowMs - lastScanTime < 3000) {
+      return; // Debounce same QR code for 3 seconds
     }
+    scannedIdsRef.current.set(decodedText, nowMs);
 
     // Find student by id
     const student = students.find(s => s.id === decodedText);
     if (!student) {
       setLastScan({ name: "طالب غير معروف!", success: false });
-      scannedIdsRef.current.delete(decodedText);
       return;
     }
 
@@ -164,15 +196,13 @@ export default function QRScanPage() {
         groupName = `${studentGroup.name} (${studentGroup.day_of_week} - ${formatTimeTo12H(studentGroup.time)})`;
       }
       setCrossGroupConfirm({ student, originalGroupName: groupName });
-      return; // Wait for confirm before adding to scannedIdsRef
+      return; // Wait for confirm
     }
-
-    // Mark as scanned immediately to prevent concurrent duplicate API calls
-    scannedIdsRef.current.add(decodedText);
 
     // Check if already scanned this session
     if (scannedToday.some(e => e.studentId === student.id)) {
       setLastScan({ name: `${student.name} — مسجل مسبقاً`, success: false });
+      setTimeout(() => setLastScan(null), 2500);
       return;
     }
 
@@ -489,7 +519,7 @@ export default function QRScanPage() {
                   <Button variant="primary" style={{ flex: 1, justifyContent: "center" }}
                     onClick={async () => {
                       const st = crossGroupConfirm.student;
-                      scannedIdsRef.current.add(st.id);
+                      scannedIdsRef.current.set(st.id, Date.now());
                       setCrossGroupConfirm(null);
                       await processAttendance(st, selectedGroupId);
                     }}
