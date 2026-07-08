@@ -2,44 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { 
-  Users, 
-  Plus, 
-  Search, 
-  Trash2, 
-  AlertCircle,
-  X,
-  UserPlus,
-  CheckSquare,
-  Square
-} from "lucide-react";
+import { Users, Plus, Search, UserPlus, CheckSquare, Square, AlertCircle } from "lucide-react";
+import { Student, Group, Grade } from "@/lib/types";
+import { StudentsService } from "@/lib/services/studentsService";
+import { GroupsService } from "@/lib/services/groupsService";
+import { GradesService } from "@/lib/services/gradesService";
 
-interface Group {
-  id: string;
-  name: string;
-  day_of_week: string;
-  time: string;
-  is_private?: boolean;
-  grade_id?: string | null;
-}
-
-interface Grade {
-  id: string;
-  name: string;
-  start_code: number;
-  prefix?: string;
-}
-
-interface Student {
-  id: string;
-  name: string;
-  code?: string;
-  group_id: string | null;
-  grade_id?: string | null;
-  months: boolean[];
-  book_1: boolean;
-  book_2: boolean;
-}
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Toast } from "@/components/ui/Toast";
+import { Spinner } from "@/components/ui/Spinner";
+import { StudentTableRow } from "@/components/features/StudentTableRow";
 
 const formatTimeTo12H = (timeStr: string) => {
   if (!timeStr) return "";
@@ -84,7 +57,6 @@ export default function StudentsManagement() {
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
   };
 
   useEffect(() => {
@@ -94,30 +66,22 @@ export default function StudentsManagement() {
         if (!session) return;
         setUserId(session.user.id);
 
-        const { data: groupsData } = await supabase
-          .from("groups")
-          .select("*")
-          .order("created_at", { ascending: false });
-        setGroups(groupsData || []);
+        const [groupsData, studentsData, gradesData] = await Promise.all([
+          GroupsService.getAllGroups(),
+          StudentsService.getAllStudents(),
+          GradesService.getAllGrades()
+        ]);
 
-        const { data: studentsData } = await supabase
-          .from("students")
-          .select("*")
-          .order("created_at", { ascending: true });
+        setGroups(groupsData);
+        setGrades(gradesData);
 
-        const validatedStudents = (studentsData || []).map(student => ({
+        const validatedStudents = studentsData.map(student => ({
           ...student,
           months: Array.isArray(student.months) && student.months.length === 12
             ? student.months 
             : Array(12).fill(false)
         }));
         setStudents(validatedStudents);
-
-        const { data: gradesData } = await supabase
-          .from("grades")
-          .select("*")
-          .order("created_at", { ascending: true });
-        setGrades(gradesData || []);
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل البيانات.", "error");
       } finally {
@@ -143,44 +107,17 @@ export default function StudentsManagement() {
       const selectedGroupIdVal = studentGroupId === "" ? null : studentGroupId;
       const initialMonths = Array(12).fill(false);
 
-      // Generate code dynamically in frontend to bypass trigger issues
-      const grade = grades.find(g => g.id === studentGradeId);
-      const startCode = grade?.start_code || 0;
-      const prefix = grade?.prefix || '';
-      
-      const gradeStudents = students.filter(s => s.grade_id === studentGradeId);
-      let maxCode = -1;
-      gradeStudents.forEach(s => {
-        let codeStr = s.code || '';
-        if (prefix && codeStr.startsWith(prefix)) {
-          codeStr = codeStr.substring(prefix.length);
-        }
-        const num = parseInt(codeStr.replace(/\D/g, '') || '-1', 10);
-        if (!isNaN(num) && num > maxCode) maxCode = num;
-      });
+      const newStudent = await StudentsService.addStudentWithGeneratedCode({
+        teacher_id: userId,
+        name: studentName,
+        group_id: selectedGroupIdVal,
+        grade_id: studentGradeId,
+        months: initialMonths,
+        book_1: false,
+        book_2: false
+      }, students);
 
-      const generatedNum = (maxCode < startCode) ? startCode : maxCode + 1;
-      const generatedCode = `${prefix}${generatedNum}`;
-
-      const { data, error } = await supabase
-        .from("students")
-        .insert([
-          {
-            teacher_id: userId,
-            name: studentName,
-            code: generatedCode,
-            group_id: selectedGroupIdVal,
-            grade_id: studentGradeId || null,
-            months: initialMonths,
-            book_1: false,
-            book_2: false
-          }
-        ])
-        .select();
-
-      if (error) throw error;
-
-      setStudents([...students, data[0]]);
+      setStudents([...students, newStudent]);
       setStudentName("");
       setStudentGroupId("");
       showToast("تم إضافة الطالب بنجاح.");
@@ -195,13 +132,7 @@ export default function StudentsManagement() {
     if (!confirm("هل أنت متأكد من حذف هذا الطالب نهائياً؟")) return;
 
     try {
-      const { error } = await supabase
-        .from("students")
-        .delete()
-        .eq("id", studentId);
-
-      if (error) throw error;
-
+      await StudentsService.deleteStudent(studentId);
       setStudents(students.filter(s => s.id !== studentId));
       setSelectedStudentIds(prev => { const n = new Set(prev); n.delete(studentId); return n; });
       showToast("تم حذف الطالب بنجاح.");
@@ -219,6 +150,9 @@ export default function StudentsManagement() {
 
     setActionLoading(true);
     try {
+      // For now, doing it sequentially as Service doesn't have bulkDelete yet,
+      // but let's assume we can add it to repo/service if needed.
+      // We will use supabase direct for bulk just to not break behavior now.
       const { error } = await supabase
         .from("students")
         .delete()
@@ -237,19 +171,14 @@ export default function StudentsManagement() {
   };
 
   const handleToggleMonth = async (student: Student, monthIdx: number) => {
-    const updatedMonths = [...student.months];
+    const updatedMonths = [...(student.months || Array(12).fill(false))];
     updatedMonths[monthIdx] = !updatedMonths[monthIdx];
 
     const prevStudents = [...students];
     setStudents(students.map(s => s.id === student.id ? { ...s, months: updatedMonths } : s));
 
     try {
-      const { error } = await supabase
-        .from("students")
-        .update({ months: updatedMonths })
-        .eq("id", student.id);
-
-      if (error) throw error;
+      await StudentsService.updateStudent(student.id, { months: updatedMonths });
     } catch (err: any) {
       setStudents(prevStudents);
       showToast("حدث خطأ أثناء تعديل حالة الدفع.", "error");
@@ -263,30 +192,19 @@ export default function StudentsManagement() {
     setStudents(students.map(s => s.id === student.id ? { ...s, [bookKey]: updatedVal } : s));
 
     try {
-      const { error } = await supabase
-        .from("students")
-        .update({ [bookKey]: updatedVal })
-        .eq("id", student.id);
-
-      if (error) throw error;
+      await StudentsService.updateStudent(student.id, { [bookKey]: updatedVal });
     } catch (err: any) {
       setStudents(prevStudents);
       showToast("حدث خطأ أثناء تعديل حالة الكتاب.", "error");
     }
   };
 
-  const handleChangeGroup = async (student: Student, newGroupId: string) => {
+  const handleChangeGroup = async (studentId: string, newGroupId: string) => {
     try {
       const targetGroupId = newGroupId === "" ? null : newGroupId;
-      const { error } = await supabase
-        .from("students")
-        .update({ group_id: targetGroupId })
-        .eq("id", student.id);
-
-      if (error) throw error;
-
-      setStudents(students.map(s => s.id === student.id ? { ...s, group_id: targetGroupId } : s));
-      showToast(`تم تغيير مجموعة "${student.name}" بنجاح.`);
+      await StudentsService.updateStudent(studentId, { group_id: targetGroupId });
+      setStudents(students.map(s => s.id === studentId ? { ...s, group_id: targetGroupId } : s));
+      showToast(`تم النقل بنجاح.`);
     } catch (err: any) {
       showToast("فشل نقل الطالب.", "error");
     }
@@ -328,11 +246,7 @@ export default function StudentsManagement() {
   const someSelected = selectedStudentIds.size > 0;
 
   if (loading) {
-    return (
-      <div className="loading-wrapper">
-        <div className="spinner"></div>
-      </div>
-    );
+    return <Spinner fullScreen />;
   }
 
   return (
@@ -353,13 +267,12 @@ export default function StudentsManagement() {
             </h2>
             <form onSubmit={handleAddStudent}>
               <div className="form-group">
-                <label className="form-label" htmlFor="sName">اسم الطالب</label>
-                <input
+                <Input
+                  label="اسم الطالب"
                   id="sName"
                   type="text"
                   required
                   placeholder="الاسم الكامل للطالب"
-                  className="form-input"
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
                 />
@@ -402,265 +315,167 @@ export default function StudentsManagement() {
                   ))}
                 </select>
               </div>
-              <button
+              
+              <Button
                 type="submit"
-                className="btn btn-primary"
-                style={{ width: "100%", marginTop: "0.5rem" }}
-                disabled={actionLoading}
+                variant="primary"
+                isLoading={actionLoading}
+                leftIcon={<Plus size={18} />}
+                style={{ width: "100%", marginTop: "1rem" }}
               >
-                <Plus size={18} />
-                <span>{actionLoading ? "جاري الإضافة..." : "إضافة طالب"}</span>
-              </button>
+                إضافة الطالب
+              </Button>
             </form>
+          </div>
+
+          <div className="glass-panel panel-content stat-card" style={{ marginTop: "1.5rem" }}>
+            <div className="stat-icon-wrapper" style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa" }}>
+              <Users size={24} />
+            </div>
+            <div>
+              <div className="stat-value">{filteredStudents.length}</div>
+              <div className="stat-label">إجمالي الطلاب في الفلتر الحالي</div>
+            </div>
           </div>
         </aside>
 
-        {/* Left Side: Students List */}
-        <section className="glass-panel panel-content">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem", flexWrap: "wrap", gap: "1rem" }}>
-            <h2 className="panel-title" style={{ margin: 0 }}>
-              <Users size={18} style={{ color: "var(--color-info)" }} />
-              <span>قائمة الطلاب ({filteredStudents.length})</span>
-            </h2>
-            
-            <select
-              value={filterGradeId}
-              onChange={(e) => {
-                setFilterGradeId(e.target.value);
-                setActiveFilter("all");
-                setSelectedStudentIds(new Set());
-              }}
-              className="form-input"
-              style={{ maxWidth: "250px", padding: "0.5rem", background: "rgba(255,255,255,0.05)" }}
-            >
-              <option value="all">-- جميع السنين الدراسية --</option>
-              {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-          </div>
-
-          {/* Group Filter Chips */}
-          <div className="chips-container">
-            <button 
-              className={`chip ${activeFilter === "all" ? "active" : ""}`}
-              onClick={() => { setActiveFilter("all"); setSelectedStudentIds(new Set()); }}
-            >
-              كل الطلاب
-            </button>
-            <button 
-              className={`chip ${activeFilter === "none" ? "active" : ""}`}
-              onClick={() => { setActiveFilter("none"); setSelectedStudentIds(new Set()); }}
-            >
-              بدون مجموعة
-            </button>
-            {groups
-              .filter(g => filterGradeId === "all" || g.grade_id === filterGradeId)
-              .map(group => (
-              <button 
-                key={group.id}
-                className={`chip ${group.is_private ? "private" : ""} ${activeFilter === group.id ? "active" : ""}`}
-                onClick={() => { setActiveFilter(group.id); setSelectedStudentIds(new Set()); }}
-              >
-                <span>{group.name} {group.is_private ? "★ " : ""}({group.day_of_week} {formatTimeTo12H(group.time)})</span>
-              </button>
-            ))}
-          </div>
-
-          {/* Search bar */}
-          <div className="table-controls">
-            <div className="search-input-wrapper">
+        {/* Main Content: Filters & Table */}
+        <div className="glass-panel panel-content" style={{ display: "flex", flexDirection: "column", minHeight: "600px" }}>
+          
+          {/* Action Bar & Filters */}
+          <div className="action-bar" style={{ display: "flex", flexWrap: "wrap", gap: "1rem", marginBottom: "1.5rem" }}>
+            {/* Search */}
+            <div className="search-input-wrapper" style={{ flex: "1 1 300px" }}>
               <Search className="search-icon" size={18} />
               <input
                 type="text"
-                placeholder="بحث سريع باسم الطالب أو الكود..."
+                placeholder="ابحث بالاسم أو بالكود..."
                 className="search-input"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+
+            {/* Filter by Grade */}
+            <select
+              className="filter-select"
+              value={filterGradeId}
+              onChange={(e) => {
+                setFilterGradeId(e.target.value);
+                setActiveFilter("all"); // Reset group filter
+              }}
+              style={{ flex: "1 1 150px" }}
+            >
+              <option value="all">كل السنين الدراسية</option>
+              {grades.map(grade => (
+                <option key={grade.id} value={grade.id}>{grade.name}</option>
+              ))}
+            </select>
+
+            {/* Filter by Group */}
+            <select
+              className="filter-select"
+              value={activeFilter}
+              onChange={(e) => setActiveFilter(e.target.value)}
+              style={{ flex: "1 1 200px" }}
+            >
+              <option value="all">جميع المجموعات</option>
+              <option value="none">بدون مجموعة</option>
+              {groups
+                .filter(g => filterGradeId === "all" || g.grade_id === filterGradeId)
+                .map(group => (
+                <option key={group.id} value={group.id}>
+                  {group.name} {group.is_private ? "(خاصة)" : ""}
+                </option>
+              ))}
+            </select>
           </div>
+
+          {/* Bulk Action Bar (Shows when items are selected) */}
+          {selectedStudentIds.size > 0 && (
+            <div style={{
+              background: "rgba(239,68,68,0.1)",
+              border: "1px solid rgba(239,68,68,0.2)",
+              borderRadius: "8px",
+              padding: "0.75rem 1rem",
+              marginBottom: "1rem",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center"
+            }}>
+              <span style={{ color: "var(--color-danger)", fontWeight: 500 }}>
+                تم تحديد {selectedStudentIds.size} طالب
+              </span>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleBulkDelete}
+                isLoading={actionLoading}
+              >
+                حذف المحدد
+              </Button>
+            </div>
+          )}
 
           {/* Students Table */}
-          <div className="table-container">
-            {filteredStudents.length === 0 ? (
-              <div className="empty-state">
-                <AlertCircle size={48} className="empty-state-icon" />
-                <p>لا يوجد طلاب يطابقون خيارات التصفية أو البحث الحالية.</p>
-              </div>
-            ) : (
-              <table className="students-table mobile-card-table">
-                <thead>
+          <div className="table-container" style={{ flex: 1 }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th style={{ width: "40px" }}>
+                    <button 
+                      onClick={toggleSelectAll} 
+                      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)", display: "flex" }}
+                      title="تحديد الكل / إلغاء"
+                    >
+                      {allSelected ? <CheckSquare size={18} className="color-teal" /> : <Square size={18} />}
+                    </button>
+                  </th>
+                  <th style={{ minWidth: "100px" }}>الكود</th>
+                  <th style={{ minWidth: "200px" }}>الاسم</th>
+                  <th style={{ minWidth: "150px" }}>المجموعة</th>
+                  <th style={{ minWidth: "300px" }}>الشهور المدفوعة (١ - ١٢)</th>
+                  <th style={{ minWidth: "200px" }}>الكتب المستلمة</th>
+                  <th style={{ minWidth: "80px" }}>إجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.length === 0 ? (
                   <tr>
-                    {/* Select All Checkbox */}
-                    <th style={{ width: "40px", textAlign: "center" }}>
-                      <button
-                        onClick={toggleSelectAll}
-                        style={{ background: "none", border: "none", cursor: "pointer", color: allSelected ? "var(--color-teal)" : "var(--text-muted)", display: "flex", alignItems: "center", margin: "0 auto" }}
-                        title={allSelected ? "إلغاء تحديد الكل" : "تحديد الكل"}
-                      >
-                        {allSelected ? <CheckSquare size={18} /> : <Square size={18} />}
-                      </button>
-                    </th>
-                    <th style={{ width: "40px", textAlign: "center" }}>#</th>
-                    <th>الكود</th>
-                    <th>اسم الطالب</th>
-                    <th>الشهور المدفوعة (١ - ١٢)</th>
-                    <th>الكتب المستلمة</th>
-                    <th>إجراءات</th>
+                    <td colSpan={7} className="empty-state">
+                      <AlertCircle size={48} style={{ opacity: 0.5, marginBottom: "1rem" }} />
+                      <p>لا يوجد طلاب حالياً للفلتر المحدد.</p>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredStudents.map((student, index) => {
-                    const studentGroup = groups.find(g => g.id === student.group_id);
-                    const isSelected = selectedStudentIds.has(student.id);
-                    return (
-                      <tr 
-                        key={student.id}
-                        style={{
-                          background: isSelected ? "rgba(20, 184, 166, 0.06)" : undefined,
-                          outline: isSelected ? "1px solid rgba(20, 184, 166, 0.2)" : undefined,
-                          transition: "background 0.15s ease"
-                        }}
-                      >
-                        {/* Row Checkbox */}
-                        <td data-label="تحديد" style={{ textAlign: "center" }}>
-                          <button
-                            onClick={() => toggleSelectStudent(student.id)}
-                            style={{ background: "none", border: "none", cursor: "pointer", color: isSelected ? "var(--color-teal)" : "var(--text-muted)", display: "flex", alignItems: "center", margin: "0 auto" }}
-                          >
-                            {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
-                          </button>
-                        </td>
-                        <td data-label="#" style={{ textAlign: "center", fontWeight: 600, color: "var(--text-muted)" }}>
-                          {index + 1}
-                        </td>
-                        <td data-label="الكود" style={{ fontWeight: 700, color: "var(--color-teal)" }}>
-                          {student.code || "-"}
-                        </td>
-                        <td data-label="اسم الطالب">
-                          <div className="student-name-cell">
-                            <span className="student-name">{student.name}</span>
-                            <select
-                              value={student.group_id || ""}
-                              onChange={(e) => handleChangeGroup(student, e.target.value)}
-                              className={`student-group-badge ${studentGroup?.is_private ? "private" : ""}`}
-                              style={{ 
-                                background: "rgba(0,0,0,0.2)", 
-                                border: "1px solid var(--border-color)", 
-                                color: studentGroup?.is_private ? "var(--color-warning)" : "var(--color-teal)",
-                                cursor: "pointer",
-                                padding: "2px 6px"
-                              }}
-                            >
-                              <option value="" style={{ background: "#0f172a" }}>بدون مجموعة</option>
-                              {groups.map(g => (
-                                <option key={g.id} value={g.id} style={{ background: "#0f172a" }}>
-                                  {g.name} ({g.day_of_week} - {formatTimeTo12H(g.time)})
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        </td>
-                        <td data-label="الشهور المدفوعة (١ - ١٢)">
-                          <div className="months-grid">
-                            {student.months.map((isPaid, idx) => (
-                              <button
-                                key={idx}
-                                className={`month-toggle ${isPaid ? "paid" : ""}`}
-                                onClick={() => handleToggleMonth(student, idx)}
-                                title={`${arabicMonths[idx]} (شهر ${idx + 1}) - اضغط للتبديل`}
-                              >
-                                {idx + 1}
-                              </button>
-                            ))}
-                          </div>
-                        </td>
-                        <td data-label="الكتب المستلمة">
-                          <div className="book-toggles">
-                            <button
-                              className={`book-toggle ${student.book_1 ? "active" : ""}`}
-                              onClick={() => handleToggleBook(student, "book_1")}
-                            >
-                              {student.book_1 ? "✓ كتاب ١" : "كتاب ١"}
-                            </button>
-                            <button
-                              className={`book-toggle ${student.book_2 ? "active" : ""}`}
-                              onClick={() => handleToggleBook(student, "book_2")}
-                            >
-                              {student.book_2 ? "✓ كتاب ٢" : "كتاب ٢"}
-                            </button>
-                          </div>
-                        </td>
-                        <td data-label="إجراءات">
-                          <button 
-                            className="btn btn-secondary btn-icon"
-                            onClick={() => handleDeleteStudent(student.id)}
-                            title="حذف الطالب"
-                            style={{ border: "none", background: "none" }}
-                          >
-                            <Trash2 size={16} className="color-danger" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
+                ) : (
+                  filteredStudents.map(student => (
+                    <StudentTableRow
+                      key={student.id}
+                      student={student}
+                      groups={groups}
+                      arabicMonths={arabicMonths}
+                      formatTimeTo12H={formatTimeTo12H}
+                      isSelected={selectedStudentIds.has(student.id)}
+                      onToggleSelect={toggleSelectStudent}
+                      onToggleMonth={handleToggleMonth}
+                      onToggleBook={handleToggleBook}
+                      onDelete={handleDeleteStudent}
+                      onUpdateGroup={handleChangeGroup}
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </section>
+        </div>
       </div>
 
-      {/* Floating Bulk Action Bar */}
-      {someSelected && (
-        <div style={{
-          position: "fixed",
-          bottom: "2rem",
-          left: "50%",
-          transform: "translateX(-50%)",
-          background: "rgba(15, 23, 42, 0.97)",
-          backdropFilter: "blur(16px)",
-          border: "1px solid rgba(20, 184, 166, 0.3)",
-          borderRadius: "14px",
-          padding: "0.85rem 1.75rem",
-          display: "flex",
-          alignItems: "center",
-          gap: "1.25rem",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(20,184,166,0.1)",
-          zIndex: 100,
-          animation: "fadeInUp 0.2s ease"
-        }}>
-          <span style={{ fontWeight: 600, color: "var(--color-teal)", fontSize: "0.95rem" }}>
-            <CheckSquare size={16} style={{ display: "inline", marginLeft: "6px", verticalAlign: "middle" }} />
-            تم تحديد {selectedStudentIds.size} طالب
-          </span>
-
-          <button
-            className="btn btn-danger"
-            onClick={handleBulkDelete}
-            disabled={actionLoading}
-            style={{ padding: "0.5rem 1.25rem", fontSize: "0.9rem" }}
-          >
-            <Trash2 size={16} />
-            <span>{actionLoading ? "جاري الحذف..." : "حذف المحدد"}</span>
-          </button>
-
-          <button
-            className="btn btn-secondary"
-            onClick={() => setSelectedStudentIds(new Set())}
-            style={{ padding: "0.5rem 1rem", fontSize: "0.9rem" }}
-          >
-            <X size={16} />
-            <span>إلغاء التحديد</span>
-          </button>
-        </div>
-      )}
-
-      {/* Toast Alert */}
       {toast && (
-        <div className={`alert-toast ${toast.type === "success" ? "alert-success" : "alert-error"}`}>
-          {toast.type === "error" ? <AlertCircle size={18} /> : <CheckSquare size={18} />}
-          <span>{toast.message}</span>
-        </div>
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );
