@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { AuthService } from "@/lib/services/authService";
+import { TeachersService } from "@/lib/services/teachersService";
+import { StudentsService } from "@/lib/services/studentsService";
+import { BillsService } from "@/lib/services/billsService";
+import { GroupsService } from "@/lib/services/groupsService";
+import { SubTeachersService } from "@/lib/services/subTeachersService";
 import { 
   TrendingUp, 
   DollarSign, 
@@ -59,42 +64,30 @@ export default function ReportsPage() {
   useEffect(() => {
     async function loadReports() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await AuthService.getSession();
         if (!session) return;
 
-        // 1. Fetch teacher settings
-        const { data: teacher } = await supabase
-          .from("teachers")
-          .select("monthly_price, books")
-          .eq("id", session.user.id)
-          .single();
+        // 1. Fetch teacher settings & Center Mode Check
+        const teacher = await TeachersService.getTeacherProfile(session.user.id);
 
         if (teacher) {
           setMonthlyPrice(Number(teacher.monthly_price) || 0);
           setTeacherBooks(teacher.books || []);
-        }
-
-        // 2. Center Mode Check
-        const { data: tData } = await supabase.from("teachers").select("is_center_mode").eq("id", session.user.id).single();
-        const centerMode = tData?.is_center_mode || false;
-        setHasCenterMode(centerMode);
-
-        if (centerMode) {
-          const { data: subs } = await supabase.from("sub_teachers").select("*").eq("center_id", session.user.id);
-          setSubTeachers(subs || []);
           
-          const { data: grps } = await supabase.from("groups").select("id, sub_teacher_id").eq("teacher_id", session.user.id);
-          if (grps) {
-             setGroups(grps);
+          const centerMode = teacher.is_center_mode || false;
+          setHasCenterMode(centerMode);
+
+          if (centerMode) {
+            const subs = await SubTeachersService.getSubTeachersByCenterId(session.user.id);
+            setSubTeachers(subs || []);
+            
+            const grps = await GroupsService.getGroupsByTeacherId(session.user.id);
+            setGroups(grps || []);
           }
         }
 
         // 3. Fetch students
-        const { data: studentsData, error: studentsError } = await supabase
-          .from("students")
-          .select("*");
-
-        if (studentsError) throw studentsError;
+        const studentsData = await StudentsService.getStudentsByTeacherId(session.user.id);
 
         const validatedStudents = (studentsData || []).map(student => ({
           ...student,
@@ -106,11 +99,7 @@ export default function ReportsPage() {
         setStudents(validatedStudents);
 
         // 4. Fetch bills
-        const { data: billsData, error: billsError } = await supabase
-          .from("bills")
-          .select("*");
-
-        if (billsError) throw billsError;
+        const billsData = await BillsService.getBillsByTeacherId(session.user.id);
         setBills(billsData || []);
 
       } catch (err: any) {
