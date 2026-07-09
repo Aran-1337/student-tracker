@@ -45,5 +45,15 @@ export const BillsRepository = {
       .delete()
       .in("id", ids);
     if (error) throw error;
+  },
+
+  async deleteRecurringBillsForMonth(monthNum: number, teacherId: string): Promise<void> {
+    const { error } = await supabase
+      .from("bills")
+      .delete()
+      .eq("billing_month", monthNum)
+      .eq("is_recurring", true)
+      .eq("teacher_id", teacherId);
+    if (error) throw error;
   }
 };

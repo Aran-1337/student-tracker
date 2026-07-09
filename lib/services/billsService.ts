@@ -58,5 +58,9 @@ export const BillsService = {
     }));
 
     return BillsRepository.addBills(insertRows);
+  },
+
+  async deleteRecurringBillsForMonth(monthNum: number, teacherId: string): Promise<void> {
+    return BillsRepository.deleteRecurringBillsForMonth(monthNum, teacherId);
   }
 };

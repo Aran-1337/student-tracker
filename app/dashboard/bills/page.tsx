@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { BillsService } from "@/lib/services/billsService";
+import { AuthService } from "@/lib/services/authService";
+import { Bill } from "@/lib/types";
 import { 
   Receipt, 
   Plus, 
@@ -16,15 +18,6 @@ import {
   X
 } from "lucide-react";
 
-interface Bill {
-  id: string;
-  title: string;
-  amount: number;
-  category: "إيجار" | "رواتب سكرتارية" | "أخرى";
-  billing_month: number;
-  is_recurring: boolean;
-  created_at: string;
-}
 
 const arabicMonths = [
   "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
@@ -69,16 +62,11 @@ export default function BillsManagement() {
   useEffect(() => {
     async function loadBills() {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await AuthService.getSession();
         if (!session) return;
         setUserId(session.user.id);
 
-        const { data, error } = await supabase
-          .from("bills")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (error) throw error;
+        const data = await BillsService.getBillsByTeacherId(session.user.id);
         setBills(data || []);
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل الفواتير.", "error");
@@ -104,23 +92,18 @@ export default function BillsManagement() {
         throw new Error("يرجى إدخال قيمة مالية صحيحة.");
       }
 
-      const { data, error } = await supabase
-        .from("bills")
-        .insert([
-          {
-            teacher_id: userId,
-            title,
-            amount: parsedAmount,
-            category,
-            billing_month: Number(billingMonth),
-            is_recurring: isRecurring
-          }
-        ])
-        .select();
+      const newBillData = {
+        teacher_id: userId,
+        title,
+        amount: parsedAmount,
+        category: category as "إيجار" | "رواتب سكرتارية" | "أخرى",
+        billing_month: Number(billingMonth),
+        is_recurring: isRecurring
+      };
 
-      if (error) throw error;
+      const newBill = await BillsService.addBill(newBillData);
 
-      setBills([data[0], ...bills]);
+      setBills([newBill, ...bills]);
       setTitle("");
       setAmount("");
       setIsRecurring(false);
@@ -138,12 +121,7 @@ export default function BillsManagement() {
     }
 
     try {
-      const { error } = await supabase
-        .from("bills")
-        .delete()
-        .eq("id", billId);
-
-      if (error) throw error;
+      await BillsService.deleteBill(billId);
 
       setBills(bills.filter(b => b.id !== billId));
       setSelectedBillIds(prev => {
@@ -168,12 +146,7 @@ export default function BillsManagement() {
 
     setActionLoading(true);
     try {
-      const { error } = await supabase
-        .from("bills")
-        .delete()
-        .in("id", Array.from(selectedBillIds));
-
-      if (error) throw error;
+      await BillsService.deleteBills(Array.from(selectedBillIds));
 
       setBills(prev => prev.filter(b => !selectedBillIds.has(b.id)));
       setSelectedBillIds(new Set());
@@ -189,57 +162,12 @@ export default function BillsManagement() {
   const handleGenerateForMonth = async (targetMonth: number) => {
     if (!userId) return;
 
-    const allRecurring = bills.filter(b => b.is_recurring);
-    if (allRecurring.length === 0) {
-      showToast("لا توجد فواتير متكررة مسجلة بعد!", "error");
-      return;
-    }
-
-    const uniqueTemplatesMap = new Map<string, Bill>();
-    for (const b of allRecurring) {
-      const key = `${b.title}|${b.category}|${b.amount}`;
-      if (!uniqueTemplatesMap.has(key)) {
-        uniqueTemplatesMap.set(key, b);
-      }
-    }
-    const uniqueTemplates = Array.from(uniqueTemplatesMap.values());
-
-    const toInsert = uniqueTemplates.filter(template => {
-      return !bills.some(
-        b =>
-          b.is_recurring &&
-          b.billing_month === targetMonth &&
-          b.title === template.title &&
-          b.category === template.category &&
-          Number(b.amount) === Number(template.amount)
-      );
-    });
-
-    if (toInsert.length === 0) {
-      showToast(`الفواتير المتكررة موجودة بالفعل لشهر ${arabicMonths[targetMonth - 1]}! لا يوجد جديد للإضافة.`, "error");
-      return;
-    }
-
     setActionLoading(true);
     try {
-      const insertRows = toInsert.map(b => ({
-        teacher_id: userId,
-        title: b.title,
-        amount: b.amount,
-        category: b.category,
-        billing_month: targetMonth,
-        is_recurring: true
-      }));
+      const generatedBills = await BillsService.generateRecurringBillsForMonth(targetMonth, userId, bills);
 
-      const { data, error } = await supabase
-        .from("bills")
-        .insert(insertRows)
-        .select();
-
-      if (error) throw error;
-
-      setBills([...(data || []), ...bills]);
-      showToast(`✓ تم توليد ${insertRows.length} فاتورة لشهر ${arabicMonths[targetMonth - 1]} بنجاح!`);
+      setBills([...generatedBills, ...bills]);
+      showToast(`✓ تم توليد ${generatedBills.length} فاتورة لشهر ${arabicMonths[targetMonth - 1]} بنجاح!`);
     } catch (err: any) {
       showToast(err.message || "فشل توليد الفواتير المتكررة.", "error");
     } finally {
@@ -256,13 +184,8 @@ export default function BillsManagement() {
 
     setActionLoading(true);
     try {
-      const { error } = await supabase
-        .from("bills")
-        .delete()
-        .eq("billing_month", monthNum)
-        .eq("is_recurring", true);
-
-      if (error) throw error;
+      if (!userId) return;
+      await BillsService.deleteRecurringBillsForMonth(monthNum, userId);
 
       setBills(prev => prev.filter(b => !(b.billing_month === monthNum && b.is_recurring)));
       setSelectedBillIds(prev => {
@@ -530,15 +453,34 @@ export default function BillsManagement() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.4rem" }}>
                   {arabicMonths.map((m, idx) => {
                     const monthNum = idx + 1;
-                    const alreadyGenerated = bills.some(
+                    
+                    const existingRecurringInMonth = bills.filter(
                       b => b.is_recurring && b.billing_month === monthNum
                     );
+                    
+                    const isPartiallyGenerated = existingRecurringInMonth.length > 0;
+                    
+                    const isFullyGenerated = recurringTemplates.length > 0 && recurringTemplates.every(template => 
+                      existingRecurringInMonth.some(
+                        b => b.title === template.title && 
+                             b.category === template.category && 
+                             Number(b.amount) === Number(template.amount)
+                      )
+                    );
+
+                    let btnStyle = { border: "1px solid var(--border-color)", color: "var(--text-secondary)" };
+                    if (isFullyGenerated) {
+                      btnStyle = { border: "1px solid rgba(16,185,129,0.4)", color: "#10b981" };
+                    } else if (isPartiallyGenerated) {
+                      btnStyle = { border: "1px solid rgba(245,158,11,0.4)", color: "#f59e0b" };
+                    }
+
                     return (
                       <button
                         key={idx}
                         className="btn btn-secondary"
                         onClick={() =>
-                          alreadyGenerated
+                          isFullyGenerated
                             ? handleDeleteMonthBills(monthNum)
                             : handleGenerateForMonth(monthNum)
                         }
@@ -547,15 +489,19 @@ export default function BillsManagement() {
                           padding: "0.4rem 0.25rem",
                           fontSize: "0.75rem",
                           position: "relative",
-                          border: alreadyGenerated 
-                            ? "1px solid rgba(16,185,129,0.4)"
-                            : "1px solid var(--border-color)",
-                          color: alreadyGenerated ? "#10b981" : "var(--text-secondary)"
+                          ...btnStyle
                         }}
-                        title={alreadyGenerated ? `حذف فواتير ${m} المتكررة` : `توليد فواتير ${m}`}
+                        title={
+                          isFullyGenerated ? `حذف فواتير ${m} المتكررة` : 
+                          isPartiallyGenerated ? `تحديث وإضافة النواقص لشهر ${m}` : 
+                          `توليد فواتير ${m}`
+                        }
                       >
-                        {alreadyGenerated && (
+                        {isFullyGenerated && (
                           <Check size={10} style={{ position: "absolute", top: "3px", left: "3px", color: "#10b981" }} />
+                        )}
+                        {(!isFullyGenerated && isPartiallyGenerated) && (
+                          <RefreshCw size={10} style={{ position: "absolute", top: "3px", left: "3px", color: "#f59e0b" }} />
                         )}
                         {m}
                       </button>
