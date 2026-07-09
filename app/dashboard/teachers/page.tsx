@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
+import { AuthService } from "@/lib/services/authService";
+import { SubTeachersService } from "@/lib/services/subTeachersService";
 import { Users, Plus, Trash2, Edit3, Save, X, AlertCircle } from "lucide-react";
 
 interface SubTeacher {
@@ -25,18 +26,10 @@ export default function CenterTeachersPage() {
 
   const fetchTeachers = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await AuthService.getSession();
       if (!session) return;
 
-      const { data, error } = await supabase
-        .from("sub_teachers")
-        .select("*")
-        .eq("center_id", session.user.id)
-        .order("created_at", { ascending: true });
-
-      if (error) {
-        throw error;
-      }
+      const data = await SubTeachersService.getSubTeachersByCenterId(session.user.id);
 
       setTeachers(data || []);
     } catch (err: unknown) {
@@ -57,17 +50,12 @@ export default function CenterTeachersPage() {
 
     setActionLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await AuthService.getSession();
       if (!session) return;
 
-      const newId = `sub-${Date.now()}`;
-      const newTeacherObj = { id: newId, center_id: session.user.id, name: newTeacherName.trim() };
+      const newTeacherObj = { center_id: session.user.id, name: newTeacherName.trim() };
 
-      const { error } = await supabase
-        .from("sub_teachers")
-        .insert([newTeacherObj]);
-
-      if (error) throw error;
+      await SubTeachersService.addSubTeacher(newTeacherObj);
 
       setNewTeacherName("");
       setShowAddForm(false);
@@ -84,12 +72,8 @@ export default function CenterTeachersPage() {
     if (!confirm(`هل أنت متأكد من حذف المعلم "${name}"؟`)) return;
 
     try {
-      const { error } = await supabase
-        .from("sub_teachers")
-        .delete()
-        .eq("id", id);
+      await SubTeachersService.deleteSubTeacher(id);
 
-      if (error) throw error;
       
       showToast("تم حذف المعلم.");
       fetchTeachers();
