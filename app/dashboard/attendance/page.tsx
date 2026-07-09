@@ -308,11 +308,16 @@ export default function AttendancePage() {
               className="form-input"
               value={selectedGroupId}
               onChange={e => setSelectedGroupId(e.target.value)}
-              style={{ padding: "0.6rem 0.75rem" }}
+              disabled={selectedGradeId === "all"}
+              style={{
+                padding: "0.6rem 0.75rem",
+                opacity: selectedGradeId === "all" ? 0.6 : 1,
+                cursor: selectedGradeId === "all" ? "not-allowed" : "pointer"
+              }}
             >
               <option value="all">كل المجموعات</option>
-              {groups
-                .filter(g => selectedGradeId === "all" || g.grade_id === selectedGradeId)
+              {selectedGradeId !== "all" && groups
+                .filter(g => g.grade_id === selectedGradeId)
                 .map(g => (
                 <option key={g.id} value={g.id}>{g.name} ({g.day_of_week} - {formatTimeTo12H(g.time)})</option>
               ))}
@@ -341,7 +346,7 @@ export default function AttendancePage() {
               onChange={e => setSelectedYear(Number(e.target.value))}
               style={{ padding: "0.6rem 0.75rem" }}
             >
-              {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+              {Array.from({ length: Math.max(2, new Date().getFullYear() - 2026 + 2) }, (_, i) => 2026 + i).map(y => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
         

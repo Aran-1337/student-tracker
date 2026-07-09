@@ -1,10 +1,28 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
-export const metadata: Metadata = {
-  title: "Student Tracker | متعقب الطلاب",
-  description: "نظام إدارة اشتراكات ومجموعات الطلاب للمعلمين",
-};
+import { SystemSettingsService } from "@/lib/services/systemSettingsService";
+
+export async function generateMetadata(): Promise<Metadata> {
+  let siteName = "نظام إدارة المراكز التعليمية والأساتذة";
+  let siteLogo = "";
+
+  try {
+    const settings = await SystemSettingsService.getSettings();
+    if (settings) {
+      if (settings.site_name) siteName = settings.site_name;
+      if (settings.site_logo) siteLogo = settings.site_logo;
+    }
+  } catch (error) {
+    console.error("Failed to fetch metadata settings:", error);
+  }
+
+  return {
+    title: siteName !== "نظام إدارة المراكز التعليمية والأساتذة" ? `${siteName}` : siteName,
+    description: "نظام إدارة اشتراكات ومجموعات الطلاب للمعلمين",
+    icons: siteLogo ? { icon: siteLogo } : undefined
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",

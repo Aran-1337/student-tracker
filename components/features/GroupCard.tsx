@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Calendar, Clock, Trash2 } from 'lucide-react';
+import { Users, Calendar, Clock, Trash2, Wallet, BookOpen } from 'lucide-react';
 import { Group, Student, SubTeacher } from '@/lib/types';
 
 // Replaces the individual group card rendering in app/dashboard/page.tsx
@@ -8,6 +8,7 @@ import { Group, Student, SubTeacher } from '@/lib/types';
 export interface GroupCardProps {
   group: Group;
   students: Student[];
+  gradeName?: string;
   subTeacher?: SubTeacher;
   hasCenterMode: boolean;
   onDelete?: (id: string) => void;
@@ -28,6 +29,7 @@ const formatTimeTo12H = (timeStr: string) => {
 export function GroupCard({
   group,
   students,
+  gradeName,
   subTeacher,
   hasCenterMode,
   onDelete
@@ -37,7 +39,7 @@ export function GroupCard({
   return (
     <div className={`glass-panel panel-content ${group.is_private ? "group-card-private" : ""}`} style={{ background: "rgba(255,255,255,0.02)", position: "relative" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.75rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
           <h3 style={{ fontSize: "1.1rem", margin: 0 }}>{group.name}</h3>
           {group.is_private && <span className="private-badge">خاصة</span>}
         </div>
@@ -55,21 +57,33 @@ export function GroupCard({
       
       <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>
         {hasCenterMode && subTeacher && (
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "var(--color-teal)" }}>
-            <Users size={14} />
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", color: "var(--color-teal)" }}>
+            <Users size={14} style={{ flexShrink: 0, marginTop: "0.15rem" }} />
             <span>المعلم: {subTeacher.name}</span>
           </div>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Calendar size={14} />
+        <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+          <Calendar size={14} style={{ flexShrink: 0, marginTop: "0.15rem" }} />
           <span>اليوم: {group.day_of_week}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <Clock size={14} />
+          <Clock size={14} style={{ flexShrink: 0 }} />
           <span>الوقت: {formatTimeTo12H(group.time)}</span>
         </div>
+        {gradeName && (
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+            <BookOpen size={14} style={{ flexShrink: 0, marginTop: "0.15rem" }} />
+            <span>السنة: {gradeName}</span>
+          </div>
+        )}
+        {group.is_private && group.monthly_price !== null && group.monthly_price !== undefined && (
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "#a78bfa" }}>
+            <Wallet size={14} style={{ flexShrink: 0 }} />
+            <span style={{ fontWeight: 600 }}>الاشتراك: {group.monthly_price}ج / شهرياً</span>
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.5rem", borderTop: "1px solid var(--border-color)", paddingTop: "0.5rem" }}>
-          <Users size={14} style={{ color: "var(--color-teal)" }} />
+          <Users size={14} style={{ flexShrink: 0, color: "var(--color-teal)" }} />
           <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>عدد الطلاب: {groupStudentCount} طالب</span>
         </div>
       </div>

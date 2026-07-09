@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { SystemSettingsService, SystemSettings } from "@/lib/services/systemSettingsService";
 import { 
   LayoutDashboard, 
   Users, 
@@ -32,7 +33,9 @@ export default function DashboardLayout({
   const [hasAttendance, setHasAttendance] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [isPending, setIsPending] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sysSettings, setSysSettings] = useState<SystemSettings | null>(null);
 
   const [hasCenterMode, setHasCenterMode] = useState(false);
 
@@ -48,7 +51,7 @@ export default function DashboardLayout({
       
       let { data: teacherData, error: teacherError } = await supabase
         .from("teachers")
-        .select("name, is_active, has_bills_feature, has_attendance_feature, is_center_mode, is_admin, subscription_expires_at")
+        .select("name, is_active, has_bills_feature, has_attendance_feature, is_center_mode, is_admin, subscription_expires_at, subscription_started_at")
         .eq("id", user.id)
         .single();
 
@@ -64,7 +67,8 @@ export default function DashboardLayout({
             has_bills_feature: true, 
             has_attendance_feature: true, 
             is_center_mode: false,
-            subscription_expires_at: "" 
+            subscription_expires_at: "",
+            subscription_started_at: ""
           };
           teacherError = null;
         }
@@ -84,7 +88,8 @@ export default function DashboardLayout({
             has_bills_feature: true, 
             has_attendance_feature: true, 
             is_center_mode: false,
-            subscription_expires_at: "" 
+            subscription_expires_at: "",
+            subscription_started_at: ""
           };
         }
       }
@@ -102,13 +107,20 @@ export default function DashboardLayout({
         setHasAttendance(attendanceEnabled);
 
         const expiredAtStr = teacherData.subscription_expires_at;
+        const startedAtStr = teacherData.subscription_started_at;
 
         const active = teacherData.is_active !== false;
         const expired = expiredAtStr 
           ? new Date(expiredAtStr) < new Date()
           : false;
           
-        if (!active || expired) {
+        if (!active) {
+          if (!startedAtStr) {
+            setIsPending(true);
+          } else {
+            setIsBlocked(true);
+          }
+        } else if (expired) {
           setIsBlocked(true);
         }
         
@@ -125,6 +137,11 @@ export default function DashboardLayout({
         if (pathname === "/dashboard/teachers" && !centerMode) {
           router.replace("/dashboard");
           return;
+        }
+
+        const settings = await SystemSettingsService.getSettings();
+        if (settings) {
+          setSysSettings(settings);
         }
       }
       
@@ -149,6 +166,39 @@ export default function DashboardLayout({
     return (
       <div className="loading-wrapper">
         <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  if (isPending) {
+    return (
+      <div className="login-container" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+        <div className="glass-panel panel-content" style={{ maxWidth: "450px", textAlign: "center", padding: "3rem 2rem" }}>
+          <div className="stat-icon-wrapper" style={{ margin: "0 auto 1.5rem auto", background: "rgba(16, 185, 129, 0.15)", color: "#10b981", width: "4rem", height: "4rem" }}>
+            <ClipboardCheck size={32} />
+          </div>
+          <h2 style={{ fontSize: "1.5rem", marginBottom: "1rem", color: "#ffffff" }}>بانتظار موافقة الإدارة</h2>
+          <p style={{ color: "var(--text-secondary)", lineHeight: "1.6", marginBottom: "1rem" }}>
+            لقد تم تسجيل حسابك بنجاح، وهو الآن قيد المراجعة. يرجى الانتظار حتى يقوم مدير النظام بمراجعة طلبك وتفعيل الحساب.
+          </p>
+          <div style={{ marginBottom: "2rem", padding: "1rem", background: "rgba(37, 211, 102, 0.1)", borderRadius: "8px", border: "1px solid rgba(37, 211, 102, 0.3)" }}>
+            <p style={{ marginBottom: "0.5rem", fontSize: "0.95rem" }}>أو يمكنك التواصل معنا لتأكيد التسجيل فوراً:</p>
+            <a 
+              href="https://wa.me/201028583616" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="btn"
+              style={{ background: "#25D366", color: "white", display: "inline-flex", gap: "0.5rem", border: "none" }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+              01028583616
+            </a>
+          </div>
+          <button className="btn btn-secondary" onClick={handleLogout} style={{ width: "100%", justifyContent: "center" }}>
+            <LogOut size={16} />
+            <span>تسجيل الخروج</span>
+          </button>
+        </div>
       </div>
     );
   }
@@ -192,11 +242,25 @@ export default function DashboardLayout({
         <div className="sidebar-inner">
           {/* Logo + Hamburger row */}
           <div className="sidebar-top-row">
-            <div className="logo">
-              <div className="stat-icon-wrapper stat-icon-teal" style={{ width: "2.5rem", height: "2.5rem", flexShrink: 0 }}>
-                <BookOpen size={20} />
-              </div>
-              <span className="logo-text monospace" style={{ fontWeight: 700 }}>Student Tracker</span>
+            <div className="logo" style={sysSettings?.hide_sidebar_name ? { width: "100%", justifyContent: "center" } : {}}>
+              {sysSettings?.site_logo ? (
+                <img 
+                  src={sysSettings.site_logo} 
+                  alt={sysSettings.site_name || "Logo"} 
+                  style={
+                    sysSettings?.hide_sidebar_name 
+                      ? { width: "100%", height: "auto", maxHeight: "80px", objectFit: "contain", borderRadius: "8px" }
+                      : { width: "3.5rem", height: "3.5rem", objectFit: "contain", borderRadius: "8px", flexShrink: 0 }
+                  }
+                />
+              ) : (
+                <div className="stat-icon-wrapper stat-icon-teal" style={{ width: "2.5rem", height: "2.5rem", flexShrink: 0 }}>
+                  <BookOpen size={20} />
+                </div>
+              )}
+              {!sysSettings?.hide_sidebar_name && (
+                <span className="logo-text monospace" style={{ fontWeight: 700 }}>{sysSettings?.site_name || "إدارة السناتر والمعلمين"}</span>
+              )}
             </div>
 
             {/* Hamburger button – mobile only */}

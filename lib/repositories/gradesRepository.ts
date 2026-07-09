@@ -31,6 +31,14 @@ export const GradesRepository = {
     return data;
   },
 
+  async updateGrade(id: string, updates: Partial<Grade>): Promise<void> {
+    const { error } = await supabase
+      .from("grades")
+      .update(updates)
+      .eq("id", id);
+    if (error) throw error;
+  },
+
   async deleteGrade(id: string): Promise<void> {
     const { error } = await supabase
       .from("grades")

@@ -380,16 +380,25 @@ export default function StudentsManagement() {
                 className="form-input"
                 value={activeFilter}
                 onChange={(e) => setActiveFilter(e.target.value)}
+                disabled={filterGradeId === "all"}
+                style={{
+                  opacity: filterGradeId === "all" ? 0.6 : 1,
+                  cursor: filterGradeId === "all" ? "not-allowed" : "pointer"
+                }}
               >
                 <option value="all">جميع المجموعات</option>
-                <option value="none">بدون مجموعة</option>
-                {groups
-                  .filter(g => filterGradeId === "all" || g.grade_id === filterGradeId)
-                  .map(group => (
-                  <option key={group.id} value={group.id}>
-                    {group.name} {group.is_private ? "(خاصة)" : ""}
-                  </option>
-                ))}
+                {filterGradeId !== "all" && (
+                  <>
+                    <option value="none">بدون مجموعة</option>
+                    {groups
+                      .filter(g => g.grade_id === filterGradeId)
+                      .map(group => (
+                      <option key={group.id} value={group.id}>
+                        {group.name} {group.is_private ? "(خاصة)" : ""}
+                      </option>
+                    ))}
+                  </>
+                )}
               </select>
             </div>
           </div>
@@ -445,9 +454,11 @@ export default function StudentsManagement() {
               <tbody>
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="empty-state">
-                      <AlertCircle size={48} style={{ opacity: 0.5, marginBottom: "1rem" }} />
-                      <p>لا يوجد طلاب حالياً للفلتر المحدد.</p>
+                    <td colSpan={7} style={{ textAlign: "center", padding: "2rem" }}>
+                      <div className="empty-state" style={{ margin: "0 auto" }}>
+                        <AlertCircle size={48} style={{ opacity: 0.5, marginBottom: "1rem" }} />
+                        <p>لا يوجد طلاب حالياً للفلتر المحدد.</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (

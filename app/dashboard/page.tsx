@@ -12,7 +12,7 @@ import {
   Calendar
 } from "lucide-react";
 
-import { Group, Grade, Student } from "@/lib/types";
+import { Group, Grade, Student, BookDef } from "@/lib/types";
 import { GroupsService } from "@/lib/services/groupsService";
 import { StudentsService } from "@/lib/services/studentsService";
 import { GradesService } from "@/lib/services/gradesService";
@@ -52,6 +52,7 @@ export default function DashboardOverview() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
+  const [teacherBooks, setTeacherBooks] = useState<BookDef[]>([]);
 
   // Form state
   const [groupName, setGroupName] = useState("");
@@ -59,6 +60,7 @@ export default function DashboardOverview() {
   const [groupDays, setGroupDays] = useState<string[]>(["السبت"]);
   const [groupTime, setGroupTime] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
+  const [groupMonthlyPrice, setGroupMonthlyPrice] = useState("");
   const [groupSubTeacherId, setGroupSubTeacherId] = useState("");
 
   const [hasCenterMode, setHasCenterMode] = useState(false);
@@ -85,6 +87,7 @@ export default function DashboardOverview() {
         const teacherInfo = await TeachersService.getTeacherProfile(currentUserId);
         const centerMode = teacherInfo?.is_center_mode || false;
         setHasCenterMode(centerMode);
+        setTeacherBooks(teacherInfo?.books || []);
 
         if (centerMode) {
           const { data: subs } = await supabase.from("sub_teachers").select("*").eq("center_id", currentUserId);
@@ -158,6 +161,7 @@ export default function DashboardOverview() {
         day_of_week: groupDays.join(" ، "),
         time: groupTime,
         is_private: isPrivate,
+        monthly_price: isPrivate && groupMonthlyPrice ? Number(groupMonthlyPrice) : null,
         grade_id: groupGradeId || null,
         teacher_id: userId,
         sub_teacher_id: hasCenterMode && groupSubTeacherId ? groupSubTeacherId : null
@@ -170,6 +174,7 @@ export default function DashboardOverview() {
       setGroupGradeId("");
       setGroupTime("");
       setIsPrivate(false);
+      setGroupMonthlyPrice("");
       setGroupSubTeacherId("");
       showToast("تم إنشاء المجموعة بنجاح.");
     } catch (err: any) {
@@ -200,7 +205,10 @@ export default function DashboardOverview() {
   const paidThisMonthCount = students.filter(s => s.months?.[currentMonthIndex] === true).length;
   const totalGroupsCount = groups.length;
   const totalBooksDeliveredCount = students.reduce((acc, s) => {
-    return acc + (Array.isArray(s.received_books) ? s.received_books.length : 0);
+    if (!Array.isArray(s.received_books)) return acc;
+    // Only count books that currently exist in the teacher's profile
+    const validBooks = s.received_books.filter(bId => teacherBooks.some(tb => tb.id === bId));
+    return acc + validBooks.length;
   }, 0);
 
   if (loading) {
@@ -344,13 +352,32 @@ export default function DashboardOverview() {
                   id="gPrivate"
                   type="checkbox"
                   checked={isPrivate}
-                  onChange={(e) => setIsPrivate(e.target.checked)}
+                  onChange={(e) => {
+                    setIsPrivate(e.target.checked);
+                    if (!e.target.checked) setGroupMonthlyPrice("");
+                  }}
                   style={{ width: "16px", height: "16px", accentColor: "#8b5cf6", cursor: "pointer" }}
                 />
                 <label className="form-label" htmlFor="gPrivate" style={{ margin: 0, cursor: "pointer" }}>
                   مجموعة خاصة / فردية
                 </label>
               </div>
+
+              {isPrivate && (
+                <div className="form-group" style={{ marginBottom: "1rem" }}>
+                  <Input
+                    label="سعر الاشتراك الشهري للمجموعة (اختياري)"
+                    id="gMonthlyPrice"
+                    type="number"
+                    placeholder="مثال: 500"
+                    value={groupMonthlyPrice}
+                    onChange={(e) => setGroupMonthlyPrice(e.target.value)}
+                    style={{ direction: "ltr", textAlign: "right" }}
+                    leftIcon={<span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>ج.م/شهرياً</span>}
+                  />
+                  <p className="settings-description" style={{ marginTop: "0.5rem" }}>يستخدم لحساب الأرباح إذا تم إدخاله بدلاً من سعر السنة أو السعر الافتراضي.</p>
+                </div>
+              )}
               
               {hasCenterMode && (
                 <div className="form-group" style={{ marginBottom: "1rem" }}>
@@ -403,6 +430,7 @@ export default function DashboardOverview() {
                     key={group.id}
                     group={group}
                     students={students}
+                    gradeName={grades.find(g => g.id === group.grade_id)?.name}
                     subTeacher={subTeachers.find(t => t.id === group.sub_teacher_id)}
                     hasCenterMode={hasCenterMode}
                     onDelete={handleDeleteGroup}

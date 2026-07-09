@@ -71,7 +71,7 @@ export default function LoginPage() {
             </div>
           </div>
           <h1 className="auth-title">تسجيل الدخول</h1>
-          <p className="auth-subtitle">مرحباً بك في Student Tracker</p>
+          <p className="auth-subtitle">مرحباً بك في نظام إدارة السناتر والمعلمين</p>
         </div>
 
         <form onSubmit={handleLogin}>
@@ -110,6 +110,11 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 style={{ direction: "ltr", textAlign: "left", paddingRight: "1rem", paddingLeft: "2.5rem" }}
               />
+            </div>
+            <div style={{ textAlign: "right", marginTop: "0.5rem" }}>
+              <Link href="/forgot-password" style={{ fontSize: "0.85rem", color: "var(--color-teal)", textDecoration: "none" }}>
+                نسيت كلمة المرور؟
+              </Link>
             </div>
           </div>
 

@@ -2,11 +2,13 @@ export interface BookDef {
   id: string;
   name: string;
   price: number;
+  grade_id?: string;
 }
 
 export interface Teacher {
   id: string;
   name: string;
+  phone?: string;
   monthly_price: number;
   books?: BookDef[];
   is_admin: boolean;
@@ -32,6 +34,7 @@ export interface Grade {
   name: string;
   start_code?: number;
   prefix?: string;
+  monthly_price?: number | null;
   teacher_id?: string;
   created_at?: string;
 }
@@ -46,6 +49,7 @@ export interface Group {
   sub_teacher_id?: string | null;
   grade_id?: string | null;
   sessions_per_month?: number;
+  monthly_price?: number | null;
   created_at?: string;
 }
 

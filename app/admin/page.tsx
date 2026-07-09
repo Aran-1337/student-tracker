@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { SystemSettingsService, SystemSettings } from "@/lib/services/systemSettingsService";
 import { 
   Shield, 
   Users, 
@@ -18,7 +19,11 @@ import {
   UserPlus,
   Trash2,
   Mail,
-  Package
+  Package,
+  X,
+  Settings,
+  Phone,
+  ChevronDown
 } from "lucide-react";
 import Link from "next/link";
 
@@ -26,6 +31,7 @@ interface Teacher {
   id: string;
   name: string;
   email: string | null;
+  phone?: string | null;
   is_admin: boolean;
   is_active: boolean;
   has_bills_feature: boolean;
@@ -76,11 +82,14 @@ export default function AdminPanel() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [adminEmails, setAdminEmails] = useState<AdminEmail[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [systemSettings, setSystemSettings] = useState<SystemSettings>({ site_name: "إدارة السناتر والمعلمين", site_logo: "" });
 
   // Form state
   const [newAdminEmail, setNewAdminEmail] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [featureModalTeacher, setFeatureModalTeacher] = useState<Teacher | null>(null);
+  const [isPlanDropdownOpen, setIsPlanDropdownOpen] = useState(false);
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -139,6 +148,12 @@ export default function AdminPanel() {
         const { data: plansData } = await supabase.from("plans").select("*");
         setPlans(plansData || []);
         
+        // Load System Settings
+        const sysSettings = await SystemSettingsService.getSettings();
+        if (sysSettings) {
+          setSystemSettings(sysSettings);
+        }
+
         // No local mapping needed, just use teachersData directly
         const mappedTeachers = (teachersData || []).map(t => {
           return {
@@ -199,10 +214,57 @@ export default function AdminPanel() {
       setTeachers(teachersData || []);
 
     } catch (err: any) {
-      showToast(err.message || "فشل تسجيل بريد المسؤول.", "error");
+      showToast(err.message || "فشل تسجيل البريد الجديد", "error");
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleUpdateSystemSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      await SystemSettingsService.updateSettings(systemSettings);
+      showToast("تم تحديث إعدادات المنصة بنجاح!");
+    } catch (err: any) {
+      showToast("فشل تحديث الإعدادات", "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 500 * 1024) {
+      showToast("حجم الصورة يجب ألا يتجاوز 500 كيلوبايت", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64String = event.target?.result as string;
+      setSystemSettings({ ...systemSettings, site_logo: base64String });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleFaviconUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 200 * 1024) {
+      showToast("حجم أيقونة المتصفح يجب ألا يتجاوز 200 كيلوبايت", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64String = event.target?.result as string;
+      setSystemSettings({ ...systemSettings, site_favicon: base64String });
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleDeleteAdminEmail = async (adminId: string, email: string) => {
@@ -395,13 +457,22 @@ export default function AdminPanel() {
 
     setUpdatingId(teacher.id);
     try {
-      // Deleting from teachers cascades to groups, students, bills via FK
-      const { error } = await supabase
-        .from("teachers")
-        .delete()
-        .eq("id", teacher.id);
+      // Call the secure backend API to delete the user from auth.users (which cascades to teachers)
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch("/api/admin/delete-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ targetUserId: teacher.id })
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error || "Failed to delete user");
+      }
 
       setTeachers(teachers.filter(t => t.id !== teacher.id));
       setStudents(students.filter(s => s.teacher_id !== teacher.id));
@@ -568,6 +639,114 @@ export default function AdminPanel() {
               </div>
             </div>
           </div>
+
+          {/* System Settings Panel */}
+          <div className="glass-panel panel-content" style={{ marginTop: "1.5rem" }}>
+            <h2 className="panel-title">
+              <Settings size={18} className="stat-icon-teal" style={{ background: "none", border: "none" }} />
+              <span>إعدادات المنصة العامة</span>
+            </h2>
+
+            <form onSubmit={handleUpdateSystemSettings}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="siteName">اسم المنصة الموحد</label>
+                <input
+                  id="siteName"
+                  type="text"
+                  required
+                  placeholder="اسم المنصة الخاص بك"
+                  className="search-input"
+                  dir="auto"
+                  value={systemSettings.site_name}
+                  onChange={(e) => setSystemSettings({ ...systemSettings, site_name: e.target.value })}
+                />
+                
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.75rem", fontSize: "0.85rem", cursor: "pointer", color: "var(--text-secondary)" }}>
+                  <input 
+                    type="checkbox" 
+                    checked={systemSettings.hide_sidebar_name || false}
+                    onChange={(e) => setSystemSettings({ ...systemSettings, hide_sidebar_name: e.target.checked })}
+                    style={{ width: "16px", height: "16px", cursor: "pointer" }}
+                  />
+                  إخفاء الاسم من القائمة الجانبية (للاكتفاء باللوجو)
+                </label>
+              </div>
+
+              <div className="form-group" style={{ marginTop: "1rem" }}>
+                <label className="form-label">لوجو المنصة</label>
+                
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.5rem" }}>
+                  {systemSettings.site_logo && (
+                    <img 
+                      src={systemSettings.site_logo} 
+                      alt="Logo Preview" 
+                      style={{ width: "40px", height: "40px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--border-color)" }} 
+                    />
+                  )}
+                  <label htmlFor="siteLogoFile" className="btn btn-secondary" style={{ flex: 1, justifyContent: "center", cursor: "pointer" }}>
+                    رفع صورة من الجهاز
+                  </label>
+                  <input
+                    id="siteLogoFile"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    style={{ display: "none" }}
+                  />
+                </div>
+                
+                <input
+                  type="text"
+                  placeholder="أو ضع رابط URL للصورة هنا"
+                  className="search-input"
+                  value={systemSettings.site_logo}
+                  onChange={(e) => setSystemSettings({ ...systemSettings, site_logo: e.target.value })}
+                  style={{ direction: "ltr", textAlign: "right" }}
+                />
+                <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem" }}>
+                  اترك الحقل فارغاً لاستخدام الأيقونة الافتراضية. الحجم الأقصى للرفع 500 كيلوبايت.
+                </p>
+              </div>
+
+              <div className="form-group" style={{ marginTop: "1.5rem" }}>
+                <label className="form-label">أيقونة المتصفح (Favicon)</label>
+                
+                <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "0.5rem" }}>
+                  {systemSettings.site_favicon && (
+                    <img 
+                      src={systemSettings.site_favicon} 
+                      alt="Favicon Preview" 
+                      style={{ width: "32px", height: "32px", borderRadius: "4px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--border-color)", background: "#fff" }} 
+                    />
+                  )}
+                  <label htmlFor="siteFaviconFile" className="btn btn-secondary" style={{ flex: 1, justifyContent: "center", cursor: "pointer" }}>
+                    رفع أيقونة مربعة (للتابة)
+                  </label>
+                  <input
+                    id="siteFaviconFile"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFaviconUpload}
+                    style={{ display: "none" }}
+                  />
+                </div>
+                
+                <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.25rem", lineHeight: "1.5" }}>
+                  هذه الأيقونة ستظهر بالأعلى في تابة المتصفح. يُفضل رفع صورة مربعة (مثال: 512x512 بيكسل) بدون تفاصيل كثيرة لتكون واضحة. الحجم الأقصى 200 كيلوبايت.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: "100%", marginTop: "1rem" }}
+                disabled={actionLoading}
+              >
+                <Check size={18} />
+                <span>{actionLoading ? "جاري الحفظ..." : "حفظ الإعدادات"}</span>
+              </button>
+            </form>
+          </div>
         </aside>
 
         {/* Left Side: Teachers Management Table */}
@@ -589,11 +768,8 @@ export default function AdminPanel() {
                 <tr>
                   <th>المعلم والبريد</th>
                   <th>تاريخ التسجيل</th>
-                  <th>إحصائيات الطلاب</th>
-                  <th style={{ color: "var(--color-teal)" }}>الباقة</th>
-                  <th>ميزة الفواتير</th>
-                  <th>ميزة الحضور</th>
-                  <th>ميزة السنتر</th>
+                  <th>إحصائيات المجموعات والطلاب</th>
+                  <th>المميزات</th>
                   <th>حالة الاشتراك</th>
                   <th>تاريخ بداية الاشتراك</th>
                   <th>تاريخ انتهاء الاشتراك</th>
@@ -633,6 +809,35 @@ export default function AdminPanel() {
                           <div style={{ fontWeight: 700, color: "#ffffff", display: "flex", alignItems: "center", gap: "0.5rem" }}>
                             {teacher.name}
                             {teacher.is_admin && <span className="private-badge" style={{ fontSize: "0.65rem", padding: "1px 6px" }}>مدير</span>}
+                            {teacher.phone && (
+                              <a 
+                                href={`https://wa.me/${teacher.phone.replace(/[^0-9]/g, '')}`} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                title={`التواصل عبر واتساب: ${teacher.phone}`}
+                                style={{ 
+                                  display: "flex", 
+                                  alignItems: "center", 
+                                  justifyContent: "center",
+                                  width: "24px", 
+                                  height: "24px", 
+                                  borderRadius: "50%", 
+                                  background: "rgba(20, 184, 166, 0.15)", 
+                                  color: "var(--color-teal)",
+                                  transition: "all 0.2s"
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "var(--color-teal)";
+                                  e.currentTarget.style.color = "#000";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "rgba(20, 184, 166, 0.15)";
+                                  e.currentTarget.style.color = "var(--color-teal)";
+                                }}
+                              >
+                                <Phone size={12} />
+                              </a>
+                            )}
                           </div>
                           <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "2px" }} className="monospace">
                             {teacher.email || "لا يوجد بريد مسجل"}
@@ -647,122 +852,24 @@ export default function AdminPanel() {
                       <td>
                         <div style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
                           <p style={{ display: "inline-block", marginRight: "1rem" }}>
-                            طلاب: <strong className="monospace" style={{ color: "var(--color-teal)" }}>{teacherStudentsCount}</strong>
+                            مجموعات: <strong className="monospace" style={{ color: "var(--color-info)" }}>{teacherGroupsCount}</strong>
                           </p>
                           <p style={{ display: "inline-block" }}>
-                            مجموعات: <strong className="monospace" style={{ color: "var(--color-info)" }}>{teacherGroupsCount}</strong>
+                            طلاب: <strong className="monospace" style={{ color: "var(--color-teal)" }}>{teacherStudentsCount}</strong>
                           </p>
                         </div>
                       </td>
 
-                      {/* Plan Assignment */}
-                      <td>
-                        {plans.length > 0 ? (
-                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                            <select
-                              value={teacher.plan_id || ""}
-                              disabled={isUpdating}
-                              onChange={e => handleAssignPlan(teacher, e.target.value)}
-                              style={{
-                                background: "rgba(0,0,0,0.25)",
-                                border: teacher.plan_id
-                                  ? `1px solid ${plans.find(p => p.id === teacher.plan_id)?.color || "var(--border-color)"}`
-                                  : "1px solid var(--border-color)",
-                                borderRadius: "8px",
-                                color: teacher.plan_id
-                                  ? (plans.find(p => p.id === teacher.plan_id)?.color || "#fff")
-                                  : "var(--text-muted)",
-                                fontSize: "0.82rem",
-                                fontWeight: 600,
-                                padding: "0.4rem 0.6rem",
-                                cursor: "pointer",
-                                minWidth: "130px"
-                              }}
-                            >
-                              <option value="">— بدون باقة —</option>
-                              {plans.map(p => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name} ({p.price}ج)
-                                </option>
-                              ))}
-                            </select>
-                            {teacher.plan_id && (
-                              <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
-                                يفعّل كل مميزات الباقة تلقائياً
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>لا توجد باقات</span>
-                        )}
-                      </td>
-
-                      {/* Bills Feature Toggle */}
+                      {/* Features Button */}
                       <td>
                         <button
-                          className="toggle-button"
-                          onClick={() => handleToggleBills(teacher.id, teacher.has_bills_feature)}
+                          className="btn btn-secondary"
+                          style={{ fontSize: "0.8rem", padding: "0.4rem 0.8rem" }}
+                          onClick={() => setFeatureModalTeacher(teacher)}
                           disabled={isUpdating}
-                          style={{ color: teacher.has_bills_feature ? "var(--color-teal)" : "var(--text-muted)" }}
-                          title={teacher.has_bills_feature ? "تعطيل ميزة الفواتير" : "تفعيل ميزة الفواتير"}
                         >
-                          {teacher.has_bills_feature ? (
-                            <>
-                              <ToggleRight size={38} />
-                              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>مفعلة</span>
-                            </>
-                          ) : (
-                            <>
-                              <ToggleLeft size={38} />
-                              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>معطلة</span>
-                            </>
-                          )}
-                        </button>
-                      </td>
-
-                      {/* Attendance Feature Toggle */}
-                      <td>
-                        <button
-                          className="toggle-button"
-                          onClick={() => handleToggleAttendance(teacher.id, teacher.has_attendance_feature ?? true)}
-                          disabled={isUpdating}
-                          style={{ color: (teacher.has_attendance_feature ?? true) ? "var(--color-teal)" : "var(--text-muted)" }}
-                          title={(teacher.has_attendance_feature ?? true) ? "تعطيل ميزة الحضور" : "تفعيل ميزة الحضور"}
-                        >
-                          {(teacher.has_attendance_feature ?? true) ? (
-                            <>
-                              <ToggleRight size={38} />
-                              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>مفعلة</span>
-                            </>
-                          ) : (
-                            <>
-                              <ToggleLeft size={38} />
-                              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>معطلة</span>
-                            </>
-                          )}
-                        </button>
-                      </td>
-
-                      {/* Center Mode Toggle */}
-                      <td>
-                        <button
-                          className="toggle-button"
-                          onClick={() => handleToggleCenterMode(teacher.id, teacher.is_center_mode ?? false)}
-                          disabled={isUpdating}
-                          style={{ color: (teacher.is_center_mode ?? false) ? "var(--color-info)" : "var(--text-muted)" }}
-                          title={(teacher.is_center_mode ?? false) ? "تعطيل نظام السنتر" : "تفعيل نظام السنتر"}
-                        >
-                          {(teacher.is_center_mode ?? false) ? (
-                            <>
-                              <ToggleRight size={38} />
-                              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>نشط</span>
-                            </>
-                          ) : (
-                            <>
-                              <ToggleLeft size={38} />
-                              <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600 }}>معطل</span>
-                            </>
-                          )}
+                          <Settings size={14} style={{ marginLeft: "4px" }} />
+                          المميزات
                         </button>
                       </td>
 
@@ -772,7 +879,7 @@ export default function AdminPanel() {
                           className="toggle-button"
                           onClick={() => handleToggleActive(teacher.id, teacher.is_active)}
                           disabled={isUpdating}
-                          style={{ color: (teacher.is_active && !isExpired) ? "#10b981" : "#ef4444" }}
+                          style={{ color: (!teacher.is_active && !teacher.subscription_started_at) ? "#f59e0b" : ((teacher.is_active && !isExpired) ? "#10b981" : "#ef4444") }}
                           title={teacher.is_active ? "تعطيل الاشتراك" : "تفعيل الاشتراك"}
                         >
                           {teacher.is_active && !isExpired ? (
@@ -783,8 +890,8 @@ export default function AdminPanel() {
                           ) : (
                             <>
                               <ToggleLeft size={38} />
-                              <span style={{ fontSize: "0.85rem", color: "#ef4444", fontWeight: 600 }}>
-                                {isExpired ? "منتهي" : "معطل"}
+                              <span style={{ fontSize: "0.85rem", color: (!teacher.is_active && !teacher.subscription_started_at) ? "#f59e0b" : "#ef4444", fontWeight: 600 }}>
+                                {(!teacher.is_active && !teacher.subscription_started_at) ? "مراجعة" : (isExpired ? "منتهي" : "معطل")}
                               </span>
                             </>
                           )}
@@ -816,25 +923,33 @@ export default function AdminPanel() {
 
                       {/* Expiration Date Editor */}
                       <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <Calendar size={14} style={{ color: isExpired ? "#ef4444" : "var(--text-muted)" }} />
-                          <input
-                            type="date"
-                            className="search-input"
-                            value={formattedExpiry}
-                            disabled={isUpdating}
-                            onChange={(e) => handleUpdateExpiration(teacher.id, e.target.value)}
-                            style={{
-                              padding: "4px 8px",
-                              fontSize: "0.85rem",
-                              border: isExpired ? "1px solid rgba(239,68,68,0.4)" : "1px solid var(--border-color)",
-                              background: "rgba(0,0,0,0.2)",
-                              color: isExpired ? "#f87171" : "#ffffff",
-                              borderRadius: "4px",
-                              width: "135px"
-                            }}
-                          />
-                        </div>
+                        {teacher.email === "3bdeniovlr@gmail.com" ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center" }}>
+                            <span className="private-badge" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.3)", padding: "4px 8px", fontSize: "0.8rem" }}>
+                              مدى الحياة
+                            </span>
+                          </div>
+                        ) : (
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <Calendar size={14} style={{ color: isExpired ? "#ef4444" : "var(--text-muted)" }} />
+                            <input
+                              type="date"
+                              className="search-input"
+                              value={formattedExpiry}
+                              disabled={isUpdating}
+                              onChange={(e) => handleUpdateExpiration(teacher.id, e.target.value)}
+                              style={{
+                                padding: "4px 8px",
+                                fontSize: "0.85rem",
+                                border: isExpired ? "1px solid rgba(239,68,68,0.4)" : "1px solid var(--border-color)",
+                                background: "rgba(0,0,0,0.2)",
+                                color: isExpired ? "#f87171" : "#ffffff",
+                                borderRadius: "4px",
+                                width: "135px"
+                              }}
+                            />
+                          </div>
+                        )}
                       </td>
 
                       {/* Delete Teacher */}
@@ -861,6 +976,242 @@ export default function AdminPanel() {
           </div>
         </section>
       </div>
+
+      {/* Features Modal */}
+      {featureModalTeacher && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.7)", display: "flex", justifyContent: "center",
+          alignItems: "center", zIndex: 1000, padding: "1rem", backdropFilter: "blur(4px)"
+        }}>
+          <div className="glass-panel panel-content" style={{ width: "100%", maxWidth: "500px", padding: "2rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+              <h2 style={{ fontSize: "1.2rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <Settings size={20} style={{ color: "var(--color-teal)" }} />
+                صلاحيات ومميزات ({featureModalTeacher.name})
+              </h2>
+              <button 
+                onClick={() => setFeatureModalTeacher(null)}
+                style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer" }}
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "2rem" }}>
+              {/* Plan Assignment */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                <div>
+                  <h3 style={{ fontSize: "1rem", marginBottom: "4px", color: "var(--color-teal)" }}>تخصيص الباقة</h3>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>اختيار الباقة سيقوم بتفعيل مميزاتها تلقائياً.</p>
+                </div>
+                <div>
+                  {plans.length > 0 ? (
+                    <div style={{ position: "relative" }}>
+                      <button
+                        onClick={() => !updatingId && setIsPlanDropdownOpen(!isPlanDropdownOpen)}
+                        disabled={updatingId === featureModalTeacher.id}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          background: "rgba(0,0,0,0.25)",
+                          border: featureModalTeacher.plan_id
+                            ? `1px solid ${plans.find(p => p.id === featureModalTeacher.plan_id)?.color || "var(--border-color)"}`
+                            : "1px solid var(--border-color)",
+                          borderRadius: "8px",
+                          color: featureModalTeacher.plan_id
+                            ? (plans.find(p => p.id === featureModalTeacher.plan_id)?.color || "#fff")
+                            : "var(--text-muted)",
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
+                          padding: "0.5rem 1rem",
+                          cursor: updatingId === featureModalTeacher.id ? "not-allowed" : "pointer",
+                          minWidth: "180px",
+                          gap: "0.5rem"
+                        }}
+                      >
+                        <span>
+                          {featureModalTeacher.plan_id 
+                            ? `${plans.find(p => p.id === featureModalTeacher.plan_id)?.name} (${plans.find(p => p.id === featureModalTeacher.plan_id)?.price}ج)`
+                            : "— بدون باقة —"
+                          }
+                        </span>
+                        <ChevronDown size={14} style={{ opacity: 0.7, transform: isPlanDropdownOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />
+                      </button>
+
+                      {isPlanDropdownOpen && (
+                        <div style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          marginTop: "0.5rem",
+                          background: "#0f172a",
+                          border: "1px solid var(--border-color)",
+                          borderRadius: "8px",
+                          overflow: "hidden",
+                          zIndex: 10,
+                          boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.5)",
+                          display: "flex",
+                          flexDirection: "column"
+                        }}>
+                          <button
+                            onClick={() => {
+                              handleAssignPlan(featureModalTeacher, "");
+                              setFeatureModalTeacher({ ...featureModalTeacher, plan_id: null });
+                              setIsPlanDropdownOpen(false);
+                            }}
+                            style={{
+                              padding: "0.75rem 1rem",
+                              textAlign: "right",
+                              background: "none",
+                              border: "none",
+                              borderBottom: "1px solid rgba(255,255,255,0.05)",
+                              color: "var(--text-muted)",
+                              cursor: "pointer",
+                              fontSize: "0.85rem"
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+                            onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+                          >
+                            — بدون باقة —
+                          </button>
+                          {plans.map(p => (
+                            <button
+                              key={p.id}
+                              onClick={() => {
+                                handleAssignPlan(featureModalTeacher, p.id);
+                                setFeatureModalTeacher({ ...featureModalTeacher, plan_id: p.id });
+                                setIsPlanDropdownOpen(false);
+                              }}
+                              style={{
+                                padding: "0.75rem 1rem",
+                                textAlign: "right",
+                                background: "none",
+                                border: "none",
+                                borderBottom: "1px solid rgba(255,255,255,0.05)",
+                                color: p.color,
+                                cursor: "pointer",
+                                fontSize: "0.85rem",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center"
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+                              onMouseLeave={(e) => e.currentTarget.style.background = "none"}
+                            >
+                              <span style={{ fontWeight: 600 }}>{p.name}</span>
+                              <span style={{ fontSize: "0.75rem", opacity: 0.8 }}>({p.price}ج)</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>لا توجد باقات</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Bills Feature Toggle */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                <div>
+                  <h3 style={{ fontSize: "1rem", marginBottom: "4px" }}>ميزة الفواتير المالية</h3>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>تفعيل نظام الحسابات وإصدار فواتير الدفع للطلاب.</p>
+                </div>
+                <button
+                  className="toggle-button"
+                  onClick={() => {
+                    handleToggleBills(featureModalTeacher.id, featureModalTeacher.has_bills_feature);
+                    setFeatureModalTeacher({ ...featureModalTeacher, has_bills_feature: !featureModalTeacher.has_bills_feature });
+                  }}
+                  disabled={updatingId === featureModalTeacher.id}
+                  style={{ color: featureModalTeacher.has_bills_feature ? "var(--color-teal)" : "var(--text-muted)" }}
+                >
+                  {featureModalTeacher.has_bills_feature ? <ToggleRight size={44} /> : <ToggleLeft size={44} />}
+                </button>
+              </div>
+
+              {/* Attendance Feature Toggle */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                <div>
+                  <h3 style={{ fontSize: "1rem", marginBottom: "4px" }}>ميزة الحضور والغياب</h3>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>تفعيل نظام مسح الـ QR وتسجيل حصص الطلاب.</p>
+                </div>
+                <button
+                  className="toggle-button"
+                  onClick={() => {
+                    const current = featureModalTeacher.has_attendance_feature ?? true;
+                    handleToggleAttendance(featureModalTeacher.id, current);
+                    setFeatureModalTeacher({ ...featureModalTeacher, has_attendance_feature: !current });
+                  }}
+                  disabled={updatingId === featureModalTeacher.id}
+                  style={{ color: (featureModalTeacher.has_attendance_feature ?? true) ? "var(--color-teal)" : "var(--text-muted)" }}
+                >
+                  {(featureModalTeacher.has_attendance_feature ?? true) ? <ToggleRight size={44} /> : <ToggleLeft size={44} />}
+                </button>
+              </div>
+
+              {/* Center Mode Toggle */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                <div>
+                  <h3 style={{ fontSize: "1rem", marginBottom: "4px" }}>نظام السنتر (المعلمين المساعدين)</h3>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>السماح بإنشاء حسابات فرعية لمساعدي المعلم.</p>
+                </div>
+                <button
+                  className="toggle-button"
+                  onClick={() => {
+                    const current = featureModalTeacher.is_center_mode ?? false;
+                    handleToggleCenterMode(featureModalTeacher.id, current);
+                    setFeatureModalTeacher({ ...featureModalTeacher, is_center_mode: !current });
+                  }}
+                  disabled={updatingId === featureModalTeacher.id}
+                  style={{ color: (featureModalTeacher.is_center_mode ?? false) ? "var(--color-info)" : "var(--text-muted)" }}
+                >
+                  {(featureModalTeacher.is_center_mode ?? false) ? <ToggleRight size={44} /> : <ToggleLeft size={44} />}
+                </button>
+              </div>
+            </div>
+
+            {(!featureModalTeacher.is_active && !featureModalTeacher.subscription_started_at) ? (
+              <div style={{ borderTop: "1px solid var(--border-color)", paddingTop: "1.5rem" }}>
+                <div style={{ background: "rgba(16, 185, 129, 0.1)", color: "#10b981", padding: "1rem", borderRadius: "8px", marginBottom: "1rem", border: "1px solid rgba(16, 185, 129, 0.2)", fontSize: "0.9rem" }}>
+                  هذا الحساب جديد وبانتظار موافقتك لتفعيله لأول مرة.
+                </div>
+                <button 
+                  className="btn btn-primary" 
+                  style={{ width: "100%", justifyContent: "center", background: "#10b981", borderColor: "#10b981" }}
+                  onClick={() => {
+                    // To approve, we toggle active and set start date to today
+                    handleToggleActive(featureModalTeacher.id, false);
+                    handleUpdateStartDate(featureModalTeacher.id, new Date().toISOString().split("T")[0]);
+                    
+                    // Update local modal state immediately
+                    setFeatureModalTeacher({ 
+                      ...featureModalTeacher, 
+                      is_active: true,
+                      subscription_started_at: new Date().toISOString()
+                    });
+                  }}
+                  disabled={updatingId === featureModalTeacher.id}
+                >
+                  <Check size={18} />
+                  موافقة وتفعيل الحساب الآن
+                </button>
+              </div>
+            ) : (
+              <button 
+                className="btn btn-secondary" 
+                style={{ width: "100%", justifyContent: "center" }}
+                onClick={() => setFeatureModalTeacher(null)}
+              >
+                إغلاق
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Toast Alert */}
       {toast && (

@@ -91,7 +91,7 @@ export function StudentTableRow({
       </td>
       <td data-label="الكتب المستلمة" style={{ textAlign: "center" }}>
         <div className="book-toggles" style={{ justifyContent: "center" }}>
-          {teacherBooks.map(book => {
+          {teacherBooks.filter(b => !b.grade_id || b.grade_id === student.grade_id).map(book => {
             const hasBook = student.received_books?.includes(book.id);
             return (
               <button

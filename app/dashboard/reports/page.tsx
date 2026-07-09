@@ -1,11 +1,15 @@
 "use client";
 
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+
 import { useState, useEffect } from "react";
 import { AuthService } from "@/lib/services/authService";
 import { TeachersService } from "@/lib/services/teachersService";
 import { StudentsService } from "@/lib/services/studentsService";
 import { BillsService } from "@/lib/services/billsService";
 import { GroupsService } from "@/lib/services/groupsService";
+import { GradesService } from "@/lib/services/gradesService";
 import { SubTeachersService } from "@/lib/services/subTeachersService";
 import { 
   TrendingUp, 
@@ -22,6 +26,7 @@ interface Student {
   id: string;
   name: string;
   group_id: string | null;
+  grade_id?: string | null;
   months: boolean[];
   received_books: string[];
 }
@@ -52,7 +57,11 @@ export default function ReportsPage() {
   const [hasCenterMode, setHasCenterMode] = useState(false);
   const [subTeachers, setSubTeachers] = useState<any[]>([]);
   const [groups, setGroups] = useState<any[]>([]);
+  const [grades, setGrades] = useState<any[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
+
+  const [showAllGrades, setShowAllGrades] = useState(false);
+  const [showAllBooks, setShowAllBooks] = useState(false);
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -80,10 +89,13 @@ export default function ReportsPage() {
           if (centerMode) {
             const subs = await SubTeachersService.getSubTeachersByCenterId(session.user.id);
             setSubTeachers(subs || []);
-            
-            const grps = await GroupsService.getGroupsByTeacherId(session.user.id);
-            setGroups(grps || []);
           }
+          
+          const grps = await GroupsService.getGroupsByTeacherId(session.user.id);
+          setGroups(grps || []);
+
+          const grds = await GradesService.getGradesByTeacherId(session.user.id);
+          setGrades(grds || []);
         }
 
         // 3. Fetch students
@@ -126,24 +138,77 @@ export default function ReportsPage() {
   const totalFilteredStudents = filteredStudents.length;
 
   // Calculations
+  const getStudentPrice = (student: any) => {
+    const studentGroup = groups.find(g => g.id === student.group_id);
+    const studentGrade = grades.find(g => g.id === student.grade_id);
+    return studentGroup?.monthly_price ?? studentGrade?.monthly_price ?? monthlyPrice;
+  };
+
   // 1. Subscriptions
   const paidThisMonthCount = filteredStudents.filter(s => s.months[currentMonthIndex] === true).length;
-  const currentMonthEarnings = paidThisMonthCount * monthlyPrice;
+  
+  const currentMonthEarnings = filteredStudents.reduce((acc, s) => {
+    if (s.months[currentMonthIndex] === true) {
+      return acc + getStudentPrice(s);
+    }
+    return acc;
+  }, 0);
 
   const totalPaidMonthsCount = filteredStudents.reduce((acc, s) => {
     return acc + s.months.filter(m => m === true).length;
   }, 0);
-  const totalSubscriptionEarnings = totalPaidMonthsCount * monthlyPrice;
+  
+  const totalSubscriptionEarnings = filteredStudents.reduce((acc, s) => {
+    const paidMonths = s.months.filter((m: boolean) => m === true).length;
+    return acc + (paidMonths * getStudentPrice(s));
+  }, 0);
 
-  // 2. Books
   // 2. Books
   let totalBookEarnings = 0;
   const booksStats = teacherBooks.map(book => {
     const count = filteredStudents.filter(s => s.received_books && s.received_books.includes(book.id)).length;
     const earnings = count * book.price;
     totalBookEarnings += earnings;
-    return { ...book, count, earnings };
+    const gradeName = grades.find(g => g.id === book.grade_id)?.name;
+    return { ...book, count, earnings, gradeName };
   });
+
+  // 2.5 Grades Subscriptions Stats
+  const gradesStats = grades.map(grade => {
+    const gradeStudents = filteredStudents.filter(s => {
+      const studentEffectiveGradeId = s.grade_id || groups.find(g => g.id === s.group_id)?.grade_id;
+      return studentEffectiveGradeId === grade.id;
+    });
+
+    const paidThisMonth = gradeStudents.filter(s => s.months[currentMonthIndex] === true).length;
+    
+    const earnings = gradeStudents.reduce((acc, s) => {
+      const paidMonths = s.months.filter((m: boolean) => m === true).length;
+      return acc + (paidMonths * getStudentPrice(s));
+    }, 0);
+
+    return { id: grade.id, name: grade.name, paidThisMonth, earnings };
+  });
+
+  const generalStudents = filteredStudents.filter(s => {
+      const studentEffectiveGradeId = s.grade_id || groups.find(g => g.id === s.group_id)?.grade_id;
+      return !studentEffectiveGradeId;
+  });
+  const generalPaidThisMonth = generalStudents.filter(s => s.months[currentMonthIndex] === true).length;
+  const generalEarnings = generalStudents.reduce((acc, s) => {
+    const paidMonths = s.months.filter((m: boolean) => m === true).length;
+    return acc + (paidMonths * getStudentPrice(s));
+  }, 0);
+  
+  if (generalEarnings > 0 || generalPaidThisMonth > 0) {
+    gradesStats.push({ id: "general", name: "طلاب بدون سنة دراسية", paidThisMonth: generalPaidThisMonth, earnings: generalEarnings });
+  }
+
+  gradesStats.sort((a, b) => b.earnings - a.earnings);
+  const topGradesStats = gradesStats.slice(0, 2);
+  
+  booksStats.sort((a, b) => b.earnings - a.earnings);
+  const topBooksStats = booksStats.slice(0, 3);
 
   // 3. Gross Revenue
   const totalGrossEarnings = totalSubscriptionEarnings + totalBookEarnings;
@@ -157,7 +222,13 @@ export default function ReportsPage() {
   // Month-by-month statistics (Subscriptions revenue vs Month expenses)
   const monthsReport = arabicMonths.map((name, index) => {
     const paidCount = filteredStudents.filter(s => s.months[index] === true).length;
-    const subscriptionEarnings = paidCount * monthlyPrice;
+    
+    const subscriptionEarnings = filteredStudents.reduce((acc, s) => {
+      if (s.months[index] === true) {
+        return acc + getStudentPrice(s);
+      }
+      return acc;
+    }, 0);
 
     // Filter bills for this specific month (1-indexed in database)
     const monthBills = bills.filter(b => b.billing_month === index + 1);
@@ -254,19 +325,12 @@ export default function ReportsPage() {
       <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
         
         {/* Subscriptions Card Details */}
-        <section className="glass-panel panel-content">
+        <section className="glass-panel panel-content" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <h2 className="panel-title">
             <CheckCircle2 size={18} style={{ color: "var(--color-teal)" }} />
             <span>تفاصيل أرباح الاشتراكات</span>
           </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", marginTop: "1rem" }}>
-            <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
-              <div>
-                <p style={{ fontWeight: 600 }}>قيمة الاشتراك الشهري المحدد</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>من صفحة الإعدادات</p>
-              </div>
-              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700, color: "var(--color-teal)" }}>{monthlyPrice} ج.م</span>
-            </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", marginTop: "1rem", flex: 1, justifyContent: "space-between" }}>
             <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
               <div>
                 <p style={{ fontWeight: 600 }}>أرباح الاشتراك في الشهر الحالي ({arabicMonths[currentMonthIndex]})</p>
@@ -274,23 +338,44 @@ export default function ReportsPage() {
               </div>
               <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{currentMonthEarnings} ج.م</span>
             </div>
-            <div className="flex-between" style={{ paddingBottom: "0.5rem" }}>
+            <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
               <div>
                 <p style={{ fontWeight: 600 }}>إجمالي إيراد الاشتراكات</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>مجموع كل عمليات دفع الشهور المسجلة لجميع الطلاب</p>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>مجموع كل عمليات الدفع لجميع السنين</p>
               </div>
               <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{totalSubscriptionEarnings} ج.م</span>
             </div>
+            {topGradesStats.map((gradeStat, idx) => (
+              <div key={gradeStat.id} className="flex-between" style={{ borderBottom: idx !== topGradesStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: idx !== topGradesStats.length - 1 ? "1rem" : "0.5rem" }}>
+                <div>
+                  <p style={{ fontWeight: 600 }}>إجمالي أرباح {gradeStat.name}</p>
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{gradeStat.paidThisMonth} طالب دفعوا الاشتراك هذا الشهر ({arabicMonths[currentMonthIndex]})</p>
+                </div>
+                <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{gradeStat.earnings} ج.م</span>
+              </div>
+            ))}
+            {gradesStats.length > 2 && (
+              <Button variant="secondary" size="sm" onClick={() => setShowAllGrades(true)} style={{ width: "100%", marginTop: "0.5rem" }}>
+                عرض المزيد
+              </Button>
+            )}
+            {gradesStats.length === 0 && (
+              <div className="flex-between" style={{ paddingBottom: "0.5rem" }}>
+                <div>
+                  <p style={{ fontWeight: 600, color: "var(--text-muted)" }}>لا توجد سنين دراسية مضافة</p>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
         {/* Expenses & Books Split Card */}
-        <section className="glass-panel panel-content">
+        <section className="glass-panel panel-content" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
           <h2 className="panel-title">
             <Receipt size={18} style={{ color: "var(--color-amber)" }} />
             <span>تفاصيل الفواتير والكتب</span>
           </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginTop: "1rem" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", marginTop: "1rem", flex: 1, justifyContent: "space-between" }}>
             <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
               <div>
                 <p style={{ fontWeight: 600 }}>إجمالي الفواتير والمصروفات</p>
@@ -298,15 +383,22 @@ export default function ReportsPage() {
               </div>
               <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700, color: "#f87171" }}>-{totalExpenses} ج.م</span>
             </div>
-            {booksStats.map((book, idx) => (
-              <div key={book.id} className="flex-between" style={{ borderBottom: idx !== booksStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: idx !== booksStats.length - 1 ? "1rem" : "0.5rem" }}>
+            {topBooksStats.map((book, idx) => (
+              <div key={book.id} className="flex-between" style={{ borderBottom: idx !== topBooksStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: idx !== topBooksStats.length - 1 ? "1rem" : "0.5rem" }}>
                 <div>
                   <p style={{ fontWeight: 600 }}>إجمالي أرباح {book.name}</p>
-                  <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{book.count} طالب استلموا الكتاب بسعر {book.price} ج.م</p>
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                    {book.count} طالب استلموا الكتاب بسعر {book.price} ج.م {book.gradeName ? `(${book.gradeName})` : ""}
+                  </p>
                 </div>
                 <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{book.earnings} ج.م</span>
               </div>
             ))}
+            {booksStats.length > 3 && (
+              <Button variant="secondary" size="sm" onClick={() => setShowAllBooks(true)} style={{ width: "100%", marginTop: "0.5rem" }}>
+                عرض المزيد
+              </Button>
+            )}
             {booksStats.length === 0 && (
               <div className="flex-between" style={{ paddingBottom: "0.5rem" }}>
                 <div>
@@ -383,6 +475,36 @@ export default function ReportsPage() {
           <span>{toast.message}</span>
         </div>
       )}
+
+      <Modal isOpen={showAllGrades} onClose={() => setShowAllGrades(false)} title="جميع أرباح الاشتراكات" maxWidth="600px">
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {gradesStats.map((gradeStat, idx) => (
+            <div key={gradeStat.id} className="flex-between" style={{ borderBottom: idx !== gradesStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: "0.5rem" }}>
+              <div>
+                <p style={{ fontWeight: 600 }}>إجمالي أرباح {gradeStat.name}</p>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{gradeStat.paidThisMonth} طالب دفعوا الاشتراك هذا الشهر</p>
+              </div>
+              <span className="monospace" style={{ fontSize: "1.1rem", fontWeight: 700 }}>{gradeStat.earnings} ج.م</span>
+            </div>
+          ))}
+        </div>
+      </Modal>
+
+      <Modal isOpen={showAllBooks} onClose={() => setShowAllBooks(false)} title="جميع أرباح الكتب" maxWidth="600px">
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          {booksStats.map((book, idx) => (
+            <div key={book.id} className="flex-between" style={{ borderBottom: idx !== booksStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: "0.5rem" }}>
+              <div>
+                <p style={{ fontWeight: 600 }}>إجمالي أرباح {book.name}</p>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
+                  {book.count} طالب استلموا الكتاب بسعر {book.price} ج.م {book.gradeName ? `(${book.gradeName})` : ""}
+                </p>
+              </div>
+              <span className="monospace" style={{ fontSize: "1.1rem", fontWeight: 700 }}>{book.earnings} ج.م</span>
+            </div>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }

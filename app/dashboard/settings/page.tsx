@@ -30,15 +30,16 @@ export default function SettingsPage() {
 
   // Form states
   const [name, setName] = useState("");
-  const [monthlyPrice, setMonthlyPrice] = useState("100");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [books, setBooks] = useState<BookDef[]>([]);
   const [deletedBookIds, setDeletedBookIds] = useState<string[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
 
   const [grades, setGrades] = useState<Grade[]>([]);
+  const [deletedGradeIds, setDeletedGradeIds] = useState<string[]>([]);
   const [newGradeName, setNewGradeName] = useState("");
-  const [newGradeStartCode, setNewGradeStartCode] = useState("");
-  const [newGradePrefix, setNewGradePrefix] = useState("");
+  const [newGradePrice, setNewGradePrice] = useState("");
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -52,6 +53,7 @@ export default function SettingsPage() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         setUserId(session.user.id);
+        setEmail(session.user.email || "");
 
         const [teacher, gradesData, studentsData] = await Promise.all([
           TeachersService.getTeacherProfile(session.user.id),
@@ -61,7 +63,7 @@ export default function SettingsPage() {
 
         if (teacher) {
           setName(teacher.name || "");
-          setMonthlyPrice(String(teacher.monthly_price ?? 100));
+          setPhone(teacher.phone || "");
           setBooks(teacher.books || []);
         }
 
@@ -95,11 +97,54 @@ export default function SettingsPage() {
 
     setSaveLoading(true);
     try {
+      // 1. Delete Grades
+      if (deletedGradeIds.length > 0) {
+        await Promise.all(deletedGradeIds.map(id => GradesService.deleteGrade(id)));
+        setDeletedGradeIds([]);
+      }
+
+      // 2. Add New Grades and Keep a Mapping of Temp ID to Real ID
+      const tempToRealIdMap: Record<string, string> = {};
+      const updatedGradesList = [...grades];
+
+      for (let i = 0; i < updatedGradesList.length; i++) {
+        const g = updatedGradesList[i];
+        if (g.id.startsWith("temp_")) {
+          const addedGrade = await GradesService.addGrade({
+            name: g.name,
+            start_code: g.start_code || 1,
+            prefix: g.prefix || '',
+            monthly_price: g.monthly_price,
+            teacher_id: userId
+          });
+          tempToRealIdMap[g.id] = addedGrade.id;
+          updatedGradesList[i] = addedGrade;
+        } else {
+          // 3. Update Existing Grades (we assume they might be modified, so we just update their price/name)
+          await GradesService.updateGrade(g.id, {
+            name: g.name,
+            monthly_price: g.monthly_price
+          });
+        }
+      }
+      setGrades(updatedGradesList);
+
+      // 4. Map Books to Real Grade IDs
+      const mappedBooks = books.map(b => {
+        if (b.grade_id && b.grade_id.startsWith("temp_") && tempToRealIdMap[b.grade_id]) {
+          return { ...b, grade_id: tempToRealIdMap[b.grade_id] };
+        }
+        return b;
+      });
+
+      // 5. Update Teacher Profile
       await TeachersService.updateTeacherProfile(userId, {
         name: name,
-        monthly_price: Number(monthlyPrice) || 0,
-        books: books
+        phone: phone,
+        books: mappedBooks
       });
+
+      setBooks(mappedBooks);
 
       if (deletedBookIds.length > 0) {
         const affectedStudents = students.filter(s => s.received_books?.some(bId => deletedBookIds.includes(bId)));
@@ -138,7 +183,7 @@ export default function SettingsPage() {
     setBooks([...books, newBook]);
   };
 
-  const handleUpdateBook = (id: string, field: "name" | "price", value: string | number) => {
+  const handleUpdateBook = (id: string, field: "name" | "price" | "grade_id", value: string | number) => {
     setBooks(books.map(b => b.id === id ? { ...b, [field]: value } : b));
   };
 
@@ -153,40 +198,33 @@ export default function SettingsPage() {
     setDeletedBookIds([...deletedBookIds, id]);
   };
 
-  const handleAddGrade = async () => {
-    if (!newGradeName || !newGradeStartCode) {
-      showToast("يرجى إدخال اسم السنة وبداية الأكواد", "error");
+  const handleAddGrade = () => {
+    if (!newGradeName || !newGradePrice) {
+      showToast("يرجى إدخال اسم السنة وسعرها الشهري", "error");
       return;
     }
     if (!userId) return;
 
-    try {
-      const addedGrade = await GradesService.addGrade({
-        name: newGradeName,
-        start_code: parseInt(newGradeStartCode),
-        prefix: newGradePrefix || '',
-        teacher_id: userId
-      });
+    const newGrade: Grade = {
+      id: `temp_${Date.now()}`,
+      name: newGradeName,
+      start_code: 1,
+      prefix: '',
+      monthly_price: Number(newGradePrice),
+      teacher_id: userId
+    };
 
-      setGrades([...grades, addedGrade]);
-      setNewGradeName("");
-      setNewGradeStartCode("");
-      setNewGradePrefix("");
-      showToast("تم إضافة السنة الدراسية بنجاح");
-    } catch (error) {
-      showToast("فشل إضافة السنة الدراسية", "error");
-    }
+    setGrades([...grades, newGrade]);
+    setNewGradeName("");
+    setNewGradePrice("");
   };
 
-  const handleDeleteGrade = async (gradeId: string) => {
-    if (confirm("هل أنت متأكد من حذف هذه السنة الدراسية؟ (المجموعات التابعة لها ستصبح بدون سنة)")) {
-      try {
-        await GradesService.deleteGrade(gradeId);
-        setGrades(grades.filter(g => g.id !== gradeId));
-        showToast("تم الحذف بنجاح");
-      } catch (err) {
-        showToast("فشل حذف السنة الدراسية.", "error");
+  const handleDeleteGrade = (gradeId: string) => {
+    if (confirm("هل أنت متأكد من حذف هذه السنة الدراسية؟ (سيتم الحذف نهائياً عند حفظ التعديلات)")) {
+      if (!gradeId.startsWith("temp_")) {
+        setDeletedGradeIds([...deletedGradeIds, gradeId]);
       }
+      setGrades(grades.filter(g => g.id !== gradeId));
     }
   };
 
@@ -210,9 +248,11 @@ export default function SettingsPage() {
 
         <form onSubmit={handleSaveSettings} style={{ marginTop: "2rem" }}>
           {/* Teacher Section */}
-          <div style={{ paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1.5rem" }}>
-            <h3 style={{ fontSize: "1.1rem", marginBottom: "1rem", color: "var(--color-info)" }}>البيانات الشخصية</h3>
-            <div className="form-group" style={{ maxWidth: "450px" }}>
+          <div style={{ paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1.5rem", display: "flex", flexWrap: "wrap", gap: "1rem" }}>
+            <div style={{ flex: "1 1 100%" }}>
+              <h3 style={{ fontSize: "1.1rem", marginBottom: "1rem", color: "var(--color-info)" }}>البيانات الشخصية</h3>
+            </div>
+            <div className="form-group" style={{ flex: "1 1 200px" }}>
               <Input
                 label="اسم المعلم الكامل"
                 id="tName"
@@ -223,35 +263,123 @@ export default function SettingsPage() {
                 onChange={(e) => setName(e.target.value)}
                 leftIcon={<User size={18} />}
               />
-              <p className="settings-description" style={{ marginTop: "0.5rem" }}>الاسم الذي يظهر أعلى الشريط الجانبي وفي التقارير</p>
+            </div>
+            <div className="form-group" style={{ flex: "1 1 200px" }}>
+              <Input
+                label="رقم الهاتف (واتساب)"
+                id="tPhone"
+                type="tel"
+                placeholder="01012345678"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                style={{ direction: "ltr", textAlign: "right" }}
+                leftIcon={<span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-secondary)" }}>+20</span>}
+              />
+            </div>
+            <div className="form-group" style={{ flex: "1 1 200px" }}>
+              <Input
+                label="البريد الإلكتروني"
+                id="tEmail"
+                type="email"
+                value={email}
+                disabled
+                style={{ direction: "ltr", textAlign: "right", opacity: 0.7 }}
+              />
             </div>
           </div>
 
-          {/* Pricing Section */}
+          {/* Grades Settings Section */}
           <div style={{ paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1.5rem" }}>
-            <h3 style={{ fontSize: "1.1rem", marginBottom: "1rem", color: "var(--color-info)" }}>قيمة الاشتراك الشهري</h3>
-            <div className="form-group" style={{ maxWidth: "250px" }}>
-              <Input
-                label="قيمة الاشتراك الشهري"
-                id="mPrice"
-                type="number"
-                min="0"
-                required
-                value={monthlyPrice}
-                onChange={(e) => setMonthlyPrice(e.target.value)}
-                style={{ direction: "ltr", textAlign: "right" }}
-                leftIcon={<span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-secondary)" }}>ج.م</span>}
-              />
-              <p className="settings-description" style={{ marginTop: "0.5rem" }}>سعر الاشتراك الشهري الافتراضي للطالب (بالجنيه)</p>
+            <div style={{ marginBottom: "1.5rem" }}>
+              <h3 style={{ fontSize: "1.1rem", marginBottom: "0.25rem", color: "var(--color-info)" }}>السنين الدراسية والسعر</h3>
+              <p className="settings-description">أضف السنين الدراسية التي تُدرّس لها مع تحديد سعر الاشتراك الشهري لكل سنة.</p>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              {grades.map(grade => (
+                <div key={grade.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{grade.name}</h3>
+                  </div>
+                  <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+                    <div style={{ width: "180px" }}>
+                      <Input 
+                        type="number"
+                        placeholder="السعر (ج.م/شهرياً)"
+                        value={grade.monthly_price === null || grade.monthly_price === undefined ? "" : grade.monthly_price}
+                        onChange={(e) => {
+                          const val = e.target.value ? Number(e.target.value) : null;
+                          const newGrades = grades.map(g => g.id === grade.id ? { ...g, monthly_price: val } : g);
+                          setGrades(newGrades);
+                        }}
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDeleteGrade(grade.id)}
+                      title="حذف"
+                    >
+                      <Trash2 size={16} />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ display: "flex", gap: "1rem", marginTop: "1rem", flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{ flex: "1 1 300px", display: "flex", flexDirection: "column" }}>
+                  <select
+                    className="form-input"
+                    value={newGradeName}
+                    onChange={(e) => setNewGradeName(e.target.value)}
+                    style={{ width: "100%", height: "42px", color: newGradeName ? "inherit" : "var(--text-muted)" }}
+                  >
+                    <option value="" disabled>اختر السنة الدراسية...</option>
+                    <option value="الصف الأول الابتدائي">الصف الأول الابتدائي</option>
+                    <option value="الصف الثاني الابتدائي">الصف الثاني الابتدائي</option>
+                    <option value="الصف الثالث الابتدائي">الصف الثالث الابتدائي</option>
+                    <option value="الصف الرابع الابتدائي">الصف الرابع الابتدائي</option>
+                    <option value="الصف الخامس الابتدائي">الصف الخامس الابتدائي</option>
+                    <option value="الصف السادس الابتدائي">الصف السادس الابتدائي</option>
+                    <option value="الصف الأول الإعدادي">الصف الأول الإعدادي</option>
+                    <option value="الصف الثاني الإعدادي">الصف الثاني الإعدادي</option>
+                    <option value="الصف الثالث الإعدادي">الصف الثالث الإعدادي</option>
+                    <option value="الصف الأول الثانوي">الصف الأول الثانوي</option>
+                    <option value="الصف الثاني الثانوي">الصف الثاني الثانوي</option>
+                    <option value="الصف الثالث الثانوي">الصف الثالث الثانوي</option>
+                  </select>
+                </div>
+                <div style={{ flex: "1 1 200px" }}>
+                  <Input
+                    type="number"
+                    placeholder="السعر (ج.م/شهرياً) *"
+                    value={newGradePrice}
+                    onChange={(e) => setNewGradePrice(e.target.value)}
+                    style={{ border: "1px solid var(--color-teal)" }}
+                  />
+                </div>
+                <div style={{ flex: "0 0 auto" }}>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={handleAddGrade}
+                    leftIcon={<Plus size={18} />}
+                    style={{ width: "100%", justifyContent: "center" }}
+                  >
+                    إضافة سنة
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Dynamic Books Section */}
-          <div>
+          <div style={{ paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-color)", marginBottom: "1.5rem" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
               <div>
                 <h3 style={{ fontSize: "1.1rem", marginBottom: "0.25rem", color: "var(--color-info)" }}>الكتب والمذكرات</h3>
-                <p className="settings-description">أضف الكتب التي تسلمها للطلاب مع تحديد سعر كل كتاب.</p>
+                <p className="settings-description">أضف الكتب مع تحديد سعرها وارتباطها بالسنة الدراسية.</p>
               </div>
               <Button type="button" variant="primary" size="sm" leftIcon={<Plus size={16} />} onClick={handleAddBook}>
                 إضافة كتاب جديد
@@ -266,8 +394,8 @@ export default function SettingsPage() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 {books.map((book, index) => (
-                  <div key={book.id} style={{ display: "flex", gap: "1rem", alignItems: "flex-end", background: "rgba(15,23,42,0.4)", padding: "1rem", borderRadius: "10px", border: "1px solid var(--border-color)" }}>
-                    <div style={{ flex: 2 }}>
+                  <div key={book.id} style={{ display: "flex", gap: "1rem", alignItems: "flex-end", background: "rgba(15,23,42,0.4)", padding: "1rem", borderRadius: "10px", border: "1px solid var(--border-color)", flexWrap: "wrap" }}>
+                    <div style={{ flex: "1 1 200px" }}>
                       <Input
                         label={`اسم الكتاب (${index + 1})`}
                         value={book.name}
@@ -277,7 +405,7 @@ export default function SettingsPage() {
                         leftIcon={<BookOpen size={18} />}
                       />
                     </div>
-                    <div style={{ flex: 1 }}>
+                    <div style={{ flex: "1 1 150px" }}>
                       <Input
                         label="السعر"
                         type="number"
@@ -288,6 +416,22 @@ export default function SettingsPage() {
                         style={{ direction: "ltr", textAlign: "right" }}
                         leftIcon={<span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-secondary)" }}>ج.م</span>}
                       />
+                    </div>
+                    <div style={{ flex: "1 1 200px", display: "flex", flexDirection: "column", gap: "0.4rem" }}>
+                      <label className="form-label" style={{ marginBottom: 0 }}>السنة الدراسية (اختياري)</label>
+                      <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                        <select
+                          className="form-input"
+                          value={book.grade_id || ""}
+                          onChange={(e) => handleUpdateBook(book.id, "grade_id", e.target.value)}
+                          style={{ width: "100%" }}
+                        >
+                          <option value="">كتاب عام (لا يرتبط بسنة)</option>
+                          {grades.map(g => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <Button
@@ -307,7 +451,11 @@ export default function SettingsPage() {
           </div>
 
           {/* Submit Button */}
-          <div style={{ marginTop: "2.5rem", display: "flex", justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem", background: "rgba(20, 184, 166, 0.05)", padding: "1.5rem", borderRadius: "10px", border: "1px solid rgba(20, 184, 166, 0.2)" }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", color: "var(--color-teal)" }}>حفظ جميع التغييرات</h3>
+              <p className="settings-description" style={{ margin: 0 }}>سيتم حفظ البيانات الشخصية، السنين الدراسية، والكتب دفعة واحدة.</p>
+            </div>
             <Button
               type="submit"
               variant="primary"
@@ -319,73 +467,6 @@ export default function SettingsPage() {
             </Button>
           </div>
         </form>
-
-        {/* Grades Settings Section */}
-        <div className="glass-panel panel-content" style={{ marginTop: "2rem" }}>
-          <h2 className="panel-title">
-            <GraduationCap size={18} style={{ color: "var(--color-teal)" }} />
-            السنين الدراسية والأكواد
-          </h2>
-          <p className="settings-description" style={{ marginBottom: "1.5rem" }}>
-            أضف السنين الدراسية التي تُدرّس لها لتتمكن من إنشاء مجموعات لكل سنة بأكواد منفصلة.
-          </p>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-            {grades.map(grade => (
-              <div key={grade.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{grade.name}</h3>
-                  <p style={{ margin: "0.2rem 0 0 0", color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                    بداية الأكواد: <strong style={{ color: "var(--color-teal)" }}>{grade.start_code}</strong>
-                    {grade.prefix && <span style={{ marginLeft: "10px" }}> | البادئة: <strong style={{ color: "var(--color-teal)" }}>{grade.prefix}</strong></span>}
-                  </p>
-                </div>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleDeleteGrade(grade.id)}
-                  title="حذف"
-                >
-                  <Trash2 size={16} />
-                </Button>
-              </div>
-            ))}
-
-            <div style={{ display: "flex", gap: "1rem", marginTop: "1rem", flexWrap: "wrap", alignItems: "center" }}>
-              <div style={{ flex: 2, minWidth: "200px" }}>
-                <Input
-                  type="text"
-                  placeholder="اسم السنة (مثال: الصف الأول الثانوي)"
-                  value={newGradeName}
-                  onChange={(e) => setNewGradeName(e.target.value)}
-                />
-              </div>
-              <div style={{ flex: 1, minWidth: "150px" }}>
-                <Input
-                  type="text"
-                  placeholder="البادئة (اختياري) مثال: prep-"
-                  value={newGradePrefix}
-                  onChange={(e) => setNewGradePrefix(e.target.value)}
-                />
-              </div>
-              <div style={{ flex: 1, minWidth: "150px" }}>
-                <Input
-                  type="number"
-                  placeholder="بداية الأكواد (مثال: 10000)"
-                  value={newGradeStartCode}
-                  onChange={(e) => setNewGradeStartCode(e.target.value)}
-                />
-              </div>
-              <Button
-                variant="primary"
-                onClick={handleAddGrade}
-                leftIcon={<Plus size={18} />}
-              >
-                إضافة سنة
-              </Button>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Toast Alert */}
