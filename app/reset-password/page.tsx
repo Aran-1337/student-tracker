@@ -68,8 +68,8 @@ export default function ResetPasswordPage() {
 
         {success ? (
           <div style={{ textAlign: "center", padding: "1rem 0" }}>
-            <div className="alert-toast alert-success" style={{ position: "static", marginBottom: "1.5rem", animation: "none" }}>
-              <span>تم تغيير كلمة المرور بنجاح!</span>
+            <div className="alert-toast alert-success" style={{ position: "static", transform: "none", marginBottom: "1.5rem", animation: "none", width: "100%", justifyContent: "center", boxSizing: "border-box" }}>
+              <span style={{ textAlign: "center" }}>تم تغيير كلمة المرور بنجاح!</span>
             </div>
             <Link href="/dashboard" className="btn btn-primary" style={{ width: "100%" }}>
               التوجه للوحة التحكم

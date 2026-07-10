@@ -259,7 +259,7 @@ export default function DashboardLayout({
                 </div>
               )}
               {!sysSettings?.hide_sidebar_name && (
-                <span className="logo-text monospace" style={{ fontWeight: 700 }}>{sysSettings?.site_name || "إدارة السناتر والمعلمين"}</span>
+                <span className="logo-text monospace" style={{ fontWeight: 700 }}>{sysSettings?.sidebar_name || sysSettings?.site_name || "إدارة السناتر والمعلمين"}</span>
               )}
             </div>
 

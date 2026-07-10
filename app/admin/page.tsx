@@ -649,26 +649,43 @@ export default function AdminPanel() {
 
             <form onSubmit={handleUpdateSystemSettings}>
               <div className="form-group">
-                <label className="form-label" htmlFor="siteName">اسم المنصة الموحد</label>
+                <label className="form-label" htmlFor="siteName">اسم المنصة (يظهر في تابة المتصفح)</label>
                 <input
                   id="siteName"
                   type="text"
                   required
-                  placeholder="اسم المنصة الخاص بك"
+                  placeholder="الاسم الكامل (مثال: منصة الطالب للتعليم)"
                   className="search-input"
                   dir="auto"
                   value={systemSettings.site_name}
                   onChange={(e) => setSystemSettings({ ...systemSettings, site_name: e.target.value })}
                 />
-                
-                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginTop: "0.75rem", fontSize: "0.85rem", cursor: "pointer", color: "var(--text-secondary)" }}>
+              </div>
+
+              {!systemSettings.hide_sidebar_name && (
+                <div className="form-group" style={{ marginTop: "1rem" }}>
+                  <label className="form-label" htmlFor="sidebarName">الاسم في القائمة الجانبية (يُفضل أن يكون قصيراً)</label>
+                  <input
+                    id="sidebarName"
+                    type="text"
+                    placeholder="سيتم استخدام الاسم الكامل إذا تُرك فارغاً"
+                    className="search-input"
+                    dir="auto"
+                    value={systemSettings.sidebar_name || ""}
+                    onChange={(e) => setSystemSettings({ ...systemSettings, sidebar_name: e.target.value })}
+                  />
+                </div>
+              )}
+
+              <div className="form-group" style={{ marginTop: "0.5rem" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "0.5rem", fontSize: "0.85rem", cursor: "pointer", color: "var(--text-secondary)" }}>
                   <input 
                     type="checkbox" 
                     checked={systemSettings.hide_sidebar_name || false}
                     onChange={(e) => setSystemSettings({ ...systemSettings, hide_sidebar_name: e.target.checked })}
                     style={{ width: "16px", height: "16px", cursor: "pointer" }}
                   />
-                  إخفاء الاسم من القائمة الجانبية (للاكتفاء باللوجو)
+                  إخفاء الاسم من القائمة الجانبية (للاكتفاء باللوجو كبانر)
                 </label>
               </div>
 

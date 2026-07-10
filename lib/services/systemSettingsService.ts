@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 export interface SystemSettings {
   id?: number;
   site_name: string;
+  sidebar_name?: string;
   site_logo: string;
   site_favicon?: string;
   hide_sidebar_name?: boolean;
@@ -26,6 +27,15 @@ export const SystemSettingsService = {
       settings.site_name = settings.site_name.replace("[HIDDEN]", "");
     }
 
+    // Parse the sidebar_name if it exists
+    if (settings.site_name && settings.site_name.includes("|||SIDEBAR|||")) {
+      const parts = settings.site_name.split("|||SIDEBAR|||");
+      settings.site_name = parts[0];
+      settings.sidebar_name = parts[1];
+    } else {
+      settings.sidebar_name = settings.site_name;
+    }
+
     // Parse the favicon if it exists
     if (settings.site_logo && settings.site_logo.includes("|||FAVICON|||")) {
       const parts = settings.site_logo.split("|||FAVICON|||");
@@ -39,8 +49,13 @@ export const SystemSettingsService = {
   async updateSettings(settings: Partial<SystemSettings>): Promise<void> {
     const current = await this.getSettings();
 
-    // Serialize the hidden flag into the site_name to avoid DB migrations
+    // Serialize the sidebar_name into site_name
     let finalSiteName = settings.site_name || "إدارة السناتر والمعلمين";
+    if (settings.sidebar_name && settings.sidebar_name !== settings.site_name) {
+      finalSiteName += "|||SIDEBAR|||" + settings.sidebar_name;
+    }
+
+    // Serialize the hidden flag
     if (settings.hide_sidebar_name) {
       finalSiteName = "[HIDDEN]" + finalSiteName;
     }
