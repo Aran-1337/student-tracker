@@ -2,19 +2,22 @@
 
 import { useState, useEffect } from "react";
 
-import { Users, Plus, Search, UserPlus, CheckSquare, Square, AlertCircle } from "lucide-react";
+import { Users, Plus, Search, UserPlus, CheckSquare, Square, AlertCircle, Printer } from "lucide-react";
 import { Student, Group, Grade, BookDef } from "@/lib/types";
 import { StudentsService } from "@/lib/services/studentsService";
 import { GroupsService } from "@/lib/services/groupsService";
 import { GradesService } from "@/lib/services/gradesService";
 import { TeachersService } from "@/lib/services/teachersService";
 import { AuthService } from "@/lib/services/authService";
+import { supabase } from "@/lib/supabaseClient";
 
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Toast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
 import { StudentTableRow } from "@/components/features/StudentTableRow";
+import { StudentProfileModal } from "@/components/features/StudentProfileModal";
+import Link from "next/link";
 
 const formatTimeTo12H = (timeStr: string) => {
   if (!timeStr) return "";
@@ -57,6 +60,15 @@ export default function StudentsManagement() {
   const [filterGradeId, setFilterGradeId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  
+  // Center Mode States
+  const [hasCenterMode, setHasCenterMode] = useState(false);
+  const [subTeachers, setSubTeachers] = useState<any[]>([]);
+  const [studentSubTeacherId, setStudentSubTeacherId] = useState("");
+  const [filterSubTeacherId, setFilterSubTeacherId] = useState("all");
+
+  // Edit Modal State
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -79,6 +91,14 @@ export default function StudentsManagement() {
         setGroups(groupsData);
         setGrades(gradesData);
         setTeacherBooks(teacherProfile?.books || []);
+
+        const centerMode = teacherProfile?.is_center_mode || false;
+        setHasCenterMode(centerMode);
+
+        if (centerMode) {
+          const { data: subs } = await supabase.from("sub_teachers").select("*").eq("center_id", session.user.id);
+          setSubTeachers(subs || []);
+        }
 
         const validatedStudents = studentsData.map(student => ({
           ...student,
@@ -214,6 +234,20 @@ export default function StudentsManagement() {
     }
   };
 
+  const handleEditStudent = (student: Student) => {
+    setEditingStudent(student);
+  };
+
+  const handleSaveStudentProfile = async (studentId: string, updates: Partial<Student>) => {
+    try {
+      await StudentsService.updateStudent(studentId, updates);
+      setStudents(students.map(s => s.id === studentId ? { ...s, ...updates } : s));
+      showToast("تم تحديث بيانات الطالب بنجاح!");
+    } catch (err: any) {
+      showToast("فشل تحديث البيانات.", "error");
+    }
+  };
+
   // Selection helpers
   const toggleSelectStudent = (id: string) => {
     setSelectedStudentIds(prev => {
@@ -241,9 +275,13 @@ export default function StudentsManagement() {
       : activeFilter === "none" 
         ? student.group_id === null 
         : student.group_id === activeFilter;
+        
+    const studentSubTId = groups.find(g => g.id === student.group_id)?.sub_teacher_id;
+    const matchesSubTeacher = !hasCenterMode || filterSubTeacherId === "all" || studentSubTId === filterSubTeacherId;
+
     const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (student.code && student.code.includes(searchQuery));
-    return matchesGrade && matchesGroup && matchesSearch;
+    return matchesGrade && matchesGroup && matchesSubTeacher && matchesSearch;
   });
 
   const allSelected = filteredStudents.length > 0 && selectedStudentIds.size === filteredStudents.length;
@@ -300,6 +338,33 @@ export default function StudentsManagement() {
                   ))}
                 </select>
               </div>
+              
+              {hasCenterMode && (
+                <div className="form-group">
+                  <label className="form-label" htmlFor="sSubTeacher">المعلم</label>
+                  <select
+                    id="sSubTeacher"
+                    className="form-input"
+                    value={studentSubTeacherId}
+                    onChange={(e) => {
+                      setStudentSubTeacherId(e.target.value);
+                      setStudentGroupId(""); // Reset group when teacher changes
+                    }}
+                    style={{ padding: "0.7rem 0.5rem" }}
+                  >
+                    <option value="">-- اختر المعلم --</option>
+                    {subTeachers
+                      .filter(st => {
+                        if (!studentGradeId) return true;
+                        return groups.some(g => g.grade_id === studentGradeId && g.sub_teacher_id === st.id);
+                      })
+                      .map(st => (
+                      <option key={st.id} value={st.id}>{st.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div className="form-group">
                 <label className="form-label" htmlFor="sGroup">المجموعة (اختياري)</label>
                 <select
@@ -312,6 +377,7 @@ export default function StudentsManagement() {
                   <option value="">بدون مجموعة</option>
                   {groups
                     .filter(g => !studentGradeId || g.grade_id === studentGradeId)
+                    .filter(g => !hasCenterMode || !studentSubTeacherId || g.sub_teacher_id === studentSubTeacherId)
                     .map(group => (
                     <option key={group.id} value={group.id}>
                       {group.name} {group.is_private ? "(خاصة) " : ""}({group.day_of_week} - {formatTimeTo12H(group.time)})
@@ -374,6 +440,30 @@ export default function StudentsManagement() {
               </select>
             </div>
 
+            {/* Filter by Teacher (if Center) */}
+            {hasCenterMode && (
+              <div style={{ flex: "1 1 150px" }}>
+                <select
+                  className="form-input"
+                  value={filterSubTeacherId}
+                  onChange={(e) => {
+                    setFilterSubTeacherId(e.target.value);
+                    setActiveFilter("all"); // Reset group filter
+                  }}
+                >
+                  <option value="all">كل المعلمين</option>
+                  {subTeachers
+                    .filter(st => {
+                      if (filterGradeId === "all") return true;
+                      return groups.some(g => g.grade_id === filterGradeId && g.sub_teacher_id === st.id);
+                    })
+                    .map(st => (
+                    <option key={st.id} value={st.id}>{st.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             {/* Filter by Group */}
             <div style={{ flex: "1 1 200px" }}>
               <select
@@ -392,6 +482,7 @@ export default function StudentsManagement() {
                     <option value="none">بدون مجموعة</option>
                     {groups
                       .filter(g => g.grade_id === filterGradeId)
+                      .filter(g => !hasCenterMode || filterSubTeacherId === "all" || g.sub_teacher_id === filterSubTeacherId)
                       .map(group => (
                       <option key={group.id} value={group.id}>
                         {group.name} {group.is_private ? "(خاصة)" : ""}
@@ -400,6 +491,18 @@ export default function StudentsManagement() {
                   </>
                 )}
               </select>
+            </div>
+
+            {/* Print QR Codes Button */}
+            <div style={{ flex: "1 1 auto", display: "flex", justifyContent: "flex-end" }}>
+              <Link 
+                href={`/dashboard/students/print-qr?gradeId=${filterGradeId}&groupId=${activeFilter}`} 
+                style={{ textDecoration: "none", width: "100%" }}
+              >
+                <Button variant="secondary" style={{ width: "100%", whiteSpace: "nowrap" }} leftIcon={<Printer size={18} />}>
+                  طباعة بطاقات QR
+                </Button>
+              </Link>
             </div>
           </div>
 
@@ -475,6 +578,7 @@ export default function StudentsManagement() {
                       onToggleMonth={handleToggleMonth}
                       onToggleBook={handleToggleBook}
                       onDelete={handleDeleteStudent}
+                      onEdit={handleEditStudent}
                       onUpdateGroup={handleChangeGroup}
                     />
                   ))
@@ -492,6 +596,15 @@ export default function StudentsManagement() {
           onClose={() => setToast(null)}
         />
       )}
+      
+      <StudentProfileModal
+        isOpen={!!editingStudent}
+        onClose={() => setEditingStudent(null)}
+        student={editingStudent}
+        groups={groups}
+        grades={grades}
+        onSave={handleSaveStudentProfile}
+      />
     </div>
   );
 }

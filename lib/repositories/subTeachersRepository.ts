@@ -13,9 +13,13 @@ export const SubTeachersRepository = {
   },
 
   async addSubTeacher(subTeacher: Omit<SubTeacher, "id" | "created_at">): Promise<SubTeacher> {
+    const payload = {
+      ...subTeacher,
+      id: crypto.randomUUID()
+    };
     const { data, error } = await supabase
       .from("sub_teachers")
-      .insert([subTeacher])
+      .insert([payload])
       .select()
       .single();
     if (error) throw error;

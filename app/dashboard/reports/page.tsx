@@ -141,7 +141,9 @@ export default function ReportsPage() {
   const getStudentPrice = (student: any) => {
     const studentGroup = groups.find(g => g.id === student.group_id);
     const studentGrade = grades.find(g => g.id === student.grade_id);
-    return studentGroup?.monthly_price ?? studentGrade?.monthly_price ?? monthlyPrice;
+    const basePrice = studentGroup?.monthly_price ?? studentGrade?.monthly_price ?? monthlyPrice;
+    const discount = student.discount_value || 0;
+    return Math.max(0, basePrice - discount);
   };
 
   // 1. Subscriptions

@@ -10,7 +10,8 @@ import {
   Save, 
   Plus,
   Trash2,
-  GraduationCap
+  GraduationCap,
+  MessageCircle
 } from "lucide-react";
 
 import { TeachersService } from "@/lib/services/teachersService";
@@ -233,12 +234,15 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ maxWidth: "800px" }}>
+    <div>
       {/* Title */}
       <div style={{ marginBottom: "2rem" }}>
         <h1 style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>الإعدادات</h1>
         <p style={{ color: "var(--text-secondary)" }}>تخصيص الحساب والقيم المالية للاشتراكات والكتب</p>
       </div>
+
+      <div style={{ display: "flex", gap: "2rem", alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 700px", maxWidth: "800px" }}>
 
       <div className="glass-panel panel-content" style={{ padding: "2.5rem 2rem" }}>
         <h2 className="panel-title">
@@ -468,6 +472,24 @@ export default function SettingsPage() {
           </div>
         </form>
       </div>
+      </div>
+
+      <div style={{ flex: "1 1 300px", maxWidth: "380px", position: "sticky", top: "2rem", minWidth: "300px" }}>
+        {/* Support Card */}
+        <div className="glass-panel panel-content" style={{ padding: "2.5rem 2rem", textAlign: "center", background: "linear-gradient(145deg, rgba(16,185,129,0.05) 0%, rgba(16,185,129,0.1) 100%)", border: "1px solid rgba(16,185,129,0.2)" }}>
+          <div style={{ width: "70px", height: "70px", borderRadius: "50%", background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem auto", boxShadow: "0 10px 25px -5px rgba(16,185,129,0.4)" }}>
+            <MessageCircle size={35} color="white" />
+          </div>
+          <h3 style={{ fontSize: "1.3rem", marginBottom: "0.75rem", fontWeight: 700 }}>هل تحتاج إلى مساعدة؟</h3>
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", marginBottom: "2rem", lineHeight: "1.6" }}>
+            فريق الدعم الفني متواجد دائماً لمساعدتك في أي استفسار أو مشكلة تواجهك في المنصة.
+          </p>
+          <a href="https://wa.me/201028583616" target="_blank" rel="noopener noreferrer" className="btn btn-primary" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "0.5rem", backgroundColor: "#25D366", borderColor: "#25D366", color: "white", padding: "0.75rem", fontSize: "1rem" }}>
+            <MessageCircle size={20} />
+            تواصل معنا عبر واتساب
+          </a>
+        </div>
+      </div>
 
       {/* Toast Alert */}
       {toast && (
@@ -477,6 +499,7 @@ export default function SettingsPage() {
           onClose={() => setToast(null)}
         />
       )}
+      </div>
     </div>
   );
 }

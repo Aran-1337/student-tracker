@@ -26,6 +26,7 @@ export interface SubTeacher {
   name: string;
   phone?: string;
   center_id: string;
+  grade_ids?: string[];
   created_at: string;
 }
 
@@ -62,6 +63,12 @@ export interface Student {
   teacher_id?: string;
   months?: boolean[];
   received_books?: string[];
+  discount_value?: number;
+  discount_reason?: string;
+  apply_discount_to_books?: boolean;
+  parent_phone?: string;
+  parent_job?: string;
+  student_email?: string;
   created_at?: string;
 }
 

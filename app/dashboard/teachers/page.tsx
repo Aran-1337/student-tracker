@@ -3,19 +3,27 @@
 import { useState, useEffect } from "react";
 import { AuthService } from "@/lib/services/authService";
 import { SubTeachersService } from "@/lib/services/subTeachersService";
+import { GradesService } from "@/lib/services/gradesService";
+import { Grade } from "@/lib/types";
 import { Users, Plus, Trash2, Edit3, Save, X, AlertCircle } from "lucide-react";
 
 interface SubTeacher {
   id: string;
   name: string;
+  name: string;
+  subject?: string;
+  grade_ids?: string[];
   created_at: string;
 }
 
 export default function CenterTeachersPage() {
   const [loading, setLoading] = useState(true);
   const [teachers, setTeachers] = useState<SubTeacher[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [newTeacherName, setNewTeacherName] = useState("");
+  const [newTeacherSubject, setNewTeacherSubject] = useState("");
+  const [newTeacherGrades, setNewTeacherGrades] = useState<string[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -29,9 +37,13 @@ export default function CenterTeachersPage() {
       const { data: { session } } = await AuthService.getSession();
       if (!session) return;
 
-      const data = await SubTeachersService.getSubTeachersByCenterId(session.user.id);
+      const [data, gradesData] = await Promise.all([
+        SubTeachersService.getSubTeachersByCenterId(session.user.id),
+        GradesService.getAllGrades()
+      ]);
 
       setTeachers(data || []);
+      setGrades(gradesData || []);
     } catch (err: unknown) {
       console.error(err);
     } finally {
@@ -53,16 +65,23 @@ export default function CenterTeachersPage() {
       const { data: { session } } = await AuthService.getSession();
       if (!session) return;
 
-      const newTeacherObj = { center_id: session.user.id, name: newTeacherName.trim() };
+      const newTeacherObj = { 
+        center_id: session.user.id, 
+        name: newTeacherName.trim(),
+        subject: newTeacherSubject.trim() || null,
+        grade_ids: newTeacherGrades
+      };
 
       await SubTeachersService.addSubTeacher(newTeacherObj);
 
       setNewTeacherName("");
+      setNewTeacherSubject("");
+      setNewTeacherGrades([]);
       setShowAddForm(false);
       showToast("تم إضافة المعلم بنجاح!");
       fetchTeachers();
-    } catch {
-      showToast("فشل إضافة المعلم.", "error");
+    } catch (err: any) {
+      showToast(err.message || "فشل إضافة المعلم.", "error");
     } finally {
       setActionLoading(false);
     }
@@ -93,7 +112,7 @@ export default function CenterTeachersPage() {
   return (
     <div style={{ maxWidth: "800px" }}>
       {toast && (
-        <div className={`toast ${toast.type}`}>
+        <div className={`alert-toast alert-${toast.type}`}>
           {toast.type === "error" ? <AlertCircle size={20} /> : <Save size={20} />}
           <span>{toast.message}</span>
         </div>
@@ -117,20 +136,55 @@ export default function CenterTeachersPage() {
       {showAddForm && (
         <div className="glass-panel panel-content" style={{ marginBottom: "2rem" }}>
           <h3 style={{ fontSize: "1.1rem", marginBottom: "1rem", color: "var(--color-teal)" }}>إضافة معلم جديد</h3>
-          <form onSubmit={handleAddTeacher} style={{ display: "flex", gap: "1rem", alignItems: "flex-end" }}>
-            <div className="form-group" style={{ margin: 0, flex: 1 }}>
-              <label className="form-label" htmlFor="tName">اسم المعلم</label>
-              <input
-                id="tName"
-                type="text"
-                className="form-input"
-                value={newTeacherName}
-                onChange={(e) => setNewTeacherName(e.target.value)}
-                placeholder="أدخل اسم المعلم ثلاثي أو ثنائي"
-                required
-              />
+          <form onSubmit={handleAddTeacher} style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+              <div className="form-group" style={{ margin: 0, flex: "1 1 250px" }}>
+                <label className="form-label" htmlFor="tName">اسم المعلم</label>
+                <input
+                  id="tName"
+                  type="text"
+                  className="form-input"
+                  value={newTeacherName}
+                  onChange={(e) => setNewTeacherName(e.target.value)}
+                  placeholder="أدخل اسم المعلم ثلاثي أو ثنائي"
+                  required
+                />
+              </div>
+              <div className="form-group" style={{ margin: 0, flex: "1 1 250px" }}>
+                <label className="form-label" htmlFor="tSubject">المادة الدراسية</label>
+                <input
+                  id="tSubject"
+                  type="text"
+                  className="form-input"
+                  value={newTeacherSubject}
+                  onChange={(e) => setNewTeacherSubject(e.target.value)}
+                  placeholder="مثال: اللغة العربية، الكيمياء..."
+                />
+              </div>
             </div>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
+
+            <div className="form-group" style={{ margin: 0 }}>
+              <label className="form-label">السنين الدراسية التي يُدرّس لها</label>
+              <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", marginTop: "0.5rem" }}>
+                {grades.map(grade => (
+                  <label key={grade.id} style={{ display: "flex", alignItems: "center", gap: "0.5rem", cursor: "pointer", background: "rgba(255,255,255,0.05)", padding: "0.5rem 1rem", borderRadius: "8px" }}>
+                    <input 
+                      type="checkbox" 
+                      checked={newTeacherGrades.includes(grade.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) setNewTeacherGrades([...newTeacherGrades, grade.id]);
+                        else setNewTeacherGrades(newTeacherGrades.filter(id => id !== grade.id));
+                      }}
+                      style={{ accentColor: "var(--color-teal)", width: "1.2rem", height: "1.2rem" }}
+                    />
+                    <span style={{ fontSize: "0.95rem" }}>{grade.name}</span>
+                  </label>
+                ))}
+                {grades.length === 0 && <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>لم تقم بإضافة أي سنين دراسية في الإعدادات بعد.</span>}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end", marginTop: "1rem" }}>
               <button type="submit" className="btn btn-primary" disabled={actionLoading}>
                 {actionLoading ? "جاري الحفظ..." : "حفظ"}
               </button>
@@ -154,6 +208,7 @@ export default function CenterTeachersPage() {
             <thead>
               <tr>
                 <th>اسم المعلم</th>
+                <th>المادة الدراسية</th>
                 <th>الإجراءات</th>
               </tr>
             </thead>
@@ -161,6 +216,7 @@ export default function CenterTeachersPage() {
               {teachers.map(teacher => (
                 <tr key={teacher.id}>
                   <td style={{ fontWeight: 600 }}>{teacher.name}</td>
+                  <td style={{ color: "var(--text-secondary)" }}>{teacher.subject || "—"}</td>
                   <td>
                     <button
                       onClick={() => handleDeleteTeacher(teacher.id, teacher.name)}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, CheckSquare, Square } from 'lucide-react';
+import { Trash2, CheckSquare, Square, User } from 'lucide-react';
 import { Student, Group, BookDef } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 
@@ -17,6 +17,7 @@ export interface StudentTableRowProps {
   onToggleMonth: (student: Student, monthIndex: number) => void;
   onToggleBook: (student: Student, bookId: string) => void;
   onDelete: (id: string) => void;
+  onEdit: (student: Student) => void;
   onUpdateGroup: (id: string, groupId: string) => void;
 }
 
@@ -31,6 +32,7 @@ export function StudentTableRow({
   onToggleMonth,
   onToggleBook,
   onDelete,
+  onEdit,
   onUpdateGroup
 }: StudentTableRowProps) {
 
@@ -106,13 +108,22 @@ export function StudentTableRow({
           })}
         </div>
       </td>
-      <td data-label="إجراءات" style={{ textAlign: "center" }}>
+      <td data-label="إجراءات" style={{ textAlign: "center", display: "flex", gap: "5px", justifyContent: "center" }}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => onEdit(student)}
+          title="تعديل ملف الطالب"
+          style={{ border: "none", background: "rgba(59, 130, 246, 0.1)" }}
+        >
+          <User size={16} className="color-primary" />
+        </Button>
         <Button
           variant="secondary"
           size="sm"
           onClick={() => onDelete(student.id)}
           title="حذف الطالب"
-          style={{ border: "none", background: "none", margin: "0 auto" }}
+          style={{ border: "none", background: "rgba(239, 68, 68, 0.1)" }}
         >
           <Trash2 size={16} className="color-danger" />
         </Button>

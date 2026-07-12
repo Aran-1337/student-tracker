@@ -1264,3 +1264,295 @@ select.form-input option {
   from { opacity: 0; transform: translateY(20px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+/* =========================================
+   Print Styles for QR ID Cards
+   ========================================= */
+
+@media print {
+  /* Hide non-printable elements */
+  .no-print,
+  .dashboard-sidebar,
+  .dashboard-header,
+  nav,
+  aside,
+  button,
+  .toast,
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  /* Reset body and container for printing */
+  body, html {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+  
+  .dashboard-main {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .print-container {
+    background: white !important;
+    padding: 0 !important;
+  }
+
+  .print-grid {
+    display: grid !important;
+    /* Fit ~2 cards per row on A4 for wider cards */
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 15px !important;
+    margin: 0 !important;
+    width: 100% !important;
+    page-break-inside: auto;
+  }
+
+  .id-card {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    border: 2px solid #ccc !important;
+    border-radius: 8px !important;
+    background: white !important;
+    color: black !important;
+    padding: 15px !important;
+    text-align: center;
+    box-shadow: none !important;
+    width: 100%;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    height: auto;
+    min-height: 220px;
+  }
+  
+  .id-card-header {
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    width: 100%;
+    border-bottom: 1px solid #eee !important;
+    padding-bottom: 10px;
+  }
+  
+  .id-card-logo {
+    max-height: 40px;
+    max-width: 120px;
+    object-fit: contain;
+  }
+  
+  .id-card-site-name {
+    font-weight: bold;
+    font-size: 1.1rem;
+    color: #333 !important;
+  }
+
+  .id-card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    width: 100%;
+  }
+
+  .student-info-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    text-align: right;
+  }
+
+  .qr-wrapper {
+    margin: 10px 0;
+    padding: 5px;
+    background: white !important;
+    border-radius: 5px;
+  }
+
+  .student-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 5px 0 10px 0;
+    color: black !important;
+    text-align: center;
+    width: 100%;
+  }
+
+  .student-details {
+    width: 100%;
+    font-size: 0.85rem;
+    color: #444 !important;
+    background: #f9f9f9 !important;
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #eee !important;
+  }
+
+  .detail-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 6px;
+    border-bottom: 1px dashed #ddd !important;
+    padding-bottom: 4px;
+  }
+  
+  .detail-row:last-child {
+    border-bottom: none !important;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .detail-label {
+    font-size: 0.75rem;
+    font-weight: normal;
+    color: #666 !important;
+  }
+  
+  .detail-value {
+    font-weight: 700;
+    color: #000 !important;
+  }
+  
+  .code-value {
+    font-family: monospace;
+    font-weight: 900;
+    font-size: 0.95rem;
+  }
+}
+
+/* Screen styles for Print QR page */
+.print-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.id-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.2s;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.id-card:hover {
+  transform: translateY(-5px);
+}
+
+.id-card-header {
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  width: 100%;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 1rem;
+}
+
+.id-card-logo {
+  max-height: 40px;
+  max-width: 150px;
+  object-fit: contain;
+}
+
+.id-card-site-name {
+  font-weight: bold;
+  font-size: 1.2rem;
+  color: var(--color-teal);
+}
+
+.id-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.student-info-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+}
+
+.qr-wrapper {
+  margin: 1rem 0;
+  padding: 10px;
+  background: white;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.student-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  color: var(--text-primary);
+  text-align: center;
+  width: 100%;
+}
+
+.student-details {
+  width: 100%;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  background: rgba(0,0,0,0.2);
+  padding: 10px;
+  border-radius: 8px;
+}
+
+.detail-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  padding-bottom: 6px;
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.detail-label {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.detail-value {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.code-value {
+  font-family: monospace;
+  font-weight: bold;
+}

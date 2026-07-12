@@ -25,6 +25,7 @@ interface Plan {
   name: string;
   description: string | null;
   price: number;
+  annual_price?: number;
   duration_months: number;
   has_bills: boolean;
   has_attendance: boolean;
@@ -39,11 +40,13 @@ const defaultForm = {
   description: "",
   customFeatures: [
     "إدارة الطلاب والمجموعات",
+    "نظام الخصومات وتعديل ملف الطالب",
     "التقارير المالية",
     "الحضور والغياب + QR",
     "المصروفات والفواتير"
   ] as string[],
   price: "" as string | number,
+  annual_price: "" as string | number,
   duration_months: 1,
   has_bills: false,
   has_attendance: false,
@@ -56,8 +59,11 @@ function parseDescription(desc: string | null) {
   if (!desc) return { summary: "", customFeatures: [] };
   try {
     const parsed = JSON.parse(desc);
-    if (parsed && typeof parsed === "object" && Array.isArray(parsed.customFeatures)) {
-      return { summary: parsed.summary || "", customFeatures: parsed.customFeatures as string[] };
+    if (parsed && typeof parsed === "object") {
+      return { 
+        summary: parsed.summary || "", 
+        customFeatures: Array.isArray(parsed.customFeatures) ? parsed.customFeatures : []
+      };
     }
   } catch (e) {}
   return { summary: desc, customFeatures: [] };
@@ -82,6 +88,7 @@ export default function PlansPage() {
   const [editingPlan, setEditingPlan] = useState<Plan | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const [isAnnual, setIsAnnual] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -104,33 +111,36 @@ export default function PlansPage() {
         const defaultPlans = [
           {
             id: "plan-1",
-            name: "باقة الحضور والغياب",
-            description: JSON.stringify({ summary: "إدارة كاملة لحضور وغياب الطلاب مع دعم QR Code", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية", "الحضور والغياب + QR"] }),
-            price: 150,
+            name: "الباقة الأساسية",
+            description: JSON.stringify({ summary: "مثالية للمعلم المستقل والمجموعات الصغيرة", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية المبسطة", "نظام الخصومات وتعديل ملف الطالب"] }),
+            price: 250,
+            annual_price: 2500,
             duration_months: 1,
             has_bills: false,
-            has_attendance: true,
+            has_attendance: false,
             has_center_mode: false,
             color: "#14b8a6",
             is_active: true
           },
           {
             id: "plan-2",
-            name: "الباقة الشاملة",
-            description: JSON.stringify({ summary: "إدارة الحضور والغياب بالإضافة إلى إدارة المصروفات والفواتير", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية", "المصروفات والفواتير", "الحضور والغياب + QR"] }),
-            price: 250,
+            name: "الباقة المحترفة",
+            description: JSON.stringify({ summary: "الأكثر مبيعاً - إدارة احترافية وأتمتة كاملة", customFeatures: ["إدارة الطلاب والمجموعات", "نظام الخصومات وتعديل ملف الطالب", "الحضور والغياب + QR", "المصروفات والفواتير"] }),
+            price: 450,
+            annual_price: 4500,
             duration_months: 1,
             has_bills: true,
             has_attendance: true,
             has_center_mode: false,
-            color: "#8b5cf6",
+            color: "#3b82f6",
             is_active: true
           },
           {
             id: "plan-3",
-            name: "باقة السنتر المتكاملة",
-            description: JSON.stringify({ summary: "النظام الشامل مع إمكانية إضافة وإدارة معلمين فرعيين تحت حسابك الخاص", customFeatures: ["إدارة الطلاب والمجموعات", "التقارير المالية والمصروفات", "الحضور والغياب + QR", "إدارة حسابات المعلمين الفرعيين"] }),
-            price: 500,
+            name: "باقة السنتر",
+            description: JSON.stringify({ summary: "للمعلمين الكبار والسناتر - إدارة الفريق الفرعي وتعدد المدرسين", customFeatures: ["جميع مميزات الباقة المحترفة", "نظام السنتر وصلاحيات المعاونين", "حسابات إيرادات المدرسين المتعددين"] }),
+            price: 850,
+            annual_price: 8500,
             duration_months: 1,
             has_bills: true,
             has_attendance: true,
@@ -165,6 +175,7 @@ export default function PlansPage() {
       description: summary,
       customFeatures: customFeatures,
       price: plan.price,
+      annual_price: plan.annual_price || 0,
       duration_months: plan.duration_months,
       has_bills: plan.has_bills,
       has_attendance: plan.has_attendance,
@@ -183,6 +194,8 @@ export default function PlansPage() {
     if (!form.name.trim()) { showToast("اسم الباقة مطلوب", "error"); return; }
     setSaving(true);
     
+    const parsedAnnualPrice = Number(form.annual_price) || 0;
+
     // Serialize description and custom features
     const payloadDesc = JSON.stringify({
       summary: form.description,
@@ -198,6 +211,7 @@ export default function PlansPage() {
           name: form.name,
           description: payloadDesc,
           price: parsedPrice,
+          annual_price: parsedAnnualPrice,
           duration_months: form.duration_months,
           has_bills: form.has_bills,
           has_attendance: form.has_attendance,
@@ -208,11 +222,11 @@ export default function PlansPage() {
         
         if (error) throw error;
 
-        updatedPlans = plans.map(p => p.id === editingPlan.id ? { ...p, ...form, price: parsedPrice, description: payloadDesc } : p);
+        updatedPlans = plans.map(p => p.id === editingPlan.id ? { ...p, ...form, price: parsedPrice, annual_price: parsedAnnualPrice, description: payloadDesc } : p);
         showToast("✓ تم تحديث الباقة بنجاح");
       } else {
         const { customFeatures, ...restForm } = form;
-        const newPlan = { id: `plan-${Date.now()}`, ...restForm, price: parsedPrice, description: payloadDesc, created_at: new Date().toISOString() };
+        const newPlan = { id: `plan-${Date.now()}`, ...restForm, price: parsedPrice, annual_price: parsedAnnualPrice, description: payloadDesc, created_at: new Date().toISOString() };
         
         const { error } = await supabase.from("plans").insert([newPlan]);
         if (error) throw error;
@@ -247,21 +261,50 @@ export default function PlansPage() {
 
   return (
     <div style={{ padding: "2rem", minHeight: "100vh", background: "var(--bg-primary)" }}>
-      {/* Header */}
-      <div style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "1rem" }}>
+      <div style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "1rem" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.4rem" }}>
             <Link href="/admin" style={{ color: "var(--text-muted)", textDecoration: "none", display: "flex", alignItems: "center", gap: "0.3rem", fontSize: "0.88rem" }}>
               <ArrowRight size={15} /> لوحة المدير
             </Link>
           </div>
-          <h1 style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>إدارة الباقات</h1>
-          <p style={{ color: "var(--text-secondary)" }}>عرّف باقات الاشتراك وحدد المميزات المتاحة في كل باقة</p>
+          <h1 style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>باقات الاشتراك</h1>
+          <p style={{ color: "var(--text-secondary)" }}>اختر الباقة المناسبة لطبيعة عملك لتنظيم سنترك بكفاءة تامة</p>
         </div>
-        <button className="btn btn-primary" onClick={openCreate}>
-          <Plus size={18} />
-          <span>باقة جديدة</span>
-        </button>
+        
+        <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
+          {/* Toggle Switch */}
+          <div style={{ 
+            display: "inline-flex", alignItems: "center", background: "var(--bg-secondary)", 
+            padding: "4px", borderRadius: "30px", border: "1px solid var(--border-color)"
+          }}>
+            <button 
+              onClick={() => setIsAnnual(false)}
+              style={{
+                background: !isAnnual ? "var(--color-teal)" : "transparent",
+                color: !isAnnual ? "#fff" : "var(--text-secondary)",
+                padding: "8px 20px", borderRadius: "24px", border: "none",
+                cursor: "pointer", fontSize: "0.95rem", fontWeight: !isAnnual ? 600 : 400,
+                transition: "all 0.3s ease"
+              }}
+            >شهري</button>
+            <button 
+              onClick={() => setIsAnnual(true)}
+              style={{
+                background: isAnnual ? "var(--color-teal)" : "transparent",
+                color: isAnnual ? "#fff" : "var(--text-secondary)",
+                padding: "8px 20px", borderRadius: "24px", border: "none",
+                cursor: "pointer", fontSize: "0.95rem", fontWeight: isAnnual ? 600 : 400,
+                transition: "all 0.3s ease"
+              }}
+            >سنوي (وفر شهرين)</button>
+          </div>
+
+          <button className="btn btn-primary" onClick={openCreate}>
+            <Plus size={18} />
+            <span>باقة جديدة</span>
+          </button>
+        </div>
       </div>
 
       {/* Plans Grid */}
@@ -307,13 +350,20 @@ export default function PlansPage() {
               </div>
 
               {/* Price */}
-              <div style={{ marginBottom: "1.25rem" }}>
-                <span style={{ fontSize: "2rem", fontWeight: 900, color: plan.color, fontFamily: "JetBrains Mono, monospace" }}>
-                  {plan.price.toLocaleString("ar-EG")}
-                </span>
-                <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginRight: "0.35rem" }}>
-                  جنيه / {plan.duration_months === 1 ? "شهر" : `${plan.duration_months} أشهر`}
-                </span>
+              <div style={{ marginBottom: "1.25rem", display: "flex", flexDirection: "column" }}>
+                <div>
+                  <span style={{ fontSize: "2.5rem", fontWeight: 900, color: plan.color, fontFamily: "JetBrains Mono, monospace" }}>
+                    {isAnnual ? (plan.annual_price || plan.price * 10).toLocaleString("ar-EG") : plan.price.toLocaleString("ar-EG")}
+                  </span>
+                  <span style={{ fontSize: "0.95rem", color: "var(--text-muted)", marginRight: "0.35rem" }}>
+                    جنيه / {isAnnual ? "سنوياً" : "شهرياً"}
+                  </span>
+                </div>
+                {isAnnual && plan.price > 0 && (
+                  <div style={{ fontSize: "0.85rem", color: "#10b981", fontWeight: 600, marginTop: "4px" }}>
+                    يوفر {(plan.price * 12) - (plan.annual_price || plan.price * 10)} جنيه مقارنة بالدفع الشهري!
+                  </div>
+                )}
               </div>
 
               {/* Custom Features */}
@@ -328,6 +378,25 @@ export default function PlansPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Subscribe Button */}
+              <button style={{
+                width: "100%", marginTop: "1.5rem", padding: "10px",
+                borderRadius: "8px", border: `1px solid ${plan.color}`,
+                background: "transparent", color: plan.color,
+                fontWeight: 600, fontSize: "1rem", cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.background = plan.color;
+                e.currentTarget.style.color = "#fff";
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = plan.color;
+              }}>
+                اشترك الآن
+              </button>
             </div>
           ))}
         </div>
@@ -411,7 +480,7 @@ export default function PlansPage() {
 
               <div className="form-row">
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">السعر (جنيه)</label>
+                  <label className="form-label">السعر الشهري (جنيه)</label>
                   <input 
                     type="number" 
                     className="form-input" 
@@ -421,8 +490,14 @@ export default function PlansPage() {
                   />
                 </div>
                 <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">المدة (أشهر)</label>
-                  <input type="number" className="form-input" value={form.duration_months} onChange={e => setForm({ ...form, duration_months: Number(e.target.value) })} min={1} max={24} />
+                  <label className="form-label">السعر السنوي (جنيه)</label>
+                  <input 
+                    type="number" 
+                    className="form-input" 
+                    value={form.annual_price === 0 ? "" : form.annual_price} 
+                    onChange={e => setForm({ ...form, annual_price: e.target.value === "" ? 0 : Number(e.target.value) })} 
+                    min={0} 
+                  />
                 </div>
               </div>
 

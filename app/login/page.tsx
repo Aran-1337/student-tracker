@@ -130,7 +130,20 @@ export default function LoginPage() {
         </form>
 
         {errorMsg && (
-          <div className="alert-toast alert-error" style={{ position: "static", marginTop: "1.5rem", animation: "none" }}>
+          <div style={{
+            background: "rgba(239, 68, 68, 0.1)",
+            border: "1px solid rgba(239, 68, 68, 0.2)",
+            color: "#f87171",
+            padding: "0.85rem 1rem",
+            borderRadius: "8px",
+            marginTop: "1.5rem",
+            fontSize: "0.9rem",
+            textAlign: "center",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.5rem"
+          }}>
             <span>{errorMsg}</span>
           </div>
         )}

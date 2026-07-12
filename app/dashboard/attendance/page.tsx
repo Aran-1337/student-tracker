@@ -12,7 +12,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Download,
-  ScanLine
+  ScanLine,
+  Printer
 } from "lucide-react";
 import Link from "next/link";
 
@@ -386,9 +387,11 @@ export default function AttendancePage() {
               {selectedGroup ? ` — ${selectedGroup.name}` : ""}
             </span>
           </h2>
-          <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-            {filteredStudents.length} طالب
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+              {filteredStudents.length} طالب
+            </span>
+          </div>
         </div>
 
         {filteredStudents.length === 0 ? (
