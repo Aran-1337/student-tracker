@@ -10,7 +10,6 @@ import { Users, Plus, Trash2, Edit3, Save, X, AlertCircle } from "lucide-react";
 interface SubTeacher {
   id: string;
   name: string;
-  name: string;
   subject?: string;
   grade_ids?: string[];
   created_at: string;
