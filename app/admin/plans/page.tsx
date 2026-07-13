@@ -55,7 +55,7 @@ const defaultForm = {
   is_active: true
 };
 
-function parseDescription(desc: string | null) {
+function parseDescription(desc: string | null): { summary: string; customFeatures: string[] } {
   if (!desc) return { summary: "", customFeatures: [] };
   try {
     const parsed = JSON.parse(desc);
