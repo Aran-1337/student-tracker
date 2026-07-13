@@ -39,7 +39,7 @@ export default function CenterTeachersPage() {
 
       const [data, gradesData] = await Promise.all([
         SubTeachersService.getSubTeachersByCenterId(session.user.id),
-        GradesService.getAllGrades()
+        GradesService.getGradesByTeacherId(session.user.id)
       ]);
 
       setTeachers(data || []);

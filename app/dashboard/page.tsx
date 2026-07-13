@@ -95,9 +95,9 @@ export default function DashboardOverview() {
         }
 
         const [gradesData, groupsData, studentsData] = await Promise.all([
-          GradesService.getAllGrades(),
-          GroupsService.getAllGroups(),
-          StudentsService.getAllStudents()
+          GradesService.getGradesByTeacherId(currentUserId),
+          GroupsService.getGroupsByTeacherId(currentUserId),
+          StudentsService.getStudentsByTeacherId(currentUserId)
         ]);
 
         setGrades(gradesData);

@@ -68,8 +68,7 @@ export default function SettingsPage() {
           setBooks(teacher.books || []);
         }
 
-        const allGrades = await GradesService.getAllGrades();
-        setGrades(allGrades);
+        setGrades(gradesData);
         setStudents(studentsData);
       } catch (err: any) {
         showToast("حدث خطأ أثناء تحميل الإعدادات.", "error");

@@ -82,9 +82,9 @@ export default function StudentsManagement() {
         setUserId(session.user.id);
 
         const [groupsData, studentsData, gradesData, teacherProfile] = await Promise.all([
-          GroupsService.getAllGroups(),
-          StudentsService.getAllStudents(),
-          GradesService.getAllGrades(),
+          GroupsService.getGroupsByTeacherId(session.user.id),
+          StudentsService.getStudentsByTeacherId(session.user.id),
+          GradesService.getGradesByTeacherId(session.user.id),
           TeachersService.getTeacherProfile(session.user.id)
         ]);
 

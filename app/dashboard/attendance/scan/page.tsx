@@ -83,9 +83,9 @@ export default function QRScanPage() {
         setUserId(session.user.id);
 
         const [grpData, stData, grdData] = await Promise.all([
-          GroupsService.getAllGroups(),
-          StudentsService.getAllStudents(),
-          GradesService.getAllGrades()
+          GroupsService.getGroupsByTeacherId(session.user.id),
+          StudentsService.getStudentsByTeacherId(session.user.id),
+          GradesService.getGradesByTeacherId(session.user.id)
         ]);
 
         setGroups(grpData);
