@@ -62,7 +62,7 @@ export function StudentProfileModal({
     try {
       // Clean up empty strings for numbers
       const sanitizedData = { ...formData };
-      if (sanitizedData.discount_value === '') {
+      if ((sanitizedData.discount_value as unknown as string) === '') {
         sanitizedData.discount_value = 0;
       }
       
