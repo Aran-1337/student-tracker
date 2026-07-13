@@ -3,12 +3,14 @@ import { AttendanceRecord } from "@/lib/types";
 
 export const AttendanceRepository = {
   async getAttendanceRecords(month: number, year: number): Promise<AttendanceRecord[]> {
-    // Note: If you want to filter by teacher_id, you might need to join students or add teacher_id to attendance_records.
-    // Assuming the current schema doesn't have teacher_id on attendance_records directly, we fetch all for now, 
-    // or you can refine this later in the services.
+    // RLS on attendance_records uses teacher_id = auth.uid(), so this is already safe.
+    // The eq("teacher_id") filter below is an extra application-level guard.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return [];
     const { data, error } = await supabase
       .from("attendance_records")
       .select("*")
+      .eq("teacher_id", session.user.id)
       .eq("month", month)
       .eq("year", year);
     if (error) throw error;
