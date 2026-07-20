@@ -41,6 +41,7 @@ export default function SettingsPage() {
   const [deletedGradeIds, setDeletedGradeIds] = useState<string[]>([]);
   const [newGradeName, setNewGradeName] = useState("");
   const [newGradePrice, setNewGradePrice] = useState("");
+  const [newGradePrefix, setNewGradePrefix] = useState("");
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -123,7 +124,8 @@ export default function SettingsPage() {
           // 3. Update Existing Grades (we assume they might be modified, so we just update their price/name)
           await GradesService.updateGrade(g.id, {
             name: g.name,
-            monthly_price: g.monthly_price
+            monthly_price: g.monthly_price,
+            prefix: g.prefix || ''
           });
         }
       }
@@ -209,7 +211,7 @@ export default function SettingsPage() {
       id: `temp_${Date.now()}`,
       name: newGradeName,
       start_code: 1,
-      prefix: '',
+      prefix: newGradePrefix,
       monthly_price: Number(newGradePrice),
       teacher_id: userId
     };
@@ -217,6 +219,7 @@ export default function SettingsPage() {
     setGrades([...grades, newGrade]);
     setNewGradeName("");
     setNewGradePrice("");
+    setNewGradePrefix("");
   };
 
   const handleDeleteGrade = (gradeId: string) => {
@@ -305,10 +308,22 @@ export default function SettingsPage() {
                     <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{grade.name}</h3>
                   </div>
                   <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-                    <div style={{ width: "180px" }}>
+                    <div style={{ width: "120px" }}>
+                      <Input
+                        type="text"
+                        placeholder="الكود (اختياري)"
+                        value={grade.prefix || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const newGrades = grades.map(g => g.id === grade.id ? { ...g, prefix: val } : g);
+                          setGrades(newGrades);
+                        }}
+                      />
+                    </div>
+                    <div style={{ width: "150px" }}>
                       <Input 
                         type="number"
-                        placeholder="السعر (ج.م/شهرياً)"
+                        placeholder="السعر (شهرياً)"
                         value={grade.monthly_price === null || grade.monthly_price === undefined ? "" : grade.monthly_price}
                         onChange={(e) => {
                           const val = e.target.value ? Number(e.target.value) : null;
@@ -353,7 +368,16 @@ export default function SettingsPage() {
                     <option value="الصف الثالث الثانوي">الصف الثالث الثانوي</option>
                   </select>
                 </div>
-                <div style={{ flex: "1 1 200px" }}>
+                <div style={{ flex: "1 1 120px" }}>
+                  <Input
+                    type="text"
+                    placeholder="كود السنة (اختياري)"
+                    value={newGradePrefix}
+                    onChange={(e) => setNewGradePrefix(e.target.value)}
+                    style={{ border: "1px solid var(--border-color)" }}
+                  />
+                </div>
+                <div style={{ flex: "1 1 150px" }}>
                   <Input
                     type="number"
                     placeholder="السعر (ج.م/شهرياً) *"

@@ -51,6 +51,7 @@ export default function StudentsManagement() {
   const [studentName, setStudentName] = useState("");
   const [studentGroupId, setStudentGroupId] = useState("");
   const [studentGradeId, setStudentGradeId] = useState("");
+  const [studentParentPhone, setStudentParentPhone] = useState("");
 
   // Bulk selection state
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
@@ -139,12 +140,14 @@ export default function StudentsManagement() {
         group_id: selectedGroupIdVal,
         grade_id: studentGradeId,
         months: initialMonths,
-        received_books: []
+        received_books: [],
+        parent_phone: studentParentPhone
       }, students);
 
       setStudents([...students, newStudent]);
       setStudentName("");
       setStudentGroupId("");
+      setStudentParentPhone("");
       showToast("تم إضافة الطالب بنجاح.");
     } catch (err: any) {
       showToast(err.message || "فشل إضافة الطالب.", "error");
@@ -317,6 +320,17 @@ export default function StudentsManagement() {
                   placeholder="الاسم الكامل للطالب"
                   value={studentName}
                   onChange={(e) => setStudentName(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <Input
+                  label="رقم هاتف ولي الأمر (اختياري)"
+                  id="sParentPhone"
+                  type="tel"
+                  placeholder="01012345678"
+                  value={studentParentPhone}
+                  onChange={(e) => setStudentParentPhone(e.target.value)}
+                  style={{ direction: "ltr", textAlign: "right" }}
                 />
               </div>
               <div className="form-group">
