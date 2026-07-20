@@ -811,9 +811,9 @@ select.form-input option {
     min-height: 100vh;
   }
 
-  /* Sidebar becomes a slim fixed top bar — override desktop fixed right */
+  /* Sidebar becomes a slim sticky top bar — override desktop fixed right */
   .sidebar {
-    position: fixed;
+    position: sticky;
     top: 0;
     right: 0;
     left: 0;
@@ -828,11 +828,10 @@ select.form-input option {
     -webkit-backdrop-filter: blur(16px);
   }
 
-  /* Remove desktop right margin, add top padding instead */
+  /* Remove desktop right margin */
   .content-area {
     margin-right: 0 !important;
     padding: 1rem;
-    padding-top: calc(60px + 1rem);
   }
 
   .sidebar-inner {
@@ -872,11 +871,11 @@ select.form-input option {
 
   /* The drawer container when open */
   .sidebar-menu.open {
-    position: fixed;
-    top: 56px; /* below the top bar */
+    position: absolute;
+    top: 100%; /* below the top bar */
     right: 0;
     left: 0;
-    bottom: 0;
+    height: 100vh;
     background: rgba(15, 23, 42, 0.99);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
