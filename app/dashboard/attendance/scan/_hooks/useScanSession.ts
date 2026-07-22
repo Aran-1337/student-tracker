@@ -10,32 +10,28 @@ import { GradesService } from "@/lib/services/gradesService";
 import { AttendanceService } from "@/lib/services/attendanceService";
 import { AttendanceQueue, OfflineCache } from "@/lib/offlineQueue";
 
-export interface LastScan {
-  name: string;
-  success: boolean;
-}
-
-export interface CrossGroupConfirm {
-  student: Student;
-  originalGroupName: string;
-}
+export interface LastScan { name: string; success: boolean; }
+export interface CrossGroupConfirm { student: Student; originalGroupName: string; }
 
 const SCAN_COOLDOWN_MS = 3000;
+const DAYS_AR = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
 function detectCurrentGroup(groups: Group[]): Group | null {
-  const DAYS_AR = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
   const now = new Date();
   const todayAr = DAYS_AR[now.getDay()];
   const nowMins = now.getHours() * 60 + now.getMinutes();
-  const WINDOW = 45;
-
-  return groups.find(g => {
+  console.log("[AutoDetect] now:", now.toLocaleTimeString(), "todayAr:", todayAr, "nowMins:", nowMins);
+  const match = groups.find(g => {
     if (!g.day_of_week || !g.time) return false;
-    if (!g.day_of_week.includes(todayAr)) return false;
+    const days = g.day_of_week.split(/\s*[,،]\s*|\s+،\s+/).map(d => d.trim());
+    if (!days.includes(todayAr)) return false;
     const [h, m] = g.time.split(":").map(Number);
-    const groupMins = h * 60 + m;
-    return nowMins >= groupMins - WINDOW && nowMins <= groupMins + WINDOW;
-  }) ?? null;
+    const gMins = h * 60 + m;
+    console.log("[AutoDetect] group:", g.name, "gMins:", gMins, "window:", gMins - 5, "-", gMins + 20);
+    return nowMins >= gMins - 5 && nowMins <= gMins + 20;
+  });
+  console.log("[AutoDetect] matched:", match?.name ?? "none");
+  return match ?? null;
 }
 
 export function useScanSession() {
@@ -45,10 +41,10 @@ export function useScanSession() {
   const [students, setStudents] = useState<Student[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
 
-  const now = new Date();
+  const today = new Date().toISOString().split("T")[0];
   const [selectedGradeId, setSelectedGradeId] = useState("all");
   const [selectedGroupId, setSelectedGroupId] = useState("");
-  const [sessionDate, setSessionDate] = useState(now.toISOString().split("T")[0]);
+  const [sessionDate, setSessionDate] = useState(today);
   const [autoDetected, setAutoDetected] = useState(false);
 
   const [scanning, setScanning] = useState(false);
@@ -62,24 +58,31 @@ export function useScanSession() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const processingRef = useRef<Set<string>>(new Set());
   const scannedIdsRef = useRef<Map<string, number>>(new Map());
-  // keep latest values accessible inside scanner callback without re-creating it
-  const stateRef = useRef({ userId: null as string | null, selectedGroupId: "", scannerPaused: false, students: [] as Student[], groups: [] as Group[], scannedToday: [] as ScannedEntry[], sessionDate: "" });
+  const autoGroupRef = useRef<string | null>(null);
+  const stateRef = useRef({
+    userId: null as string | null,
+    selectedGroupId: "",
+    scannerPaused: false,
+    students: [] as Student[],
+    groups: [] as Group[],
+    scannedToday: [] as ScannedEntry[],
+    sessionDate: today,
+  });
   const scannerDivId = "qr-reader";
+
+  useEffect(() => {
+    stateRef.current = { userId, selectedGroupId, scannerPaused, students, groups, scannedToday, sessionDate };
+  }, [userId, selectedGroupId, scannerPaused, students, groups, scannedToday, sessionDate]);
 
   const showLastScan = useCallback((name: string, success: boolean) => {
     setLastScan({ name, success });
     setTimeout(() => setLastScan(null), 2500);
   }, []);
 
-  // keep stateRef in sync
-  useEffect(() => {
-    stateRef.current = { userId, selectedGroupId, scannerPaused, students, groups, scannedToday, sessionDate };
-  }, [userId, selectedGroupId, scannerPaused, students, groups, scannedToday, sessionDate]);
-
-  // ── startScanner (stable ref — never changes) ─────────────────
+  // ── startScanner ──────────────────────────────────────────────
   const startScanner = useCallback(async (groupId?: string) => {
     const gid = groupId ?? stateRef.current.selectedGroupId;
-    if (!gid) return;
+    if (!gid || scannerRef.current) return; // already running
     try {
       const config = { fps: 6, qrbox: { width: 220, height: 220 } };
       const qr = new Html5Qrcode(scannerDivId);
@@ -111,7 +114,6 @@ export function useScanSession() {
           return;
         }
 
-        // process attendance inline
         try {
           const [syear, smonth] = sessionDate.split("-").map(Number);
           await AttendanceService.upsertAttendanceRecord({
@@ -142,12 +144,52 @@ export function useScanSession() {
       }
       setScanning(true);
     } catch (err: any) {
+      scannerRef.current = null;
       showLastScan(`تعذّر تشغيل الكاميرا: ${err?.message ?? err}`, false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showLastScan]);
 
-  // ── Load data + auto-detect + auto-start ──────────────────────
+  const stopScanner = useCallback(async () => {
+    if (scannerRef.current) {
+      try { await scannerRef.current.stop(); } catch {}
+      try { scannerRef.current.clear(); } catch {}
+      scannerRef.current = null;
+    }
+    setScanning(false);
+  }, []);
+
+  // ── Auto-detect: sets group + starts camera, never touches scannedToday ──
+  const applyAutoDetect = useCallback(async (grpData: Group[]) => {
+    const match = detectCurrentGroup(grpData);
+    if (match) {
+      if (match.id === autoGroupRef.current && scannerRef.current) return; // same group & camera running, nothing to do
+      autoGroupRef.current = match.id;
+      if (scannerRef.current) {
+        try { await scannerRef.current.stop(); } catch {}
+        try { scannerRef.current.clear(); } catch {}
+        scannerRef.current = null;
+        setScanning(false);
+      }
+      setSelectedGroupId(match.id);
+      if (match.grade_id) setSelectedGradeId(match.grade_id);
+      setAutoDetected(true);
+      stateRef.current.selectedGroupId = match.id;
+      // scannedToday loaded by loadSessionAttendance useEffect below
+      setIsStarting(true);
+      await startScanner(match.id);
+      setIsStarting(false);
+    } else {
+      if (autoGroupRef.current && scannerRef.current) {
+        autoGroupRef.current = null;
+        await stopScanner();
+        setAutoDetected(false);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startScanner, stopScanner]);
+
+  // ── Load data on mount ────────────────────────────────────────
   useEffect(() => {
     async function load() {
       try {
@@ -178,21 +220,9 @@ export function useScanSession() {
         setGrades(grdData);
         stateRef.current.students = stData;
         stateRef.current.groups = grpData;
-
-        // auto-detect group
-        const match = detectCurrentGroup(grpData);
-        if (match) {
-          setSelectedGroupId(match.id);
-          if (match.grade_id) setSelectedGradeId(match.grade_id);
-          setAutoDetected(true);
-          stateRef.current.selectedGroupId = match.id;
-
-          // auto-start camera
-          setIsStarting(true);
-          await startScanner(match.id);
-          setIsStarting(false);
-        }
-      } catch {
+        console.log("[Load] groups loaded:", grpData.length, grpData.map(g => g.name + "|" + g.day_of_week + "|" + g.time));
+      } catch (e) {
+        console.error("[Load] error:", e);
         const grpData = OfflineCache.loadGroups();
         setGroups(grpData);
         setStudents(OfflineCache.loadStudents());
@@ -205,7 +235,28 @@ export function useScanSession() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Load session attendance ───────────────────────────────────
+  // keep latest applyAutoDetect in a ref so effects always call the fresh version
+  const applyAutoDetectRef = useRef(applyAutoDetect);
+  useEffect(() => { applyAutoDetectRef.current = applyAutoDetect; }, [applyAutoDetect]);
+
+  // ── Fire auto-detect once data is ready ──────────────────────
+  useEffect(() => {
+    if (loading || groups.length === 0) return;
+    console.log("[AutoDetect] triggering with", groups.length, "groups");
+    applyAutoDetectRef.current(groups);
+  }, [loading, groups]);
+
+  // ── Periodic auto-detect every 30s ───────────────────────────
+  useEffect(() => {
+    if (loading) return;
+    const interval = setInterval(() => {
+      const grpData = stateRef.current.groups;
+      if (grpData.length > 0) applyAutoDetectRef.current(grpData);
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  // ── Load session attendance from Supabase after group is set ─
   useEffect(() => {
     if (!userId || !selectedGroupId || students.length === 0) return;
     async function loadSessionAttendance() {
@@ -221,7 +272,11 @@ export function useScanSession() {
           if (data) {
             setScannedToday(data.map(r => {
               const st = students.find(s => s.id === r.student_id);
-              return { studentId: r.student_id, studentName: st?.name ?? "طالب غير معروف", time: new Date(r.created_at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) };
+              return {
+                studentId: r.student_id,
+                studentName: st?.name ?? "طالب غير معروف",
+                time: new Date(r.created_at).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }),
+              };
             }));
           }
         } catch {}
@@ -229,7 +284,11 @@ export function useScanSession() {
         const queued = AttendanceQueue.getAll().filter(r => r.group_id === selectedGroupId && r.session_date === sessionDate);
         setScannedToday(queued.map(r => {
           const st = students.find(s => s.id === r.student_id);
-          return { studentId: r.student_id, studentName: st?.name ?? "طالب غير معروف", time: new Date(r._queuedAt).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) };
+          return {
+            studentId: r.student_id,
+            studentName: st?.name ?? "طالب غير معروف",
+            time: new Date(r._queuedAt).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }),
+          };
         }));
       }
     }
@@ -244,15 +303,6 @@ export function useScanSession() {
         try { scannerRef.current.clear(); } catch {}
       }
     };
-  }, []);
-
-  const stopScanner = useCallback(async () => {
-    if (scannerRef.current) {
-      try { await scannerRef.current.stop(); } catch {}
-      try { scannerRef.current.clear(); } catch {}
-      scannerRef.current = null;
-    }
-    setScanning(false);
   }, []);
 
   const handleQRSuccess = useCallback(async (decodedText: string) => {
@@ -319,6 +369,7 @@ export function useScanSession() {
   }, [scanning, stopScanner]);
 
   const handleGroupChange = useCallback(async (v: string) => {
+    autoGroupRef.current = null; // manual override cancels auto
     setSelectedGroupId(v);
     stateRef.current.selectedGroupId = v;
     setScannedToday([]);
