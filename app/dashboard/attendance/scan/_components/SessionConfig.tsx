@@ -22,6 +22,7 @@ interface Props {
   isStarting: boolean;
   manualCode: string;
   manualPlaceholder: string;
+  autoDetected?: boolean;
   onGradeChange: (v: string) => void;
   onGroupChange: (v: string) => void;
   onSessionDateChange: (v: string) => void;
@@ -36,6 +37,7 @@ export function SessionConfig({
   selectedGradeId, selectedGroupId, sessionDate,
   scanning, isStarting,
   manualCode, manualPlaceholder,
+  autoDetected,
   onGradeChange, onGroupChange, onSessionDateChange,
   onStartScanner, onStopScanner,
   onManualCodeChange, onManualSubmit,
@@ -53,7 +55,6 @@ export function SessionConfig({
           className="form-input"
           value={selectedGradeId}
           onChange={e => onGradeChange(e.target.value)}
-          disabled={scanning}
         >
           <option value="all">-- كل السنين --</option>
           {grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -61,12 +62,18 @@ export function SessionConfig({
       </div>
 
       <div className="form-group">
-        <label className="form-label">المجموعة</label>
+        <label className="form-label">
+          المجموعة
+          {autoDetected && (
+            <span style={{ marginRight: "0.4rem", fontSize: "0.75rem", color: "var(--color-teal)", fontWeight: 600 }}>
+              ✦ تم الاكتشاف تلقائياً
+            </span>
+          )}
+        </label>
         <select
           className="form-input"
           value={selectedGroupId}
           onChange={e => onGroupChange(e.target.value)}
-          disabled={scanning}
         >
           <option value="">اختر المجموعة...</option>
           {groups
@@ -87,7 +94,6 @@ export function SessionConfig({
           className="form-input"
           value={sessionDate}
           onChange={e => onSessionDateChange(e.target.value)}
-          disabled={scanning}
         />
       </div>
 

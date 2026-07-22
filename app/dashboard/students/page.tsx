@@ -56,6 +56,7 @@ export default function StudentsManagement() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
   const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingDeleteRef = useRef<PendingDelete | null>(null);
 
   const showToast = (message: string, type: "success" | "error" = "success") =>
     setToast({ message, type });
@@ -154,7 +155,9 @@ export default function StudentsManagement() {
   const scheduleDelete = (ids: string[], removedStudents: Student[], message: string) => {
     setStudents((prev) => prev.filter((s) => !ids.includes(s.id)));
     setSelectedIds(new Set());
-    setPendingDelete({ ids, students: removedStudents, message });
+    const pending = { ids, students: removedStudents, message };
+    pendingDeleteRef.current = pending;
+    setPendingDelete(pending);
 
     if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
     deleteTimerRef.current = setTimeout(async () => {
@@ -164,16 +167,24 @@ export default function StudentsManagement() {
       } catch {
         showToast("فشل الحذف من قاعدة البيانات.", "error");
       }
+      pendingDeleteRef.current = null;
       setPendingDelete(null);
     }, 5000);
   };
 
-  const handleUndoDelete = () => {
-    if (!pendingDelete) return;
+  const handleUndoDelete = useCallback(() => {
+    const pending = pendingDeleteRef.current;
+    if (!pending) return;
     if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
-    setStudents((prev) => [...pendingDelete.students, ...prev]);
+    setStudents((prev) => [...pending.students, ...prev]);
+    pendingDeleteRef.current = null;
     setPendingDelete(null);
-  };
+  }, []);
+
+  const handleDismissDelete = useCallback(() => {
+    pendingDeleteRef.current = null;
+    setPendingDelete(null);
+  }, []);
 
   const handleDeleteStudent = (studentId: string) => {
     const target = students.find((s) => s.id === studentId);
@@ -429,7 +440,7 @@ export default function StudentsManagement() {
         <UndoToast
           message={pendingDelete.message}
           onUndo={handleUndoDelete}
-          onDismiss={() => setPendingDelete(null)}
+          onDismiss={handleDismissDelete}
         />
       )}
 

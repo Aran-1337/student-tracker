@@ -20,6 +20,7 @@ export default function QRScanPage() {
     crossGroupConfirm, manualCode,
     manualPlaceholder, scannerDivId,
     groupStudentsCount,
+    autoDetected,
     handleGradeChange, handleGroupChange, handleSessionDateChange,
     startScanner, stopScanner,
     handleManualSubmit, setManualCode,
@@ -82,6 +83,7 @@ export default function QRScanPage() {
             isStarting={isStarting}
             manualCode={manualCode}
             manualPlaceholder={manualPlaceholder}
+            autoDetected={autoDetected}
             onGradeChange={handleGradeChange}
             onGroupChange={handleGroupChange}
             onSessionDateChange={handleSessionDateChange}

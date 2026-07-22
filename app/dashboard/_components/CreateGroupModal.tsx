@@ -100,6 +100,14 @@ export function CreateGroupModal({
       onError("يرجى تحديد وقت المجموعة.");
       return;
     }
+    if (!groupGradeId) {
+      onError("يرجى اختيار السنة الدراسية.");
+      return;
+    }
+    if (isPrivate && !groupMonthlyPrice) {
+      onError("يرجى إدخال سعر الاشتراك الشهري.");
+      return;
+    }
 
     // تحقق من اسم مكرر
     const duplicate = groups.find(
@@ -188,8 +196,9 @@ export function CreateGroupModal({
             value={groupGradeId}
             onChange={(e) => setGroupGradeId(e.target.value)}
             style={{ padding: "0.7rem 0.5rem" }}
+            required
           >
-            <option value="">-- بدون سنة دراسية --</option>
+            <option value="">-- اختر السنة الدراسية --</option>
             {grades.map((g) => (
               <option key={g.id} value={g.id}>{g.name}</option>
             ))}
@@ -254,7 +263,7 @@ export function CreateGroupModal({
         {isPrivate && (
           <div className="form-group" style={{ marginBottom: "1rem" }}>
             <Input
-              label="سعر الاشتراك الشهري (اختياري)"
+              label="سعر الاشتراك الشهري"
               id="gMonthlyPrice"
               type="number"
               min="1"

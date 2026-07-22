@@ -19,6 +19,7 @@ import { StatsGrid } from "./_components/StatsGrid";
 import { TodaySessions } from "./_components/TodaySessions";
 import { RecentActivity } from "./_components/RecentActivity";
 import { CreateGroupModal } from "./_components/CreateGroupModal";
+import { EditGroupModal } from "./_components/EditGroupModal";
 import { GroupsList } from "./_components/GroupsList";
 
 const arabicMonths = [
@@ -39,6 +40,7 @@ export default function DashboardOverview() {
   const [subTeachers, setSubTeachers] = useState<any[]>([]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const showToast = (message: string, type: "success" | "error" = "success") =>
@@ -88,6 +90,11 @@ export default function DashboardOverview() {
     }
     loadData();
   }, []);
+
+  const handleUpdateGroup = (updated: Group) => {
+    setGroups((prev) => prev.map((g) => g.id === updated.id ? updated : g));
+    showToast("تم تعديل المجموعة بنجاح.");
+  };
 
   const handleDeleteGroup = async (groupId: string) => {
     if (!confirm("هل أنت متأكد من حذف هذه المجموعة؟ سيتم إلغاء تعيين طلابها دون حذفهم.")) return;
@@ -159,6 +166,7 @@ export default function DashboardOverview() {
           subTeachers={subTeachers}
           hasCenterMode={hasCenterMode}
           onDelete={handleDeleteGroup}
+          onEdit={(group) => setEditingGroup(group)}
         />
       </div>
 
@@ -175,6 +183,18 @@ export default function DashboardOverview() {
           setGroups((prev) => [newGroup, ...prev]);
           showToast("تم إنشاء المجموعة بنجاح.");
         }}
+        onError={(msg) => showToast(msg, "error")}
+      />
+
+      <EditGroupModal
+        isOpen={!!editingGroup}
+        onClose={() => setEditingGroup(null)}
+        group={editingGroup}
+        grades={grades}
+        groups={groups}
+        hasCenterMode={hasCenterMode}
+        subTeachers={subTeachers}
+        onUpdated={handleUpdateGroup}
         onError={(msg) => showToast(msg, "error")}
       />
 

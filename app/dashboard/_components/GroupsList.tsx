@@ -11,6 +11,7 @@ interface GroupsListProps {
   subTeachers: any[];
   hasCenterMode: boolean;
   onDelete: (id: string) => void;
+  onEdit: (group: Group) => void;
 }
 
 export function GroupsList({
@@ -20,6 +21,7 @@ export function GroupsList({
   subTeachers,
   hasCenterMode,
   onDelete,
+  onEdit,
 }: GroupsListProps) {
   const ungrouped = groups.filter((g) => !g.grade_id);
 
@@ -48,6 +50,7 @@ export function GroupsList({
                 subTeacher={subTeachers.find((t) => t.id === group.sub_teacher_id)}
                 hasCenterMode={hasCenterMode}
                 onDelete={onDelete}
+                onEdit={onEdit}
               />
             ))}
           </div>
@@ -72,6 +75,7 @@ export function GroupsList({
                   subTeacher={subTeachers.find((t) => t.id === group.sub_teacher_id)}
                   hasCenterMode={hasCenterMode}
                   onDelete={onDelete}
+                  onEdit={onEdit}
                 />
               ))}
             </div>
@@ -94,6 +98,7 @@ export function GroupsList({
                 subTeacher={subTeachers.find((t) => t.id === group.sub_teacher_id)}
                 hasCenterMode={hasCenterMode}
                 onDelete={onDelete}
+                onEdit={onEdit}
               />
             ))}
           </div>

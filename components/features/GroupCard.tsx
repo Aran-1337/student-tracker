@@ -1,5 +1,5 @@
 import React from 'react';
-import { Users, Calendar, Clock, Trash2, Wallet, BookOpen } from 'lucide-react';
+import { Users, Calendar, Clock, Trash2, Wallet, BookOpen, Pencil } from 'lucide-react';
 import { Group, Student, SubTeacher } from '@/lib/types';
 
 // Replaces the individual group card rendering in app/dashboard/page.tsx
@@ -12,6 +12,7 @@ export interface GroupCardProps {
   subTeacher?: SubTeacher;
   hasCenterMode: boolean;
   onDelete?: (id: string) => void;
+  onEdit?: (group: Group) => void;
 }
 
 const formatTimeTo12H = (timeStr: string) => {
@@ -32,7 +33,8 @@ export function GroupCard({
   gradeName,
   subTeacher,
   hasCenterMode,
-  onDelete
+  onDelete,
+  onEdit,
 }: GroupCardProps) {
   const groupStudentCount = students.filter(s => s.group_id === group.id).length;
 
@@ -43,16 +45,28 @@ export function GroupCard({
           <h3 style={{ fontSize: "1.1rem", margin: 0 }}>{group.name}</h3>
           {group.is_private && <span className="private-badge">خاصة</span>}
         </div>
-        {onDelete && (
-          <button
-            className="btn btn-secondary btn-icon"
-            onClick={() => onDelete(group.id)}
-            style={{ border: "none", background: "none", width: "1.75rem", height: "1.75rem", padding: 0 }}
-            title="حذف المجموعة"
-          >
-            <Trash2 size={15} className="color-danger" />
-          </button>
-        )}
+        <div style={{ display: "flex", gap: "0.25rem" }}>
+          {onEdit && (
+            <button
+              className="btn btn-secondary btn-icon"
+              onClick={() => onEdit(group)}
+              style={{ border: "none", background: "none", width: "1.75rem", height: "1.75rem", padding: 0 }}
+              title="تعديل المجموعة"
+            >
+              <Pencil size={15} style={{ color: "var(--color-teal)" }} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              className="btn btn-secondary btn-icon"
+              onClick={() => onDelete(group.id)}
+              style={{ border: "none", background: "none", width: "1.75rem", height: "1.75rem", padding: 0 }}
+              title="حذف المجموعة"
+            >
+              <Trash2 size={15} className="color-danger" />
+            </button>
+          )}
+        </div>
       </div>
       
       <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", fontSize: "0.9rem", color: "var(--text-secondary)" }}>

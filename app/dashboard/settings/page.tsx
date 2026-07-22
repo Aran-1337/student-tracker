@@ -38,7 +38,7 @@ export default function SettingsPage() {
   const [students, setStudents] = useState<Student[]>([]);
 
   const [grades, setGrades] = useState<Grade[]>([]);
-  const [deletedGradeIds, setDeletedGradeIds] = useState<string[]>([]);
+
   const [newGradeName, setNewGradeName] = useState("");
   const [newGradePrice, setNewGradePrice] = useState("");
   const [newGradePrefix, setNewGradePrefix] = useState("");
@@ -98,12 +98,6 @@ export default function SettingsPage() {
 
     setSaveLoading(true);
     try {
-      // 1. Delete Grades
-      if (deletedGradeIds.length > 0) {
-        await Promise.all(deletedGradeIds.map(id => GradesService.deleteGrade(id)));
-        setDeletedGradeIds([]);
-      }
-
       // 2. Update Existing Grades
       await Promise.all(grades.map(g =>
         GradesService.updateGrade(g.id, {
@@ -202,12 +196,14 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDeleteGrade = (gradeId: string) => {
-    if (confirm("هل أنت متأكد من حذف هذه السنة الدراسية؟ (سيتم الحذف نهائياً عند حفظ التعديلات)")) {
-      if (!gradeId.startsWith("temp_")) {
-        setDeletedGradeIds([...deletedGradeIds, gradeId]);
-      }
+  const handleDeleteGrade = async (gradeId: string) => {
+    if (!confirm("هل أنت متأكد من حذف هذه السنة الدراسية؟")) return;
+    try {
+      await GradesService.deleteGrade(gradeId);
       setGrades(grades.filter(g => g.id !== gradeId));
+      showToast("تم حذف السنة الدراسية بنجاح.");
+    } catch (err: any) {
+      showToast(err.message || "فشل حذف السنة الدراسية.", "error");
     }
   };
 
