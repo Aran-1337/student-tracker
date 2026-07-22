@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { SystemSettingsService, SystemSettings } from "@/lib/services/systemSettingsService";
+import { OfflineCache } from "@/lib/offlineQueue";
 import { 
   LayoutDashboard, 
   Users, 
@@ -41,6 +42,20 @@ export default function DashboardLayout({
 
   useEffect(() => {
     async function checkSession() {
+      const isOnline = navigator.onLine;
+
+      // ── Offline: use cached teacher data ──────────────────────
+      if (!isOnline) {
+        const cached = OfflineCache.loadTeacher();
+        if (!cached) { router.replace("/login"); return; }
+        applyTeacherData(cached as any, "");
+        const cachedSettings = OfflineCache.loadSysSettings();
+        if (cachedSettings) setSysSettings(cachedSettings);
+        setLoading(false);
+        return;
+      }
+
+      // ── Online: normal flow ───────────────────────────────────
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         router.replace("/login");
@@ -95,57 +110,41 @@ export default function DashboardLayout({
       }
       
       if (teacherData) {
-        setTeacherName(teacherData.name || user.email?.split("@")[0] || "المعلم");
-        
-        const centerMode = teacherData.is_center_mode === true;
-        setHasCenterMode(centerMode);
-        
-        const billsEnabled = teacherData.has_bills_feature !== false;
-        setHasBills(billsEnabled);
-        
-        const attendanceEnabled = teacherData.has_attendance_feature !== false;
-        setHasAttendance(attendanceEnabled);
-
-        const expiredAtStr = teacherData.subscription_expires_at;
-        const startedAtStr = teacherData.subscription_started_at;
-
-        const active = teacherData.is_active !== false;
-        const expired = expiredAtStr 
-          ? new Date(expiredAtStr) < new Date()
-          : false;
-          
-        if (!active) {
-          if (!startedAtStr) {
-            setIsPending(true);
-          } else {
-            setIsBlocked(true);
-          }
-        } else if (expired) {
-          setIsBlocked(true);
-        }
-        
-        setIsAdmin(teacherData.is_admin === true);
-
-        if (pathname === "/dashboard/bills" && !billsEnabled) {
-          router.replace("/dashboard");
-          return;
-        }
-        if ((pathname === "/dashboard/attendance" || pathname === "/dashboard/attendance/scan") && !attendanceEnabled) {
-          router.replace("/dashboard");
-          return;
-        }
-        if (pathname === "/dashboard/teachers" && !centerMode) {
-          router.replace("/dashboard");
-          return;
-        }
+        OfflineCache.saveTeacher(teacherData as any);
+        applyTeacherData(teacherData, user.email?.split("@")[0] || "المعلم");
 
         const settings = await SystemSettingsService.getSettings();
         if (settings) {
           setSysSettings(settings);
+          OfflineCache.saveSysSettings(settings);
         }
       }
       
       setLoading(false);
+    }
+
+    function applyTeacherData(teacherData: any, fallbackName: string) {
+      setTeacherName(teacherData.name || fallbackName || "المعلم");
+      const centerMode = teacherData.is_center_mode === true;
+      setHasCenterMode(centerMode);
+      const billsEnabled = teacherData.has_bills_feature !== false;
+      setHasBills(billsEnabled);
+      const attendanceEnabled = teacherData.has_attendance_feature !== false;
+      setHasAttendance(attendanceEnabled);
+      const active = teacherData.is_active !== false;
+      const expired = teacherData.subscription_expires_at
+        ? new Date(teacherData.subscription_expires_at) < new Date()
+        : false;
+      if (!active) {
+        if (!teacherData.subscription_started_at) setIsPending(true);
+        else setIsBlocked(true);
+      } else if (expired) {
+        setIsBlocked(true);
+      }
+      setIsAdmin(teacherData.is_admin === true);
+      if (pathname === "/dashboard/bills" && !billsEnabled) { router.replace("/dashboard"); return; }
+      if ((pathname === "/dashboard/attendance" || pathname === "/dashboard/attendance/scan") && !attendanceEnabled) { router.replace("/dashboard"); return; }
+      if (pathname === "/dashboard/teachers" && !centerMode) { router.replace("/dashboard"); return; }
     }
     
     checkSession();

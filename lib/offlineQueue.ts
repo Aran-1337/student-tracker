@@ -1,4 +1,5 @@
 import { Student, Group, Grade, AttendanceRecord } from "@/lib/types";
+import type { SystemSettings } from "@/lib/services/systemSettingsService";
 
 const KEYS = {
   students: "ot_students",
@@ -6,6 +7,8 @@ const KEYS = {
   grades: "ot_grades",
   queue: "ot_attendance_queue",
   lastSync: "ot_last_sync",
+  teacher: "ot_teacher",
+  sysSettings: "ot_sys_settings",
 };
 
 export type QueuedRecord = Omit<AttendanceRecord, "id" | "created_at"> & {
@@ -50,6 +53,26 @@ export const OfflineCache = {
   },
   getLastSync(): string | null {
     return localStorage.getItem(KEYS.lastSync);
+  },
+
+  saveTeacher(data: Record<string, unknown>) {
+    localStorage.setItem(KEYS.teacher, JSON.stringify(data));
+  },
+  loadTeacher(): Record<string, unknown> | null {
+    try {
+      const raw = localStorage.getItem(KEYS.teacher);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  },
+
+  saveSysSettings(settings: SystemSettings) {
+    localStorage.setItem(KEYS.sysSettings, JSON.stringify(settings));
+  },
+  loadSysSettings(): SystemSettings | null {
+    try {
+      const raw = localStorage.getItem(KEYS.sysSettings);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
   },
 };
 

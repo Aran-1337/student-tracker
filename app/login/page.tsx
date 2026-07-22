@@ -15,8 +15,14 @@ export default function LoginPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in
     async function checkUser() {
+      // Offline: if we have cached teacher data, go straight to dashboard
+      if (!navigator.onLine) {
+        const cached = localStorage.getItem("ot_teacher");
+        if (cached) { router.replace("/dashboard"); return; }
+        setCheckingAuth(false);
+        return;
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         router.replace("/dashboard");
@@ -47,7 +53,7 @@ export default function LoginPage() {
         router.replace("/dashboard");
       }
     } catch {
-      setErrorMsg("حدث خطأ أثناء الاتصال بالخادم.");
+      setErrorMsg("لا يوجد اتصال بالإنترنت. يرجى الاتصال أولاً لتسجيل الدخول.");
     } finally {
       setLoading(false);
     }
