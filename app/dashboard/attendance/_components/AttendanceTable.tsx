@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { Student, AttendanceRecord } from "@/lib/types";
-import { CheckCircle2, AlertCircle, QrCode, CheckSquare, XSquare } from "lucide-react";
+import { CheckCircle2, AlertCircle, QrCode, Trash2, CheckSquare, XSquare } from "lucide-react";
 
 interface Props {
   students: Student[];
@@ -23,14 +22,6 @@ export function AttendanceTable({
   onToggle, onMarkAll, onClearSession, onShowQR,
 }: Props) {
   const today = new Date().toISOString().split("T")[0];
-  const [counted, setCounted] = useState<Set<string>>(new Set());
-
-  const toggleCounted = (id: string) =>
-    setCounted(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
 
   if (students.length === 0) {
     return (
@@ -78,7 +69,6 @@ export function AttendanceTable({
               );
             })}
             <th style={{ textAlign: "center", minWidth: 80 }}>النسبة</th>
-            <th style={{ textAlign: "center", minWidth: 56 }}>حصر</th>
             <th style={{ textAlign: "center", minWidth: 56 }}>QR</th>
           </tr>
         </thead>
@@ -129,15 +119,6 @@ export function AttendanceTable({
                       />
                     </div>
                   </div>
-                </td>
-                <td style={{ textAlign: "center" }}>
-                  <input
-                    type="checkbox"
-                    checked={counted.has(student.id)}
-                    onChange={() => toggleCounted(student.id)}
-                    style={{ width: 17, height: 17, cursor: "pointer", accentColor: "var(--color-teal)" }}
-                    title="حصر الطالب"
-                  />
                 </td>
                 <td style={{ textAlign: "center" }}>
                   <button className="qr-cell-btn" onClick={() => onShowQR(student)} title="عرض QR">
