@@ -42,84 +42,74 @@ export default function DashboardLayout({
 
   useEffect(() => {
     async function checkSession() {
-      const isOnline = navigator.onLine;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("no-session");
 
-      // ── Offline: use cached teacher data ──────────────────────
-      if (!isOnline) {
+        const user = session.user;
+
+        let { data: teacherData, error: teacherError } = await supabase
+          .from("teachers")
+          .select("name, is_active, has_bills_feature, has_attendance_feature, is_center_mode, is_admin, subscription_expires_at, subscription_started_at")
+          .eq("id", user.id)
+          .single();
+
+        if (teacherError) {
+          const { data: fallback } = await supabase
+            .from("teachers")
+            .select("name, is_active, is_admin")
+            .eq("id", user.id)
+            .single();
+          if (fallback) {
+            teacherData = {
+              ...fallback,
+              has_bills_feature: true,
+              has_attendance_feature: true,
+              is_center_mode: false,
+              subscription_expires_at: "",
+              subscription_started_at: "",
+            };
+            teacherError = null;
+          }
+        }
+
+        if (teacherError || !teacherData) {
+          const defaultName = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split("@")[0] || "المعلم";
+          const { data: newProfile } = await supabase
+            .from("teachers")
+            .insert([{ id: user.id, name: defaultName, email: user.email }])
+            .select("name, is_active, is_admin")
+            .single();
+          if (newProfile) {
+            teacherData = {
+              ...newProfile,
+              has_bills_feature: true,
+              has_attendance_feature: true,
+              is_center_mode: false,
+              subscription_expires_at: "",
+              subscription_started_at: "",
+            };
+          }
+        }
+
+        if (teacherData) {
+          OfflineCache.saveTeacher(teacherData as any);
+          applyTeacherData(teacherData, user.email?.split("@")[0] || "المعلم");
+          const settings = await SystemSettingsService.getSettings();
+          if (settings) {
+            setSysSettings(settings);
+            OfflineCache.saveSysSettings(settings);
+          }
+        }
+      } catch {
+        // Network failed or no session — try cache
         const cached = OfflineCache.loadTeacher();
         if (!cached) { router.replace("/login"); return; }
         applyTeacherData(cached as any, "");
         const cachedSettings = OfflineCache.loadSysSettings();
         if (cachedSettings) setSysSettings(cachedSettings);
-        setLoading(false);
-        return;
       }
 
-      // ── Online: normal flow ───────────────────────────────────
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.replace("/login");
-        return;
-      }
-      
-      const user = session.user;
-      
-      let { data: teacherData, error: teacherError } = await supabase
-        .from("teachers")
-        .select("name, is_active, has_bills_feature, has_attendance_feature, is_center_mode, is_admin, subscription_expires_at, subscription_started_at")
-        .eq("id", user.id)
-        .single();
-
-      if (teacherError) {
-        const { data: fallback } = await supabase
-          .from("teachers")
-          .select("name, is_active, is_admin")
-          .eq("id", user.id)
-          .single();
-        if (fallback) {
-          teacherData = { 
-            ...fallback, 
-            has_bills_feature: true, 
-            has_attendance_feature: true, 
-            is_center_mode: false,
-            subscription_expires_at: "",
-            subscription_started_at: ""
-          };
-          teacherError = null;
-        }
-      }
-        
-      if (teacherError || !teacherData) {
-        const defaultName = user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split("@")[0] || "المعلم";
-        const { data: newProfile } = await supabase
-          .from("teachers")
-          .insert([{ id: user.id, name: defaultName, email: user.email }])
-          .select("name, is_active, is_admin")
-          .single();
-        
-        if (newProfile) {
-          teacherData = { 
-            ...newProfile, 
-            has_bills_feature: true, 
-            has_attendance_feature: true, 
-            is_center_mode: false,
-            subscription_expires_at: "",
-            subscription_started_at: ""
-          };
-        }
-      }
-      
-      if (teacherData) {
-        OfflineCache.saveTeacher(teacherData as any);
-        applyTeacherData(teacherData, user.email?.split("@")[0] || "المعلم");
-
-        const settings = await SystemSettingsService.getSettings();
-        if (settings) {
-          setSysSettings(settings);
-          OfflineCache.saveSysSettings(settings);
-        }
-      }
-      
       setLoading(false);
     }
 
