@@ -163,7 +163,7 @@ export function useScanSession() {
   const applyAutoDetect = useCallback(async (grpData: Group[]) => {
     const match = detectCurrentGroup(grpData);
     if (match) {
-      if (match.id === autoGroupRef.current && scannerRef.current) return; // same group & camera running, nothing to do
+      if (match.id === autoGroupRef.current) return; // same group, nothing to do
       autoGroupRef.current = match.id;
       if (scannerRef.current) {
         try { await scannerRef.current.stop(); } catch {}
