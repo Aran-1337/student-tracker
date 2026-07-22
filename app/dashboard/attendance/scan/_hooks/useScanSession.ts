@@ -59,6 +59,7 @@ export function useScanSession() {
   const processingRef = useRef<Set<string>>(new Set());
   const scannedIdsRef = useRef<Map<string, number>>(new Map());
   const autoGroupRef = useRef<string | null>(null);
+  const manualOverrideRef = useRef(false);
   const stateRef = useRef({
     userId: null as string | null,
     selectedGroupId: "",
@@ -159,35 +160,17 @@ export function useScanSession() {
     setScanning(false);
   }, []);
 
-  // ── Auto-detect: sets group + starts camera, never touches scannedToday ──
-  const applyAutoDetect = useCallback(async (grpData: Group[]) => {
+  // ── Auto-detect: fills group/grade only, never touches camera ──
+  const applyAutoDetect = useCallback((grpData: Group[]) => {
     const match = detectCurrentGroup(grpData);
-    if (match) {
-      if (match.id === autoGroupRef.current) return; // same group, nothing to do
-      autoGroupRef.current = match.id;
-      if (scannerRef.current) {
-        try { await scannerRef.current.stop(); } catch {}
-        try { scannerRef.current.clear(); } catch {}
-        scannerRef.current = null;
-        setScanning(false);
-      }
-      setSelectedGroupId(match.id);
-      if (match.grade_id) setSelectedGradeId(match.grade_id);
-      setAutoDetected(true);
-      stateRef.current.selectedGroupId = match.id;
-      // scannedToday loaded by loadSessionAttendance useEffect below
-      setIsStarting(true);
-      await startScanner(match.id);
-      setIsStarting(false);
-    } else {
-      if (autoGroupRef.current && scannerRef.current) {
-        autoGroupRef.current = null;
-        await stopScanner();
-        setAutoDetected(false);
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [startScanner, stopScanner]);
+    if (!match) return;
+    if (match.id === autoGroupRef.current) return; // same group, nothing to do
+    autoGroupRef.current = match.id;
+    setSelectedGroupId(match.id);
+    if (match.grade_id) setSelectedGradeId(match.grade_id);
+    setAutoDetected(true);
+    stateRef.current.selectedGroupId = match.id;
+  }, []);
 
   // ── Load data on mount ────────────────────────────────────────
   useEffect(() => {
@@ -241,7 +224,7 @@ export function useScanSession() {
 
   // ── Fire auto-detect once data is ready ──────────────────────
   useEffect(() => {
-    if (loading || groups.length === 0) return;
+    if (loading || groups.length === 0 || manualOverrideRef.current) return;
     console.log("[AutoDetect] triggering with", groups.length, "groups");
     applyAutoDetectRef.current(groups);
   }, [loading, groups]);
@@ -250,6 +233,7 @@ export function useScanSession() {
   useEffect(() => {
     if (loading) return;
     const interval = setInterval(() => {
+      if (manualOverrideRef.current) return;
       const grpData = stateRef.current.groups;
       if (grpData.length > 0) applyAutoDetectRef.current(grpData);
     }, 30_000);
@@ -360,6 +344,7 @@ export function useScanSession() {
   }, [manualCode, selectedGradeId, students, grades, handleQRSuccess, showLastScan]);
 
   const handleGradeChange = useCallback((v: string) => {
+    manualOverrideRef.current = true;
     setSelectedGradeId(v);
     setSelectedGroupId("");
     if (scanning) stopScanner();
@@ -369,7 +354,8 @@ export function useScanSession() {
   }, [scanning, stopScanner]);
 
   const handleGroupChange = useCallback(async (v: string) => {
-    autoGroupRef.current = null; // manual override cancels auto
+    autoGroupRef.current = null;
+    manualOverrideRef.current = true; // stop auto-detect from overriding
     setSelectedGroupId(v);
     stateRef.current.selectedGroupId = v;
     setScannedToday([]);
