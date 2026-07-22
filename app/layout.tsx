@@ -20,7 +20,8 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: siteName !== "نظام إدارة المراكز التعليمية والأساتذة" ? `${siteName}` : siteName,
     description: "نظام إدارة اشتراكات ومجموعات الطلاب للمعلمين",
-    icons: siteLogo ? { icon: siteLogo } : undefined
+    icons: siteLogo ? { icon: siteLogo } : undefined,
+    manifest: "/manifest.json",
   };
 }
 
@@ -33,6 +34,22 @@ export const viewport: Viewport = {
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
+function ServiceWorkerRegister() {
+  return (
+    <script
+      dangerouslySetInnerHTML={{
+        __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+              navigator.serviceWorker.register('/sw.js');
+            });
+          }
+        `,
+      }}
+    />
+  );
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -41,6 +58,7 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <ServiceWorkerRegister />
         {children}
         <Analytics />
         <SpeedInsights />
