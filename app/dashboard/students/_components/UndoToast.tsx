@@ -16,12 +16,16 @@ export function UndoToast({ message, onUndo, onDismiss, duration = 5000 }: Props
   useEffect(() => {
     const interval = setInterval(() => {
       setProgress((p) => {
-        if (p <= 0) { clearInterval(interval); onDismiss(); return 0; }
+        if (p <= 0) { clearInterval(interval); return 0; }
         return p - (100 / (duration / 100));
       });
     }, 100);
     return () => clearInterval(interval);
-  }, [duration, onDismiss]);
+  }, [duration]);
+
+  useEffect(() => {
+    if (progress <= 0) onDismiss();
+  }, [progress, onDismiss]);
 
   return (
     <div style={{

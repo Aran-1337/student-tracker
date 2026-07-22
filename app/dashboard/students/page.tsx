@@ -22,13 +22,12 @@ import { AddStudentForm } from "./_components/AddStudentForm";
 import { StudentsFilters } from "./_components/StudentsFilters";
 import { BulkActionBar } from "./_components/BulkActionBar";
 import { Pagination } from "./_components/Pagination";
-import { UndoToast } from "./_components/UndoToast";
+import { ConfirmDeleteDialog } from "./_components/ConfirmDeleteDialog";
 
 const PAGE_SIZE = 20;
 
-interface PendingDelete {
+interface PendingConfirm {
   ids: string[];
-  students: Student[];
   message: string;
 }
 
@@ -52,11 +51,8 @@ export default function StudentsManagement() {
   const [currentPage, setCurrentPage] = useState(1);
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
-
-  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingDeleteRef = useRef<PendingDelete | null>(null);
 
   const showToast = (message: string, type: "success" | "error" = "success") =>
     setToast({ message, type });
@@ -151,53 +147,33 @@ export default function StudentsManagement() {
     }
   };
 
-  // ─── Delete with Undo ─────────────────────────────────────────────────────
-  const scheduleDelete = (ids: string[], removedStudents: Student[], message: string) => {
-    setStudents((prev) => prev.filter((s) => !ids.includes(s.id)));
-    setSelectedIds(new Set());
-    const pending = { ids, students: removedStudents, message };
-    pendingDeleteRef.current = pending;
-    setPendingDelete(pending);
-
-    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
-    deleteTimerRef.current = setTimeout(async () => {
-      try {
-        if (ids.length === 1) await StudentsService.deleteStudent(ids[0]);
-        else await StudentsService.deleteStudents(ids);
-      } catch {
-        showToast("فشل الحذف من قاعدة البيانات.", "error");
-      }
-      pendingDeleteRef.current = null;
-      setPendingDelete(null);
-    }, 5000);
-  };
-
-  const handleUndoDelete = useCallback(() => {
-    const pending = pendingDeleteRef.current;
-    if (!pending) return;
-    if (deleteTimerRef.current) clearTimeout(deleteTimerRef.current);
-    setStudents((prev) => [...pending.students, ...prev]);
-    pendingDeleteRef.current = null;
-    setPendingDelete(null);
-  }, []);
-
-  const handleDismissDelete = useCallback(() => {
-    pendingDeleteRef.current = null;
-    setPendingDelete(null);
-  }, []);
-
+  // ─── Delete with Confirm ──────────────────────────────────────────────────
   const handleDeleteStudent = (studentId: string) => {
     const target = students.find((s) => s.id === studentId);
     if (!target) return;
-    scheduleDelete([studentId], [target], `تم حذف "${target.name}"`);
+    setPendingConfirm({ ids: [studentId], message: `هل أنت متأكد من حذف "${target.name}"؟` });
   };
 
   const handleBulkDelete = () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    const removed = students.filter((s) => ids.includes(s.id));
-    scheduleDelete(ids, removed, `تم حذف ${ids.length} طالب`);
+    setPendingConfirm({ ids, message: `هل أنت متأكد من حذف ${ids.length} طالب؟` });
   };
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingConfirm) return;
+    const { ids } = pendingConfirm;
+    setPendingConfirm(null);
+    setStudents((prev) => prev.filter((s) => !ids.includes(s.id)));
+    setSelectedIds(new Set());
+    try {
+      if (ids.length === 1) await StudentsService.deleteStudent(ids[0]);
+      else await StudentsService.deleteStudents(ids);
+      showToast(ids.length === 1 ? "تم حذف الطالب بنجاح." : `تم حذف ${ids.length} طالب بنجاح.`);
+    } catch {
+      showToast("فشل الحذف من قاعدة البيانات.", "error");
+    }
+  }, [pendingConfirm]);
 
   // ─── Toggle Month (debounced per student) ─────────────────────────────────
   const monthTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -436,11 +412,11 @@ export default function StudentsManagement() {
       {/* Toasts */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-      {pendingDelete && (
-        <UndoToast
-          message={pendingDelete.message}
-          onUndo={handleUndoDelete}
-          onDismiss={handleDismissDelete}
+      {pendingConfirm && (
+        <ConfirmDeleteDialog
+          message={pendingConfirm.message}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setPendingConfirm(null)}
         />
       )}
 
