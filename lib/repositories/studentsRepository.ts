@@ -12,6 +12,16 @@ export const StudentsRepository = {
     return data || [];
   },
 
+  async getStudentById(id: string): Promise<Student | null> {
+    const { data, error } = await supabase
+      .from("students")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) return null;
+    return data;
+  },
+
   async getAllStudents(): Promise<Student[]> {
     const { data, error } = await supabase
       .from("students")

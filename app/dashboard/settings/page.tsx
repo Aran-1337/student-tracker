@@ -104,40 +104,17 @@ export default function SettingsPage() {
         setDeletedGradeIds([]);
       }
 
-      // 2. Add New Grades and Keep a Mapping of Temp ID to Real ID
-      const tempToRealIdMap: Record<string, string> = {};
-      const updatedGradesList = [...grades];
+      // 2. Update Existing Grades
+      await Promise.all(grades.map(g =>
+        GradesService.updateGrade(g.id, {
+          name: g.name,
+          monthly_price: g.monthly_price,
+          prefix: g.prefix || ''
+        })
+      ));
 
-      for (let i = 0; i < updatedGradesList.length; i++) {
-        const g = updatedGradesList[i];
-        if (g.id.startsWith("temp_")) {
-          const addedGrade = await GradesService.addGrade({
-            name: g.name,
-            start_code: g.start_code || 1,
-            prefix: g.prefix || '',
-            monthly_price: g.monthly_price,
-            teacher_id: userId
-          });
-          tempToRealIdMap[g.id] = addedGrade.id;
-          updatedGradesList[i] = addedGrade;
-        } else {
-          // 3. Update Existing Grades (we assume they might be modified, so we just update their price/name)
-          await GradesService.updateGrade(g.id, {
-            name: g.name,
-            monthly_price: g.monthly_price,
-            prefix: g.prefix || ''
-          });
-        }
-      }
-      setGrades(updatedGradesList);
-
-      // 4. Map Books to Real Grade IDs
-      const mappedBooks = books.map(b => {
-        if (b.grade_id && b.grade_id.startsWith("temp_") && tempToRealIdMap[b.grade_id]) {
-          return { ...b, grade_id: tempToRealIdMap[b.grade_id] };
-        }
-        return b;
-      });
+      // 3. Map Books (no temp IDs anymore)
+      const mappedBooks = books;
 
       // 5. Update Teacher Profile
       await TeachersService.updateTeacherProfile(userId, {
@@ -200,26 +177,29 @@ export default function SettingsPage() {
     setDeletedBookIds([...deletedBookIds, id]);
   };
 
-  const handleAddGrade = () => {
+  const handleAddGrade = async () => {
     if (!newGradeName || !newGradePrice) {
       showToast("يرجى إدخال اسم السنة وسعرها الشهري", "error");
       return;
     }
     if (!userId) return;
 
-    const newGrade: Grade = {
-      id: `temp_${Date.now()}`,
-      name: newGradeName,
-      start_code: 1,
-      prefix: newGradePrefix,
-      monthly_price: Number(newGradePrice),
-      teacher_id: userId
-    };
-
-    setGrades([...grades, newGrade]);
-    setNewGradeName("");
-    setNewGradePrice("");
-    setNewGradePrefix("");
+    try {
+      const addedGrade = await GradesService.addGrade({
+        name: newGradeName,
+        start_code: 1,
+        prefix: newGradePrefix,
+        monthly_price: Number(newGradePrice),
+        teacher_id: userId
+      });
+      setGrades([...grades, addedGrade]);
+      setNewGradeName("");
+      setNewGradePrice("");
+      setNewGradePrefix("");
+      showToast("تمت إضافة السنة الدراسية بنجاح.");
+    } catch (err: any) {
+      showToast(err.message || "فشل إضافة السنة الدراسية.", "error");
+    }
   };
 
   const handleDeleteGrade = (gradeId: string) => {

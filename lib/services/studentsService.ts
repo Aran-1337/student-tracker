@@ -7,6 +7,10 @@ export const StudentsService = {
     return StudentsRepository.getStudentsByTeacherId(teacherId);
   },
 
+  async getStudentById(id: string): Promise<Student | null> {
+    return StudentsRepository.getStudentById(id);
+  },
+
   async getAllStudents(): Promise<Student[]> {
     return StudentsRepository.getAllStudents();
   },
