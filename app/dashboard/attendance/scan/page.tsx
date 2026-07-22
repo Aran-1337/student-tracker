@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import { ScanLine, ArrowRight, Wifi, WifiOff, RefreshCw } from "lucide-react";
 import Link from "next/link";
 
@@ -10,7 +11,7 @@ import { ScannerPanel } from "./_components/ScannerPanel";
 import { useScanSession } from "./_hooks/useScanSession";
 import { useOnlineSync } from "./_hooks/useOnlineSync";
 
-export default function QRScanPage() {
+function QRScanPageInner() {
   const {
     loading,
     groups, grades,
@@ -115,5 +116,13 @@ export default function QRScanPage() {
         />
       </div>
     </div>
+  );
+}
+
+export default function QRScanPage() {
+  return (
+    <Suspense fallback={<Spinner fullScreen />}>
+      <QRScanPageInner />
+    </Suspense>
   );
 }

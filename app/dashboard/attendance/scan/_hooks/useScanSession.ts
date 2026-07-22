@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/lib/supabaseClient";
 import { Group, Student, Grade, ScannedEntry } from "@/lib/types";
@@ -222,12 +223,38 @@ export function useScanSession() {
   const applyAutoDetectRef = useRef(applyAutoDetect);
   useEffect(() => { applyAutoDetectRef.current = applyAutoDetect; }, [applyAutoDetect]);
 
+  const searchParams = useSearchParams();
+  const urlGroupId = searchParams.get("group");
+
+  // ── Apply group from URL param (from dashboard "ابدأ الحضور" button) ──
+  useEffect(() => {
+    if (loading || groups.length === 0 || !urlGroupId) return;
+    const match = groups.find(g => g.id === urlGroupId);
+    if (!match) return;
+    manualOverrideRef.current = true;
+    autoGroupRef.current = match.id;
+    setSelectedGroupId(match.id);
+    if (match.grade_id) setSelectedGradeId(match.grade_id);
+    setAutoDetected(false);
+    stateRef.current.selectedGroupId = match.id;
+  }, [loading, groups, urlGroupId]);
+
   // ── Fire auto-detect once data is ready ──────────────────────
   useEffect(() => {
     if (loading || groups.length === 0 || manualOverrideRef.current) return;
     console.log("[AutoDetect] triggering with", groups.length, "groups");
     applyAutoDetectRef.current(groups);
   }, [loading, groups]);
+
+  // ── Auto-start camera when group is set from URL ────────────
+  const urlAutoStartedRef = useRef(false);
+  useEffect(() => {
+    if (!urlGroupId || !selectedGroupId || selectedGroupId !== urlGroupId) return;
+    if (urlAutoStartedRef.current || scanning || scannerRef.current) return;
+    urlAutoStartedRef.current = true;
+    setIsStarting(true);
+    startScanner(selectedGroupId).finally(() => setIsStarting(false));
+  }, [urlGroupId, selectedGroupId, scanning, startScanner]);
 
   // ── Periodic auto-detect every 30s ───────────────────────────
   useEffect(() => {
