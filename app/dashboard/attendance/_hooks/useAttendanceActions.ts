@@ -3,6 +3,17 @@
 import { useState } from "react";
 import { Student, AttendanceRecord } from "@/lib/types";
 import { AttendanceService } from "@/lib/services/attendanceService";
+import { AttendanceQueue } from "@/lib/offlineQueue";
+
+const isOfflineRecord = (id: string) => id.startsWith("offline-");
+
+const deleteRecord = async (record: AttendanceRecord) => {
+  if (isOfflineRecord(record.id)) {
+    AttendanceQueue.remove(record.student_id, record.session_date!);
+  } else {
+    await AttendanceService.deleteAttendanceRecord(record.id);
+  }
+};
 
 interface UseAttendanceActionsProps {
   userId: string | null;
@@ -67,7 +78,7 @@ export function useAttendanceActions({
     setAttendance(optimistic);
     setPendingDelete(null);
     try {
-      await AttendanceService.deleteAttendanceRecord(pendingDelete.record.id);
+      await deleteRecord(pendingDelete.record);
     } catch {
       setAttendance(attendance);
       showToast("فشل حذف الحضور", "error");
@@ -112,7 +123,7 @@ export function useAttendanceActions({
       const toDelete = attendance.filter(
         a => a.session_date === dateStr && filteredStudents.some(s => s.id === a.student_id)
       );
-      await Promise.all(toDelete.map(r => AttendanceService.deleteAttendanceRecord(r.id)));
+      await Promise.all(toDelete.map(r => deleteRecord(r)));
       setAttendance(attendance.filter(a => !toDelete.some(d => d.id === a.id)));
       showToast(`تم مسح حضور ${toDelete.length} طالب`);
     } catch {

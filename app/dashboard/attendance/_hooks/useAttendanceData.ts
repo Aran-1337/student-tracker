@@ -7,7 +7,7 @@ import { GroupsService } from "@/lib/services/groupsService";
 import { StudentsService } from "@/lib/services/studentsService";
 import { GradesService } from "@/lib/services/gradesService";
 import { AttendanceService } from "@/lib/services/attendanceService";
-import { OfflineCache } from "@/lib/offlineQueue";
+import { OfflineCache, AttendanceQueue } from "@/lib/offlineQueue";
 
 export function useAttendanceData() {
   const now = new Date();
@@ -62,7 +62,20 @@ export function useAttendanceData() {
     if (!userId) return;
     try {
       const records = await AttendanceService.getAttendanceRecords(selectedMonth, selectedYear);
-      setAttendance(records);
+      // merge offline queue records for the same month/year
+      const queued = AttendanceQueue.getAll().filter(
+        r => r.month === selectedMonth && r.year === selectedYear
+      );
+      const merged = [...records];
+      for (const q of queued) {
+        const exists = merged.some(
+          r => r.student_id === q.student_id && r.session_date === q.session_date
+        );
+        if (!exists) {
+          merged.push({ ...q, id: `offline-${q.student_id}-${q.session_date}`, created_at: q._queuedAt } as AttendanceRecord);
+        }
+      }
+      setAttendance(merged);
     } catch {}
   }, [userId, selectedMonth, selectedYear]);
 

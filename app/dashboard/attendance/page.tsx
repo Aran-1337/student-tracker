@@ -15,6 +15,7 @@ import { AttendanceTable } from "./_components/AttendanceTable";
 import { QRModal } from "./_components/QRModal";
 import { ConfirmDeleteModal } from "./_components/ConfirmDeleteModal";
 import { exportAttendancePrint } from "./_utils/exportUtils";
+import { useOnlineSync } from "./scan/_hooks/useOnlineSync";
 import { Student } from "@/lib/types";
 
 const arabicMonths = [
@@ -31,6 +32,11 @@ export default function AttendancePage() {
     setToast({ message, type });
 
   const data = useAttendanceData();
+
+  useOnlineSync((count) => {
+    if (count > 0) data.loadAttendance();
+  });
+
   const actions = useAttendanceActions({
     userId: data.userId,
     attendance: data.attendance,
