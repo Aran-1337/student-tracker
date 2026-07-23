@@ -284,16 +284,18 @@ export default function DashboardLayout({
                 </Link>
               );
             })}
+          </nav>
 
-            {/* Logout button inside menu on mobile */}
-            <button 
+          {/* Logout button – mobile only, shown when menu is open */}
+          {mobileMenuOpen && (
+            <button
               className="btn btn-secondary sidebar-logout-mobile"
               onClick={handleLogout}
             >
               <LogOut size={16} />
               <span>تسجيل الخروج</span>
             </button>
-          </nav>
+          )}
 
           {/* Logout Button – desktop only */}
           <div className="sidebar-logout-desktop">
