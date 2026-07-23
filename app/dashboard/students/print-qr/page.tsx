@@ -26,6 +26,11 @@ function PrintQRContent() {
   const [groups, setGroups] = useState<Record<string, string>>({});
   const [siteLogo, setSiteLogo] = useState<string>("");
   const [siteName, setSiteName] = useState<string>("Student Tracker");
+  const [baseUrl, setBaseUrl] = useState<string>("");
+
+  useEffect(() => {
+    setBaseUrl(typeof window !== "undefined" ? window.location.origin : "");
+  }, []);
 
   useEffect(() => {
     async function loadData() {
@@ -127,7 +132,7 @@ function PrintQRContent() {
               <div className="id-card-body">
                 <div className="qr-wrapper">
                   <QRCodeSVG 
-                    value={student.id} 
+                    value={baseUrl ? `${baseUrl}/report/${student.id}` : student.id} 
                     size={100}
                     level="H"
                     includeMargin={true}

@@ -16,6 +16,7 @@ create table if not exists public.teachers (
     monthly_price numeric not null default 100,
     book_1_price numeric not null default 50,
     book_2_price numeric not null default 50,
+    whatsapp_template text,
     created_at timestamp with time zone default now() not null
 );
 
@@ -276,3 +277,253 @@ on conflict (email) do nothing;
 update public.teachers 
 set is_admin = true 
 where email = '3bdeniovlr@gmail.com';
+
+-- ============================================================
+-- إضافة جداول الامتحانات وبنوك الأسئلة
+-- ============================================================
+
+-- 15. جدول الامتحانات (Exams)
+create table if not exists public.exams (
+    id uuid primary key default gen_random_uuid(),
+    teacher_id uuid references public.teachers(id) on delete cascade not null,
+    group_id uuid references public.groups(id) on delete cascade not null,
+    title text not null,
+    max_score numeric not null default 100,
+    exam_date date not null,
+    created_at timestamp with time zone default now() not null
+);
+
+-- 16. جدول درجات الامتحانات (Exam Grades)
+create table if not exists public.exam_grades (
+    id uuid primary key default gen_random_uuid(),
+    exam_id uuid references public.exams(id) on delete cascade not null,
+    student_id uuid references public.students(id) on delete cascade not null,
+    score numeric not null,
+    created_at timestamp with time zone default now() not null,
+    unique(exam_id, student_id)
+);
+
+-- 17. بنوك الأسئلة (Question Banks)
+create table if not exists public.question_banks (
+    id uuid primary key default gen_random_uuid(),
+    teacher_id uuid references public.teachers(id) on delete cascade not null,
+    billing_month integer not null check (billing_month >= 1 and billing_month <= 12),
+    is_recurring boolean not null default false,
+    created_at timestamp with time zone default now() not null
+);
+
+-- 5. جدول الأدمنز المرخصين
+create table if not exists public.admins (
+    id uuid primary key default gen_random_uuid(),
+    email text unique not null,
+    created_at timestamp with time zone default now() not null
+);
+
+-- 6. جدول سجلات الحضور والغياب
+create table if not exists public.attendance_records (
+    id uuid primary key default gen_random_uuid(),
+    teacher_id uuid references public.teachers(id) on delete cascade not null,
+    student_id uuid references public.students(id) on delete cascade not null,
+    group_id uuid references public.groups(id) on delete set null,
+    session_number integer not null check (session_number >= 1),
+    month integer not null check (month between 1 and 12),
+    year integer not null,
+    status text not null default 'present'
+        check (status in ('present', 'absent', 'late', 'excused')),
+    scanned_by_qr boolean not null default false,
+    created_at timestamptz default now(),
+    unique (student_id, session_number, month, year)
+);
+
+-- ============================================================
+-- تفعيل Row Level Security
+-- ============================================================
+alter table public.teachers enable row level security;
+alter table public.grades enable row level security;
+alter table public.groups enable row level security;
+alter table public.students enable row level security;
+alter table public.bills enable row level security;
+alter table public.admins enable row level security;
+alter table public.attendance_records enable row level security;
+
+-- ============================================================
+-- سياسات الأمان (RLS Policies)
+-- ============================================================
+
+-- Grades
+drop policy if exists "Teachers can manage their own grades or admin manage" on public.grades;
+create policy "Teachers can manage their own grades or admin manage" on public.grades
+    for all using (teacher_id = auth.uid() or public.is_admin(auth.uid()))
+    with check (teacher_id = auth.uid() or public.is_admin(auth.uid()));
+
+-- Teachers
+drop policy if exists "Allow select own profile or admin view" on public.teachers;
+create policy "Allow select own profile or admin view" on public.teachers
+    for select using (id = auth.uid() or public.is_admin(auth.uid()));
+
+drop policy if exists "Allow insert own profile" on public.teachers;
+create policy "Allow insert own profile" on public.teachers
+    for insert with check (id = auth.uid());
+
+drop policy if exists "Allow update own profile or admin update" on public.teachers;
+create policy "Allow update own profile or admin update" on public.teachers
+    for update using (id = auth.uid() or public.is_admin(auth.uid()))
+    with check (id = auth.uid() or public.is_admin(auth.uid()));
+
+drop policy if exists "Allow admin delete teachers" on public.teachers;
+create policy "Allow admin delete teachers" on public.teachers
+    for delete using (public.is_admin(auth.uid()));
+
+-- Groups
+drop policy if exists "Teachers can manage their own groups or admin manage" on public.groups;
+create policy "Teachers can manage their own groups or admin manage" on public.groups
+    for all using (teacher_id = auth.uid() or public.is_admin(auth.uid()))
+    with check (teacher_id = auth.uid() or public.is_admin(auth.uid()));
+
+-- Students
+drop policy if exists "Teachers can manage their own students or admin manage" on public.students;
+create policy "Teachers can manage their own students or admin manage" on public.students
+    for all using (teacher_id = auth.uid() or public.is_admin(auth.uid()))
+    with check (teacher_id = auth.uid() or public.is_admin(auth.uid()));
+
+-- Bills
+drop policy if exists "Teachers can manage their own bills or admin manage" on public.bills;
+create policy "Teachers can manage their own bills or admin manage" on public.bills
+    for all using (teacher_id = auth.uid() or public.is_admin(auth.uid()))
+    with check (teacher_id = auth.uid() or public.is_admin(auth.uid()));
+
+-- Admins
+drop policy if exists "Admins can manage admin list" on public.admins;
+create policy "Admins can manage admin list" on public.admins
+    for all using (public.is_admin(auth.uid()))
+    with check (public.is_admin(auth.uid()));
+
+-- Attendance Records
+drop policy if exists "teacher_own_attendance" on public.attendance_records;
+create policy "teacher_own_attendance" on public.attendance_records
+    for all using (teacher_id = auth.uid())
+    with check (teacher_id = auth.uid());
+
+-- ============================================================
+-- Trigger: إنشاء ملف المعلم تلقائياً عند التسجيل
+-- ============================================================
+create or replace function public.handle_new_user()
+returns trigger as $$
+declare
+    v_is_admin boolean := false;
+begin
+    select exists (
+        select 1 from public.admins where email = new.email
+    ) into v_is_admin;
+
+    insert into public.teachers (id, name, email, is_admin)
+    values (
+        new.id,
+        coalesce(
+            new.raw_user_meta_data->>'name',
+            new.raw_user_meta_data->>'full_name',
+            split_part(new.email, '@', 1),
+            'معلم جديد'
+        ),
+        new.email,
+        v_is_admin
+    );
+    return new;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+    after insert on auth.users
+    for each row execute procedure public.handle_new_user();
+
+-- ============================================================
+-- Trigger: مزامنة صلاحيات الأدمن عند تغيير قائمة الإيميلات
+-- ============================================================
+create or replace function public.handle_admin_email_change()
+returns trigger as $$
+begin
+    if (TG_OP = 'INSERT') then
+        update public.teachers set is_admin = true where email = new.email;
+        return new;
+    elsif (TG_OP = 'DELETE') then
+        if (old.email = '3bdeniovlr@gmail.com') then
+            return old;
+        end if;
+        update public.teachers set is_admin = false where email = old.email;
+        return old;
+    end if;
+    return null;
+end;
+$$ language plpgsql security definer;
+
+drop trigger if exists on_admin_email_change on public.admins;
+create trigger on_admin_email_change
+    after insert or delete on public.admins
+    for each row execute procedure public.handle_admin_email_change();
+
+-- ============================================================
+-- بيانات البذر: ترخيص الأدمن الرئيسي
+-- ============================================================
+insert into public.admins (email) 
+values ('3bdeniovlr@gmail.com')
+on conflict (email) do nothing;
+
+update public.teachers 
+set is_admin = true 
+where email = '3bdeniovlr@gmail.com';
+
+-- ============================================================
+-- إضافة جداول الامتحانات وبنوك الأسئلة
+-- ============================================================
+
+-- 15. جدول الامتحانات (Exams)
+create table if not exists public.exams (
+    id uuid primary key default gen_random_uuid(),
+    teacher_id uuid references public.teachers(id) on delete cascade not null,
+    group_id uuid references public.groups(id) on delete cascade not null,
+    title text not null,
+    max_score numeric not null default 100,
+    exam_date date not null,
+    created_at timestamp with time zone default now() not null
+);
+
+-- 16. جدول درجات الامتحانات (Exam Grades)
+create table if not exists public.exam_grades (
+    id uuid primary key default gen_random_uuid(),
+    exam_id uuid references public.exams(id) on delete cascade not null,
+    student_id uuid references public.students(id) on delete cascade not null,
+    score numeric not null,
+    created_at timestamp with time zone default now() not null,
+    unique(exam_id, student_id)
+);
+
+-- 17. بنوك الأسئلة (Question Banks)
+create table if not exists public.question_banks (
+    id uuid primary key default gen_random_uuid(),
+    teacher_id uuid references public.teachers(id) on delete cascade not null,
+    title text not null,
+    grade_id uuid references public.grades(id) on delete set null,
+    created_at timestamp with time zone default now() not null
+);
+
+-- 18. الأسئلة (Questions)
+create table if not exists public.questions (
+    id uuid primary key default gen_random_uuid(),
+    bank_id uuid references public.question_banks(id) on delete cascade not null,
+    content text not null,
+    options jsonb, -- array of strings for multiple choice
+    correct_answer text,
+    created_at timestamp with time zone default now() not null
+);
+
+-- RLS Policies for new tables
+alter table public.exams enable row level security;
+alter table public.exam_grades enable row level security;
+alter table public.question_banks enable row level security;
+alter table public.questions enable row level security;
+
+create policy "Allow full access on exams" on public.exams for all using (true) with check (true);
+create policy "Allow full access on exam_grades" on public.exam_grades for all using (true) with check (true);
+create policy "Allow full access on question_banks" on public.question_banks for all using (true) with check (true);
+create policy "Allow full access on questions" on public.questions for all using (true) with check (true);

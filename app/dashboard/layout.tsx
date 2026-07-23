@@ -18,7 +18,12 @@ import {
   Lock,
   Menu,
   X,
-  ClipboardCheck
+  ClipboardCheck,
+  FileText,
+  Award,
+  FileQuestion,
+  Sun,
+  Moon
 } from "lucide-react";
 
 export default function DashboardLayout({
@@ -37,6 +42,7 @@ export default function DashboardLayout({
   const [isPending, setIsPending] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sysSettings, setSysSettings] = useState<SystemSettings | null>(null);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
 
   const [hasCenterMode, setHasCenterMode] = useState(false);
 
@@ -146,6 +152,21 @@ export default function DashboardLayout({
     setMobileMenuOpen(false);
   }, [pathname]);
 
+  // Theme initialization
+  useEffect(() => {
+    const saved = localStorage.getItem("theme") as "dark" | "light" | null;
+    const initial = saved || "dark";
+    setTheme(initial);
+    document.documentElement.setAttribute("data-theme", initial);
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    document.documentElement.setAttribute("data-theme", next);
+    localStorage.setItem("theme", next);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.replace("/login");
@@ -220,6 +241,9 @@ export default function DashboardLayout({
     ...(hasAttendance ? [{ name: "الحضور والغياب", path: "/dashboard/attendance", icon: ClipboardCheck }] : []),
     ...(hasBills ? [{ name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt }] : []),
     { name: "التقارير المالية", path: "/dashboard/reports", icon: TrendingUp },
+    { name: "تقارير الطلاب", path: "/dashboard/reports/students", icon: FileText },
+    { name: "درجات الامتحانات", path: "/dashboard/exams", icon: Award },
+    { name: "نماذج الامتحانات", path: "/dashboard/exams/generator", icon: FileQuestion },
     { name: "الإعدادات", path: "/dashboard/settings", icon: Settings },
     ...(isAdmin ? [{ name: "لوحة المدير العام", path: "/admin", icon: Shield }] : [])
   ];
@@ -286,19 +310,38 @@ export default function DashboardLayout({
             })}
           </nav>
 
-          {/* Logout button – mobile only, shown when menu is open */}
+          {/* Theme toggle + Logout button inside menu on mobile */}
           {mobileMenuOpen && (
-            <button
-              className="btn btn-secondary sidebar-logout-mobile"
-              onClick={handleLogout}
-            >
-              <LogOut size={16} />
-              <span>تسجيل الخروج</span>
-            </button>
+            <>
+              <button 
+                className="btn btn-secondary sidebar-logout-mobile open"
+                onClick={toggleTheme}
+                style={{ marginTop: "0.5rem" }}
+              >
+                {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+                <span>{theme === "dark" ? "الوضع المضيء" : "الوضع المظلم"}</span>
+              </button>
+              <button 
+                className="btn btn-secondary sidebar-logout-mobile open"
+                onClick={handleLogout}
+              >
+                <LogOut size={16} />
+                <span>تسجيل الخروج</span>
+              </button>
+            </>
           )}
 
-          {/* Logout Button – desktop only */}
+          {/* Theme Toggle + Logout – desktop only */}
           <div className="sidebar-logout-desktop">
+            <button 
+              className="btn btn-secondary"
+              onClick={toggleTheme}
+              style={{ width: "100%", justifyContent: "center", marginBottom: "0.5rem" }}
+              title={theme === "dark" ? "الوضع المضيء" : "الوضع المظلم"}
+            >
+              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+              <span>{theme === "dark" ? "الوضع المضيء" : "الوضع المظلم"}</span>
+            </button>
             <button 
               className="btn btn-secondary"
               onClick={handleLogout}

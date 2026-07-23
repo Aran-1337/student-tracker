@@ -96,7 +96,13 @@ export function useScanSession() {
         processingRef.current.add(decodedText);
         scannedIdsRef.current.set(decodedText, nowMs);
 
-        const student = students.find(s => s.id === decodedText);
+        let studentId = decodedText;
+        if (decodedText.startsWith("http")) {
+          const parts = decodedText.split("/");
+          studentId = parts[parts.length - 1];
+        }
+
+        const student = students.find(s => s.id === studentId);
         if (!student) { processingRef.current.delete(decodedText); showLastScan("طالب غير معروف!", false); return; }
 
         if (student.group_id !== selectedGroupId) {

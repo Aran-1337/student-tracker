@@ -43,6 +43,8 @@ export default function SettingsPage() {
   const [newGradeName, setNewGradeName] = useState("");
   const [newGradePrice, setNewGradePrice] = useState("");
   const [newGradePrefix, setNewGradePrefix] = useState("");
+  
+  const [whatsappTemplate, setWhatsappTemplate] = useState("");
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const profileReady = useRef(false);
@@ -70,6 +72,7 @@ export default function SettingsPage() {
           setName(teacher.name || "");
           setPhone(teacher.phone || "");
           setBooks(teacher.books || []);
+          setWhatsappTemplate(teacher.whatsapp_template || "مرحباً ولي أمر الطالب [اسم_الطالب]،\nنود إعلامكم بتقرير الطالب كالتالي:\nأيام الحضور: [الحضور]\nأيام الغياب: [الغياب]\nحالة الدفع: [حالة_الدفع]\nشكراً لتعاونكم.");
         }
 
         setGrades(gradesData);
@@ -94,7 +97,8 @@ export default function SettingsPage() {
       await TeachersService.updateTeacherProfile(userId, {
         name: currentName,
         phone: currentPhone,
-        books: currentBooks
+        books: currentBooks,
+        whatsapp_template: whatsappTemplate
       });
 
       if (currentDeletedIds.length > 0) {
@@ -473,6 +477,32 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
+          </div>
+
+          <hr style={{ border: "none", borderTop: "1px solid var(--border-color)", margin: "2.5rem 0" }} />
+
+          {/* WhatsApp Template Section */}
+          <div className="settings-section">
+            <h3 className="section-title">
+              <MessageCircle size={18} className="text-teal" />
+              <span>إعدادات رسائل الواتساب</span>
+            </h3>
+            <div style={{ marginBottom: "1.5rem" }}>
+              <p className="settings-description">
+                قم بتخصيص الرسالة التي سيتم إرسالها لولي الأمر عند إرسال التقرير. يمكنك استخدام المتغيرات التالية وسيتم استبدالها تلقائياً:
+                <br/>
+                <code>[اسم_الطالب]</code> - <code>[الحضور]</code> - <code>[الغياب]</code> - <code>[حالة_الدفع]</code>
+              </p>
+            </div>
+            <div className="form-group">
+              <textarea
+                className="form-input"
+                style={{ minHeight: "150px", resize: "vertical", direction: "rtl", padding: "1rem" }}
+                value={whatsappTemplate}
+                onChange={(e) => setWhatsappTemplate(e.target.value)}
+                placeholder="اكتب قالب الرسالة هنا..."
+              />
+            </div>
           </div>
 
           {/* Submit Button */}

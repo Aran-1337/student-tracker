@@ -15,6 +15,7 @@ export interface Teacher {
   has_bills_feature: boolean;
   has_attendance_feature: boolean;
   is_center_mode: boolean;
+  whatsapp_template?: string;
   plan_id?: string | null;
   subscription_started_at?: string | null;
   subscription_expires_at?: string | null;
@@ -122,4 +123,39 @@ export interface ScannedEntry {
   studentId: string;
   studentName: string;
   time: string;
+}
+
+export interface Exam {
+  id: string;
+  teacher_id: string;
+  group_id: string;
+  title: string;
+  max_score: number;
+  exam_date: string;
+  created_at?: string;
+}
+
+export interface ExamGrade {
+  id: string;
+  exam_id: string;
+  student_id: string;
+  score: number;
+  created_at?: string;
+}
+
+export interface QuestionBank {
+  id: string;
+  teacher_id: string;
+  title: string;
+  grade_id?: string | null;
+  created_at?: string;
+}
+
+export interface Question {
+  id: string;
+  bank_id: string;
+  content: string;
+  options?: string[] | null;
+  correct_answer?: string | null;
+  created_at?: string;
 }
