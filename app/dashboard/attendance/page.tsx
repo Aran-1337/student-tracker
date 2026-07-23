@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ClipboardCheck, ScanLine, Printer } from "lucide-react";
+import { ClipboardCheck, ScanLine, FileDown } from "lucide-react";
 
 import { Spinner } from "@/components/ui/Spinner";
 import { Toast } from "@/components/ui/Toast";
@@ -131,8 +131,8 @@ export default function AttendancePage() {
                 )}
                 title="طباعة الكشف"
               >
-                <Printer size={15} />
-                <span>طباعة</span>
+                <FileDown size={15} />
+                <span>تصدير PDF</span>
               </button>
             </div>
           )}

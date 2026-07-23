@@ -115,7 +115,7 @@ export function exportAttendancePrint(
       .cell-code { text-align: center; font-family: monospace; font-size: 11px; color: #555; }
       .cell-name { font-weight: 600; }
       .group-block { margin-bottom: 20px; }
-      .group-header { background: #0d9488; color: #fff; padding: 6px 12px; font-weight: 700; font-size: 13px; border-radius: 6px 6px 0 0; }
+      .group-header { background: #0d9488; color: #fff; padding: 6px 12px; font-weight: 700; font-size: 13px; border-radius: 6px 6px 0 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
       .group-count { font-weight: 400; opacity: 0.85; margin-right: 6px; }
       @media print {
         body { padding: 8px; }
@@ -126,7 +126,14 @@ export function exportAttendancePrint(
     <h2>كشف الحضور — ${groupName} — ${arabicMonths[month - 1]} ${year}</h2>
     <p class="subtitle">${students.length} طالب · ${allDates.length} حصة · ${new Date().toLocaleDateString("ar-EG")}</p>
     ${body}
-    <script>window.onload=()=>window.print()</script></body></html>`;
+    <script>
+      window.onload = () => {
+        setTimeout(() => {
+          window.print();
+          window.onafterprint = () => window.close();
+        }, 500);
+      };
+    </script></body></html>`;
 
   const w = window.open("", "_blank");
   if (w) { w.document.write(html); w.document.close(); }
