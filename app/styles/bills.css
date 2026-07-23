@@ -1,0 +1,146 @@
+/* Bills Header */
+.bills-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.bills-header-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.bills-header-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  flex-shrink: 0;
+  background: rgba(245,158,11,0.1);
+  border: 1px solid rgba(245,158,11,0.25);
+  color: var(--color-amber);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bills-header-subtitle {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-family: Tajawal, sans-serif;
+  font-weight: 400;
+}
+
+.bills-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.monthly-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+
+.bills-table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.bills-table-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Responsive table */
+.bills-col-category,
+.bills-col-date {
+  /* visible by default */
+}
+
+/* Months horizontal scroll */
+.bills-months-scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  padding: 0.5rem 0 0.75rem;
+  margin-bottom: 1rem;
+  scrollbar-width: none;
+}
+.bills-months-scroll::-webkit-scrollbar { display: none; }
+.bills-months-scroll .chip {
+  flex-shrink: 0;
+  scroll-snap-align: start;
+}
+
+.bills-table-section .table-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bills-table-section .students-table {
+  min-width: 560px;
+}
+
+@media (max-width: 1024px) {
+  .bills-summary-grid { grid-template-columns: repeat(2, 1fr); }
+  .monthly-overview-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .bills-header-top { gap: 0.75rem; }
+  .bills-header-icon { width: 40px; height: 40px; }
+  .bills-header-top h1 { font-size: 1.35rem !important; }
+
+  .bills-summary-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+  .monthly-overview-grid { grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+
+  .bills-table-header { flex-direction: column; align-items: flex-start; }
+  .bills-table-controls { width: 100%; justify-content: space-between; gap: 0.5rem; }
+
+  .bills-header-bottom { flex-direction: column; align-items: stretch; }
+  .bills-header-bottom > div:first-child { justify-content: center; }
+  .bills-header-bottom > div:last-child { justify-content: center; }
+
+  /* Hide category column on tablet */
+  .bills-col-category { display: none; }
+}
+
+@media (max-width: 600px) {
+  .monthly-overview-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+
+  /* Hide date column on mobile, keep title + amount + actions */
+  .bills-col-date { display: none; }
+
+  .bills-table-controls { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .bills-table-controls > * { width: 100%; }
+  .bills-table-controls .bills-total-inline { justify-content: space-between; }
+}
+
+@media (max-width: 480px) {
+  .bills-summary-grid { grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+  .bills-header-subtitle { display: none; }
+  .bills-add-btn-text { display: none; }
+  .bills-header-top h1 { font-size: 1.15rem !important; }
+}
+
+@media (max-width: 360px) {
+  .bills-summary-grid { grid-template-columns: 1fr; }
+  .monthly-overview-grid { grid-template-columns: repeat(2, 1fr); }
+}

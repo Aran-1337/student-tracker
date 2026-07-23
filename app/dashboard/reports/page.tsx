@@ -1,9 +1,7 @@
 "use client";
 
-import { Modal } from "@/components/ui/Modal";
-import { Button } from "@/components/ui/Button";
-
 import { useState, useEffect } from "react";
+import { Modal } from "@/components/ui/Modal";
 import { AuthService } from "@/lib/services/authService";
 import { TeachersService } from "@/lib/services/teachersService";
 import { StudentsService } from "@/lib/services/studentsService";
@@ -11,16 +9,14 @@ import { BillsService } from "@/lib/services/billsService";
 import { GroupsService } from "@/lib/services/groupsService";
 import { GradesService } from "@/lib/services/gradesService";
 import { SubTeachersService } from "@/lib/services/subTeachersService";
-import { 
-  TrendingUp, 
-  DollarSign, 
-  BookOpen, 
-  Calendar, 
-  Users,
-  CheckCircle2,
-  AlertCircle,
-  Receipt
-} from "lucide-react";
+import { AlertCircle, BarChart3, Filter } from "lucide-react";
+
+import { ReportsSummaryCards } from "./_components/ReportsSummaryCards";
+import { InsightsStrip } from "./_components/InsightsStrip";
+import { MonthlyTable } from "./_components/MonthlyTable";
+import { UnpaidStudentsModal } from "./_components/UnpaidStudentsModal";
+
+import type { BookDef, Grade, Group, SubTeacher, Bill } from "@/lib/types";
 
 interface Student {
   id: string;
@@ -29,40 +25,31 @@ interface Student {
   grade_id?: string | null;
   months: boolean[];
   received_books: string[];
-}
-
-interface Bill {
-  id: string;
-  title: string;
-  amount: number;
-  category: "إيجار" | "رواتب سكرتارية" | "أخرى";
-  billing_month: number;
+  discount_value?: number;
 }
 
 const arabicMonths = [
-  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
+  "يناير","فبراير","مارس","أبريل","مايو","يونيو",
+  "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر",
 ];
+
+const currentYear = new Date().getFullYear();
 
 export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState<Student[]>([]);
   const [bills, setBills] = useState<Bill[]>([]);
-  
-  // Pricing settings from teachers table
   const [monthlyPrice, setMonthlyPrice] = useState(100);
-  const [teacherBooks, setTeacherBooks] = useState<any[]>([]);
-
-  // Center Mode settings
+  const [teacherBooks, setTeacherBooks] = useState<BookDef[]>([]);
   const [hasCenterMode, setHasCenterMode] = useState(false);
-  const [subTeachers, setSubTeachers] = useState<any[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
-  const [grades, setGrades] = useState<any[]>([]);
+  const [subTeachers, setSubTeachers] = useState<SubTeacher[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("all");
-
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear);
   const [showAllGrades, setShowAllGrades] = useState(false);
   const [showAllBooks, setShowAllBooks] = useState(false);
-
+  const [showUnpaid, setShowUnpaid] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
@@ -76,401 +63,255 @@ export default function ReportsPage() {
         const { data: { session } } = await AuthService.getSession();
         if (!session) return;
 
-        // 1. Fetch teacher settings & Center Mode Check
         const teacher = await TeachersService.getTeacherProfile(session.user.id);
-
         if (teacher) {
           setMonthlyPrice(Number(teacher.monthly_price) || 0);
           setTeacherBooks(teacher.books || []);
-          
           const centerMode = teacher.is_center_mode || false;
           setHasCenterMode(centerMode);
-
           if (centerMode) {
             const subs = await SubTeachersService.getSubTeachersByCenterId(session.user.id);
             setSubTeachers(subs || []);
           }
-          
           const grps = await GroupsService.getGroupsByTeacherId(session.user.id);
           setGroups(grps || []);
-
           const grds = await GradesService.getGradesByTeacherId(session.user.id);
           setGrades(grds || []);
         }
 
-        // 3. Fetch students
         const studentsData = await StudentsService.getStudentsByTeacherId(session.user.id);
+        setStudents(
+          (studentsData || []).map((s) => ({
+            ...s,
+            months: Array.isArray(s.months) && s.months.length === 12 ? s.months : Array(12).fill(false),
+            received_books: Array.isArray(s.received_books) ? s.received_books : [],
+          }))
+        );
 
-        const validatedStudents = (studentsData || []).map(student => ({
-          ...student,
-          months: Array.isArray(student.months) && student.months.length === 12
-            ? student.months 
-            : Array(12).fill(false),
-          received_books: Array.isArray(student.received_books) ? student.received_books : []
-        }));
-        setStudents(validatedStudents);
-
-        // 4. Fetch bills
         const billsData = await BillsService.getBillsByTeacherId(session.user.id);
         setBills(billsData || []);
-
-      } catch (err: any) {
+      } catch {
         showToast("حدث خطأ أثناء تحميل التقارير.", "error");
       } finally {
         setLoading(false);
       }
     }
-
     loadReports();
   }, []);
 
-  const totalStudents = students.length;
+  // ── helpers ───────────────────────────────────────────────────────────────
+  const getStudentPrice = (student: Student) => {
+    const grp = groups.find((g) => g.id === student.group_id);
+    const grd = grades.find((g) => g.id === student.grade_id);
+    const base = grp?.monthly_price ?? grd?.monthly_price ?? monthlyPrice;
+    return Math.max(0, (base ?? monthlyPrice) - (student.discount_value || 0));
+  };
+
+  const getEffectiveGradeId = (s: Student) =>
+    s.grade_id || groups.find((g) => g.id === s.group_id)?.grade_id || null;
+
   const currentMonthIndex = new Date().getMonth();
 
-  // Apply Teacher Filter
-  const filteredStudents = selectedTeacherId === "all" 
-    ? students 
-    : students.filter(s => {
-        const studentGroup = groups.find(g => g.id === s.group_id);
-        return studentGroup && studentGroup.sub_teacher_id === selectedTeacherId;
-      });
+  const filteredStudents =
+    selectedTeacherId === "all"
+      ? students
+      : students.filter((s) => {
+          const grp = groups.find((g) => g.id === s.group_id);
+          return grp && grp.sub_teacher_id === selectedTeacherId;
+        });
 
   const totalFilteredStudents = filteredStudents.length;
 
-  // Calculations
-  const getStudentPrice = (student: any) => {
-    const studentGroup = groups.find(g => g.id === student.group_id);
-    const studentGrade = grades.find(g => g.id === student.grade_id);
-    const basePrice = studentGroup?.monthly_price ?? studentGrade?.monthly_price ?? monthlyPrice;
-    const discount = student.discount_value || 0;
-    return Math.max(0, basePrice - discount);
-  };
+  // ── expenses filtered by selected year ───────────────────────────────────
+  const yearBills = bills.filter(b => (b.billing_year ?? currentYear) === selectedYear);
 
-  // 1. Subscriptions
-  const paidThisMonthCount = filteredStudents.filter(s => s.months[currentMonthIndex] === true).length;
-  
-  const currentMonthEarnings = filteredStudents.reduce((acc, s) => {
-    if (s.months[currentMonthIndex] === true) {
-      return acc + getStudentPrice(s);
-    }
-    return acc;
-  }, 0);
-
-  const totalPaidMonthsCount = filteredStudents.reduce((acc, s) => {
-    return acc + s.months.filter(m => m === true).length;
-  }, 0);
-  
+  // ── subscriptions ─────────────────────────────────────────────────────────
+  const paidThisMonthCount = filteredStudents.filter((s) => s.months[currentMonthIndex]).length;
   const totalSubscriptionEarnings = filteredStudents.reduce((acc, s) => {
-    const paidMonths = s.months.filter((m: boolean) => m === true).length;
-    return acc + (paidMonths * getStudentPrice(s));
+    return acc + s.months.filter(Boolean).length * getStudentPrice(s);
   }, 0);
 
-  // 2. Books
+  // ── books ─────────────────────────────────────────────────────────────────
   let totalBookEarnings = 0;
-  const booksStats = teacherBooks.map(book => {
-    const count = filteredStudents.filter(s => s.received_books && s.received_books.includes(book.id)).length;
+  const booksStats = teacherBooks.map((book) => {
+    const count = filteredStudents.filter((s) => s.received_books?.includes(book.id)).length;
     const earnings = count * book.price;
     totalBookEarnings += earnings;
-    const gradeName = grades.find(g => g.id === book.grade_id)?.name;
+    const gradeName = grades.find((g) => g.id === book.grade_id)?.name;
     return { ...book, count, earnings, gradeName };
   });
+  booksStats.sort((a, b) => b.earnings - a.earnings);
 
-  // 2.5 Grades Subscriptions Stats
-  const gradesStats = grades.map(grade => {
-    const gradeStudents = filteredStudents.filter(s => {
-      const studentEffectiveGradeId = s.grade_id || groups.find(g => g.id === s.group_id)?.grade_id;
-      return studentEffectiveGradeId === grade.id;
-    });
-
-    const paidThisMonth = gradeStudents.filter(s => s.months[currentMonthIndex] === true).length;
-    
-    const earnings = gradeStudents.reduce((acc, s) => {
-      const paidMonths = s.months.filter((m: boolean) => m === true).length;
-      return acc + (paidMonths * getStudentPrice(s));
-    }, 0);
-
+  // ── grades stats ──────────────────────────────────────────────────────────
+  const gradesStats = grades.map((grade) => {
+    const gs = filteredStudents.filter((s) => getEffectiveGradeId(s) === grade.id);
+    const paidThisMonth = gs.filter((s) => s.months[currentMonthIndex]).length;
+    const earnings = gs.reduce((acc, s) => acc + s.months.filter(Boolean).length * getStudentPrice(s), 0);
     return { id: grade.id, name: grade.name, paidThisMonth, earnings };
   });
 
-  const generalStudents = filteredStudents.filter(s => {
-      const studentEffectiveGradeId = s.grade_id || groups.find(g => g.id === s.group_id)?.grade_id;
-      return !studentEffectiveGradeId;
-  });
-  const generalPaidThisMonth = generalStudents.filter(s => s.months[currentMonthIndex] === true).length;
-  const generalEarnings = generalStudents.reduce((acc, s) => {
-    const paidMonths = s.months.filter((m: boolean) => m === true).length;
-    return acc + (paidMonths * getStudentPrice(s));
-  }, 0);
-  
+  const generalStudents = filteredStudents.filter((s) => !getEffectiveGradeId(s));
+  const generalPaidThisMonth = generalStudents.filter((s) => s.months[currentMonthIndex]).length;
+  const generalEarnings = generalStudents.reduce(
+    (acc, s) => acc + s.months.filter(Boolean).length * getStudentPrice(s), 0
+  );
   if (generalEarnings > 0 || generalPaidThisMonth > 0) {
     gradesStats.push({ id: "general", name: "طلاب بدون سنة دراسية", paidThisMonth: generalPaidThisMonth, earnings: generalEarnings });
   }
-
   gradesStats.sort((a, b) => b.earnings - a.earnings);
-  const topGradesStats = gradesStats.slice(0, 2);
-  
-  booksStats.sort((a, b) => b.earnings - a.earnings);
-  const topBooksStats = booksStats.slice(0, 3);
 
-  // 3. Gross Revenue
+  // ── totals ────────────────────────────────────────────────────────────────
   const totalGrossEarnings = totalSubscriptionEarnings + totalBookEarnings;
-
-  // 4. Expenses / Bills
-  const totalExpenses = bills.reduce((sum, b) => sum + Number(b.amount), 0);
-
-  // 5. Net Profit
+  const totalExpenses = yearBills.reduce((sum, b) => sum + Number(b.amount), 0);
   const totalNetProfit = totalGrossEarnings - totalExpenses;
 
-  // Month-by-month statistics (Subscriptions revenue vs Month expenses)
+  // ── prev month for trend ──────────────────────────────────────────────────
+  const prevMonthIndex = currentMonthIndex === 0 ? 11 : currentMonthIndex - 1;
+  const prevMonthEarnings = filteredStudents.reduce(
+    (acc, s) => acc + (s.months[prevMonthIndex] ? getStudentPrice(s) : 0), 0
+  );
+  const prevMonthBills = yearBills.filter(b => b.billing_month === prevMonthIndex + 1);
+  const prevMonthExpenses = prevMonthBills.reduce((sum, b) => sum + Number(b.amount), 0);
+  const prevMonthNetProfit = prevMonthEarnings - prevMonthExpenses;
+
+  // ── unpaid students ───────────────────────────────────────────────────────
+  const unpaidStudents = filteredStudents
+    .filter((s) => !s.months[currentMonthIndex])
+    .map((s) => ({
+      id: s.id,
+      name: s.name,
+      gradeName: grades.find((g) => g.id === getEffectiveGradeId(s))?.name,
+      groupName: groups.find((g) => g.id === s.group_id)?.name,
+    }));
+
+  // ── monthly breakdown ─────────────────────────────────────────────────────
   const monthsReport = arabicMonths.map((name, index) => {
-    const paidCount = filteredStudents.filter(s => s.months[index] === true).length;
-    
-    const subscriptionEarnings = filteredStudents.reduce((acc, s) => {
-      if (s.months[index] === true) {
-        return acc + getStudentPrice(s);
-      }
-      return acc;
-    }, 0);
-
-    // Filter bills for this specific month (1-indexed in database)
-    const monthBills = bills.filter(b => b.billing_month === index + 1);
+    const paidCount = filteredStudents.filter((s) => s.months[index]).length;
+    const subscriptionEarnings = filteredStudents.reduce(
+      (acc, s) => acc + (s.months[index] ? getStudentPrice(s) : 0), 0
+    );
+    const monthBills = yearBills.filter(b => b.billing_month === index + 1);
     const monthExpenses = monthBills.reduce((sum, b) => sum + Number(b.amount), 0);
-
     const netProfit = subscriptionEarnings - monthExpenses;
     const percentage = totalFilteredStudents > 0 ? Math.round((paidCount / totalFilteredStudents) * 100) : 0;
-
-    return { name, paidCount, subscriptionEarnings, monthExpenses, netProfit, percentage };
+    return {
+      name, paidCount, subscriptionEarnings,
+      bookEarnings: 0,
+      monthExpenses, netProfit, percentage,
+      isCurrentMonth: index === currentMonthIndex && selectedYear === currentYear,
+    };
   });
 
+  // ── CSV export ────────────────────────────────────────────────────────────
+  const handleExportCSV = () => {
+    const headers = ["الشهر", "عدد المدفوعات", "إيراد الاشتراك", "المصروفات", "صافي الربح", "نسبة السداد"];
+    const rows = monthsReport.map((m) => [
+      m.name, m.paidCount, m.subscriptionEarnings, m.monthExpenses, m.netProfit, `${m.percentage}%`,
+    ]);
+    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `تقرير_${selectedYear}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── render ────────────────────────────────────────────────────────────────
   if (loading) {
-    return (
-      <div className="loading-wrapper">
-        <div className="spinner"></div>
-      </div>
-    );
+    return <div className="loading-wrapper"><div className="spinner" /></div>;
   }
 
   return (
-    <div>
-      {/* Title */}
-      <div style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem" }}>
-        <div>
-          <h1 style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>التقارير المالية</h1>
-          <p style={{ color: "var(--text-secondary)" }}>تحليلات الإيرادات الكلية، المصروفات، وصافي الأرباح</p>
+    <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+
+      {/* ── Header ── */}
+      <div style={{ marginBottom: "1.5rem" }}>
+        <div className="reports-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "0.75rem", marginBottom: "0.875rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+            <div style={{ width: "44px", height: "44px", borderRadius: "12px", background: "rgba(20,184,166,0.1)", border: "1px solid rgba(20,184,166,0.25)", color: "var(--color-teal)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <BarChart3 size={20} />
+            </div>
+            <div>
+              <h1 style={{ fontSize: "clamp(1.25rem, 3vw, 1.75rem)", marginBottom: "0.1rem" }}>التقارير المالية</h1>
+              <p style={{ color: "var(--text-muted)", fontSize: "clamp(0.75rem, 1.5vw, 0.85rem)" }}>تحليلات الإيرادات · المصروفات · صافي الأرباح</p>
+            </div>
+          </div>
         </div>
-        {hasCenterMode && (
-          <div style={{ minWidth: "250px" }}>
-            <label className="form-label" style={{ fontSize: "0.85rem", marginBottom: "0.5rem" }}>فلتر حسب المعلم:</label>
+
+          {/* Filters Bar */}
+        <div className="glass-panel reports-filters" style={{ padding: "0.65rem 1rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", color: "var(--text-muted)", fontSize: "0.8rem" }}>
+            <Filter size={13} />
+            <span>فلتر:</span>
+          </div>
+
+          {/* Year selector */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+            <label style={{ fontSize: "0.8rem", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>السنة:</label>
             <select
               className="form-input"
-              value={selectedTeacherId}
-              onChange={(e) => setSelectedTeacherId(e.target.value)}
-              style={{ padding: "0.5rem", borderRadius: "8px", border: "1px solid var(--border-color)", background: "var(--bg-card)" }}
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              style={{ padding: "0.3rem 0.6rem", borderRadius: "8px", fontSize: "0.82rem", width: "auto" }}
             >
-              <option value="all">كل معلمين السنتر</option>
-              {subTeachers.map(t => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+              {[currentYear - 1, currentYear, currentYear + 1].map(y => (
+                <option key={y} value={y}>{y}</option>
               ))}
             </select>
           </div>
-        )}
+
+          {/* Teacher filter (center mode only) */}
+          {hasCenterMode && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <label style={{ fontSize: "0.8rem", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>المعلم:</label>
+              <select
+                className="form-input"
+                value={selectedTeacherId}
+                onChange={(e) => setSelectedTeacherId(e.target.value)}
+                style={{ padding: "0.3rem 0.6rem", borderRadius: "8px", fontSize: "0.82rem", width: "auto" }}
+              >
+                <option value="all">الكل</option>
+                {subTeachers.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="reports-filters-info" style={{ marginRight: "auto", fontSize: "0.78rem", color: "var(--text-muted)" }}>
+            {totalFilteredStudents} طالب · {arabicMonths[currentMonthIndex]} {selectedYear}
+          </div>
+        </div>
       </div>
 
-      {/* Main Earnings Summary Cards (4 Cards Grid) */}
-      <section className="stats-grid" style={{ marginBottom: "2.5rem", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
-        {/* Net Profit Card */}
-        <div className="stat-card glass-panel report-card-green" style={{ borderLeft: "4px solid #10b981" }}>
-          <div className="stat-icon-wrapper" style={{ background: "rgba(16, 185, 129, 0.15)", color: "#10b981", border: "1px solid rgba(16, 185, 129, 0.2)" }}>
-            <DollarSign size={24} />
-          </div>
-          <div className="stat-info">
-            <span className="stat-label" style={{ color: "#a7f3d0" }}>صافي الأرباح الكلي</span>
-            <span className="stat-value monospace" style={{ fontSize: "1.8rem", fontWeight: 900, color: "#10b981" }}>{totalNetProfit} ج.م</span>
-          </div>
-        </div>
+      {/* ── KPI Cards ── */}
+      <ReportsSummaryCards
+        totalNetProfit={totalNetProfit}
+        totalGrossEarnings={totalGrossEarnings}
+        totalExpenses={totalExpenses}
+        totalBookEarnings={totalBookEarnings}
+        prevMonthNetProfit={prevMonthNetProfit}
+        prevMonthGrossEarnings={prevMonthEarnings}
+        prevMonthExpenses={prevMonthExpenses}
+        prevMonthBookEarnings={0}
+      />
 
-        {/* Gross Revenue Card */}
-        <div className="stat-card glass-panel" style={{ borderLeft: "4px solid var(--color-teal)" }}>
-          <div className="stat-icon-wrapper" style={{ background: "rgba(20, 184, 166, 0.15)", color: "var(--color-teal)", border: "1px solid rgba(20, 184, 166, 0.2)" }}>
-            <TrendingUp size={24} />
-          </div>
-          <div className="stat-info">
-            <span className="stat-label">إجمالي الإيرادات الكلي</span>
-            <span className="stat-value monospace">{totalGrossEarnings} ج.م</span>
-          </div>
-        </div>
+      {/* ── Insights Strip ── */}
+      <InsightsStrip
+        topGrade={gradesStats[0] ?? null}
+        unpaidCount={unpaidStudents.length}
+        topBook={booksStats[0] ?? null}
+        totalStudents={totalFilteredStudents}
+        currentMonthName={arabicMonths[currentMonthIndex]}
+        onShowUnpaid={() => setShowUnpaid(true)}
+      />
 
-        {/* Total Expenses Card */}
-        <div className="stat-card glass-panel" style={{ borderLeft: "4px solid #ef4444" }}>
-          <div className="stat-icon-wrapper" style={{ background: "rgba(239, 68, 68, 0.15)", color: "#f87171", border: "1px solid rgba(239, 68, 68, 0.2)" }}>
-            <Receipt size={24} />
-          </div>
-          <div className="stat-info">
-            <span className="stat-label" style={{ color: "#fca5a5" }}>إجمالي المصروفات (الفواتير)</span>
-            <span className="stat-value monospace" style={{ color: "#f87171" }}>{totalExpenses} ج.م</span>
-          </div>
-        </div>
+      {/* ── Monthly Table ── */}
+      <MonthlyTable monthsReport={monthsReport} onExportCSV={handleExportCSV} />
 
-        {/* Book Earnings Card */}
-        <div className="stat-card glass-panel" style={{ borderLeft: "4px solid var(--color-amber)" }}>
-          <div className="stat-icon-wrapper" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-amber)", border: "1px solid rgba(245, 158, 11, 0.2)" }}>
-            <BookOpen size={24} />
-          </div>
-          <div className="stat-info">
-            <span className="stat-label">أرباح الكتب الكلية</span>
-            <span className="stat-value monospace">{totalBookEarnings} ج.م</span>
-          </div>
-        </div>
-      </section>
-
-      {/* Financial Split Grid */}
-      <div className="dashboard-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-        
-        {/* Subscriptions Card Details */}
-        <section className="glass-panel panel-content" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-          <h2 className="panel-title">
-            <CheckCircle2 size={18} style={{ color: "var(--color-teal)" }} />
-            <span>تفاصيل أرباح الاشتراكات</span>
-          </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", marginTop: "1rem", flex: 1, justifyContent: "space-between" }}>
-            <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
-              <div>
-                <p style={{ fontWeight: 600 }}>أرباح الاشتراك في الشهر الحالي ({arabicMonths[currentMonthIndex]})</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{paidThisMonthCount} طالب دفعوا الاشتراك</p>
-              </div>
-              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{currentMonthEarnings} ج.م</span>
-            </div>
-            <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
-              <div>
-                <p style={{ fontWeight: 600 }}>إجمالي إيراد الاشتراكات</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>مجموع كل عمليات الدفع لجميع السنين</p>
-              </div>
-              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{totalSubscriptionEarnings} ج.م</span>
-            </div>
-            {topGradesStats.map((gradeStat, idx) => (
-              <div key={gradeStat.id} className="flex-between" style={{ borderBottom: idx !== topGradesStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: idx !== topGradesStats.length - 1 ? "1rem" : "0.5rem" }}>
-                <div>
-                  <p style={{ fontWeight: 600 }}>إجمالي أرباح {gradeStat.name}</p>
-                  <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{gradeStat.paidThisMonth} طالب دفعوا الاشتراك هذا الشهر ({arabicMonths[currentMonthIndex]})</p>
-                </div>
-                <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{gradeStat.earnings} ج.م</span>
-              </div>
-            ))}
-            {gradesStats.length > 2 && (
-              <Button variant="secondary" size="sm" onClick={() => setShowAllGrades(true)} style={{ width: "100%", marginTop: "0.5rem" }}>
-                عرض المزيد
-              </Button>
-            )}
-            {gradesStats.length === 0 && (
-              <div className="flex-between" style={{ paddingBottom: "0.5rem" }}>
-                <div>
-                  <p style={{ fontWeight: 600, color: "var(--text-muted)" }}>لا توجد سنين دراسية مضافة</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Expenses & Books Split Card */}
-        <section className="glass-panel panel-content" style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-          <h2 className="panel-title">
-            <Receipt size={18} style={{ color: "var(--color-amber)" }} />
-            <span>تفاصيل الفواتير والكتب</span>
-          </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem", marginTop: "1rem", flex: 1, justifyContent: "space-between" }}>
-            <div className="flex-between" style={{ borderBottom: "1px solid var(--border-color)", paddingBottom: "1rem" }}>
-              <div>
-                <p style={{ fontWeight: 600 }}>إجمالي الفواتير والمصروفات</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>تشمل الإيجارات ورواتب السكرتارية والمصروفات الأخرى</p>
-              </div>
-              <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700, color: "#f87171" }}>-{totalExpenses} ج.م</span>
-            </div>
-            {topBooksStats.map((book, idx) => (
-              <div key={book.id} className="flex-between" style={{ borderBottom: idx !== topBooksStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: idx !== topBooksStats.length - 1 ? "1rem" : "0.5rem" }}>
-                <div>
-                  <p style={{ fontWeight: 600 }}>إجمالي أرباح {book.name}</p>
-                  <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                    {book.count} طالب استلموا الكتاب بسعر {book.price} ج.م {book.gradeName ? `(${book.gradeName})` : ""}
-                  </p>
-                </div>
-                <span className="monospace" style={{ fontSize: "1.25rem", fontWeight: 700 }}>{book.earnings} ج.م</span>
-              </div>
-            ))}
-            {booksStats.length > 3 && (
-              <Button variant="secondary" size="sm" onClick={() => setShowAllBooks(true)} style={{ width: "100%", marginTop: "0.5rem" }}>
-                عرض المزيد
-              </Button>
-            )}
-            {booksStats.length === 0 && (
-              <div className="flex-between" style={{ paddingBottom: "0.5rem" }}>
-                <div>
-                  <p style={{ fontWeight: 600, color: "var(--text-muted)" }}>لا يوجد كتب مضافة</p>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-      </div>
-
-      {/* Month-by-Month Table Breakdown */}
-      <section className="glass-panel panel-content" style={{ marginTop: "2rem" }}>
-        <h2 className="panel-title">
-          <Calendar size={18} style={{ color: "var(--color-info)" }} />
-          <span>التقرير المالي التفصيلي للشهور الـ 12</span>
-        </h2>
-        
-        <div className="table-container" style={{ marginTop: "1rem" }}>
-          <table className="report-table">
-            <thead>
-              <tr>
-                <th>الشهر</th>
-                <th>عدد المدفوعات</th>
-                <th>إيراد الاشتراك</th>
-                <th>المصروفات والفواتير</th>
-                <th>صافي الربح</th>
-                <th>نسبة السداد للطلاب (%)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {monthsReport.map((month) => (
-                <tr key={month.name}>
-                  <td style={{ fontWeight: 600 }}>{month.name}</td>
-                  <td className="monospace">{month.paidCount} طالب</td>
-                  <td className="monospace" style={{ color: month.subscriptionEarnings > 0 ? "var(--color-teal)" : "var(--text-muted)", fontWeight: month.subscriptionEarnings > 0 ? 600 : 400 }}>
-                    {month.subscriptionEarnings} ج.م
-                  </td>
-                  <td className="monospace" style={{ color: month.monthExpenses > 0 ? "#f87171" : "var(--text-muted)" }}>
-                    {month.monthExpenses > 0 ? `-${month.monthExpenses}` : "0"} ج.م
-                  </td>
-                  <td className="monospace" style={{ 
-                    color: month.netProfit > 0 ? "#10b981" : month.netProfit < 0 ? "#ef4444" : "var(--text-muted)", 
-                    fontWeight: month.netProfit !== 0 ? 700 : 400 
-                  }}>
-                    {month.netProfit} ج.م
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                      <span className="monospace" style={{ minWidth: "40px", display: "inline-block", textAlign: "left" }}>{month.percentage}%</span>
-                      <div className="progress-bar-container">
-                        <div 
-                          className="progress-bar-fill" 
-                          style={{ 
-                            width: `${month.percentage}%`,
-                            background: month.percentage > 70 ? "var(--color-success)" : month.percentage > 30 ? "var(--color-teal)" : "var(--text-muted)"
-                          }}
-                        ></div>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Toast Alert */}
+      {/* ── Toast ── */}
       {toast && (
         <div className={`alert-toast ${toast.type === "success" ? "alert-success" : "alert-error"}`}>
           {toast.type === "error" && <AlertCircle size={18} />}
@@ -478,15 +319,23 @@ export default function ReportsPage() {
         </div>
       )}
 
+      {/* ── Modals ── */}
+      <UnpaidStudentsModal
+        isOpen={showUnpaid}
+        onClose={() => setShowUnpaid(false)}
+        students={unpaidStudents}
+        currentMonthName={arabicMonths[currentMonthIndex]}
+      />
+
       <Modal isOpen={showAllGrades} onClose={() => setShowAllGrades(false)} title="جميع أرباح الاشتراكات" maxWidth="600px">
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {gradesStats.map((gradeStat, idx) => (
-            <div key={gradeStat.id} className="flex-between" style={{ borderBottom: idx !== gradesStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: "0.5rem" }}>
+          {gradesStats.map((g, idx) => (
+            <div key={g.id} className="flex-between" style={{ borderBottom: idx !== gradesStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: "0.5rem" }}>
               <div>
-                <p style={{ fontWeight: 600 }}>إجمالي أرباح {gradeStat.name}</p>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{gradeStat.paidThisMonth} طالب دفعوا الاشتراك هذا الشهر</p>
+                <p style={{ fontWeight: 600 }}>إجمالي أرباح {g.name}</p>
+                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>{g.paidThisMonth} طالب دفعوا هذا الشهر</p>
               </div>
-              <span className="monospace" style={{ fontSize: "1.1rem", fontWeight: 700 }}>{gradeStat.earnings} ج.م</span>
+              <span className="monospace" style={{ fontSize: "1.1rem", fontWeight: 700 }}>{g.earnings.toLocaleString()} ج.م</span>
             </div>
           ))}
         </div>
@@ -497,12 +346,12 @@ export default function ReportsPage() {
           {booksStats.map((book, idx) => (
             <div key={book.id} className="flex-between" style={{ borderBottom: idx !== booksStats.length - 1 ? "1px solid var(--border-color)" : "none", paddingBottom: "0.5rem" }}>
               <div>
-                <p style={{ fontWeight: 600 }}>إجمالي أرباح {book.name}</p>
+                <p style={{ fontWeight: 600 }}>{book.name}</p>
                 <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>
-                  {book.count} طالب استلموا الكتاب بسعر {book.price} ج.م {book.gradeName ? `(${book.gradeName})` : ""}
+                  {book.count} طالب · {book.price} ج.م{book.gradeName ? ` · ${book.gradeName}` : ""}
                 </p>
               </div>
-              <span className="monospace" style={{ fontSize: "1.1rem", fontWeight: 700 }}>{book.earnings} ج.م</span>
+              <span className="monospace" style={{ fontSize: "1.1rem", fontWeight: 700 }}>{book.earnings.toLocaleString()} ج.م</span>
             </div>
           ))}
         </div>

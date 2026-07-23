@@ -55,5 +55,13 @@ export const GroupsRepository = {
       .delete()
       .eq("id", id);
     if (error) throw error;
+  },
+
+  async updateGroupsByGradeId(gradeId: string, updates: Partial<Group>): Promise<void> {
+    const { error } = await supabase
+      .from("groups")
+      .update(updates)
+      .eq("grade_id", gradeId);
+    if (error) throw error;
   }
 };

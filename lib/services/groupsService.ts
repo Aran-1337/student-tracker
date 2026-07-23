@@ -24,5 +24,9 @@ export const GroupsService = {
 
   async deleteGroup(id: string): Promise<void> {
     return GroupsRepository.deleteGroup(id);
+  },
+
+  async updateGroupsByGradeId(gradeId: string, updates: Partial<Group>): Promise<void> {
+    return GroupsRepository.updateGroupsByGradeId(gradeId, updates);
   }
 };

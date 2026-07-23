@@ -142,6 +142,8 @@ export default function AttendancePage() {
           allDates={data.allDates}
           attendance={data.attendance}
           saving={actions.saving}
+          selectedGroupId={data.selectedGroupId}
+          groups={data.groups}
           isPresent={actions.isPresent}
           getAttendancePercent={actions.getAttendancePercent}
           onToggle={actions.handleToggle}

@@ -47,11 +47,23 @@ export const BillsRepository = {
     if (error) throw error;
   },
 
-  async deleteRecurringBillsForMonth(monthNum: number, teacherId: string): Promise<void> {
+  async updateBill(id: string, updates: Partial<Omit<Bill, "id" | "created_at" | "teacher_id">>): Promise<Bill> {
+    const { data, error } = await supabase
+      .from("bills")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteRecurringBillsForMonth(monthNum: number, yearNum: number, teacherId: string): Promise<void> {
     const { error } = await supabase
       .from("bills")
       .delete()
       .eq("billing_month", monthNum)
+      .eq("billing_year", yearNum)
       .eq("is_recurring", true)
       .eq("teacher_id", teacherId);
     if (error) throw error;

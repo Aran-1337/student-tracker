@@ -1,13 +1,15 @@
 "use client";
 
-import { Student, AttendanceRecord } from "@/lib/types";
-import { CheckCircle2, AlertCircle, QrCode, Trash2, CheckSquare, XSquare } from "lucide-react";
+import { Student, AttendanceRecord, Group } from "@/lib/types";
+import { CheckCircle2, AlertCircle, QrCode, CheckSquare, XSquare } from "lucide-react";
 
 interface Props {
   students: Student[];
   allDates: string[];
   attendance: AttendanceRecord[];
   saving: boolean;
+  selectedGroupId: string;
+  groups: Group[];
   isPresent: (sid: string, date: string) => boolean;
   getAttendancePercent: (sid: string, dates: string[]) => number;
   onToggle: (student: Student, date: string) => void;
@@ -16,8 +18,104 @@ interface Props {
   onShowQR: (student: Student) => void;
 }
 
+function TableHeaders({ allDates, today, saving, onMarkAll, onClearSession }: {
+  allDates: string[]; today: string; saving: boolean;
+  onMarkAll: (d: string) => void; onClearSession: (d: string) => void;
+}) {
+  return (
+    <thead>
+      <tr>
+        <th style={{ width: 40, textAlign: "center" }}>#</th>
+        <th style={{ minWidth: 60, textAlign: "center" }}>الكود</th>
+        <th style={{ minWidth: 160 }}>الطالب</th>
+        {allDates.map(dateStr => {
+          const isPast = dateStr < today;
+          const shortDate = dateStr.slice(5).split("-").reverse().join("/");
+          return (
+            <th key={dateStr} className="session-col-header">
+              <div className="session-header-inner">
+                <span className="session-date-label">{shortDate}</span>
+                <div className="session-header-actions">
+                  <button className="session-action-btn session-action-check" onClick={() => onMarkAll(dateStr)} disabled={saving || isPast} title={isPast ? "لا يمكن تعديل يوم سابق" : "تحضير الكل"}>
+                    <CheckSquare size={11} />
+                  </button>
+                  <button className="session-action-btn session-action-clear" onClick={() => onClearSession(dateStr)} disabled={saving || isPast} title={isPast ? "لا يمكن تعديل يوم سابق" : "مسح الكل"}>
+                    <XSquare size={11} />
+                  </button>
+                </div>
+              </div>
+            </th>
+          );
+        })}
+        <th style={{ textAlign: "center", minWidth: 80 }}>النسبة</th>
+        <th style={{ textAlign: "center", minWidth: 56 }}>QR</th>
+      </tr>
+    </thead>
+  );
+}
+
+function StudentRows({ students, allDates, today, saving, isPresent, getAttendancePercent, onToggle, onShowQR, startIndex = 0 }: {
+  students: Student[]; allDates: string[]; today: string; saving: boolean; startIndex?: number;
+  isPresent: (sid: string, date: string) => boolean;
+  getAttendancePercent: (sid: string, dates: string[]) => number;
+  onToggle: (student: Student, date: string) => void;
+  onShowQR: (student: Student) => void;
+}) {
+  return (
+    <>
+      {students.map((student, index) => {
+        const percent = getAttendancePercent(student.id, allDates);
+        const percentColor = percent >= 75 ? "#10b981" : percent >= 50 ? "#f59e0b" : "#ef4444";
+        const rowDanger = percent < 75 && allDates.length > 0;
+        return (
+          <tr key={student.id} className={rowDanger ? "row-danger" : ""}>
+            <td style={{ textAlign: "center", color: "var(--text-muted)", fontWeight: 600 }}>{startIndex + index + 1}</td>
+            <td style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.8rem", fontWeight: 600 }}>
+              {student.code || "—"}
+            </td>
+            <td>
+              <div className="student-name-cell">
+                <span className="student-name">{student.name}</span>
+              </div>
+            </td>
+            {allDates.map(dateStr => {
+              const present = isPresent(student.id, dateStr);
+              const isPast = dateStr < today;
+              return (
+                <td key={dateStr} style={{ textAlign: "center", padding: "0.5rem 0.25rem" }}>
+                  <button
+                    className={`attendance-cell-btn ${present ? "present" : "absent"} ${isPast ? "locked" : ""}`}
+                    onClick={() => !isPast && onToggle(student, dateStr)}
+                    disabled={isPast}
+                    title={isPast ? "لا يمكن تعديل يوم سابق" : present ? `إلغاء حضور ${student.name}` : `تسجيل حضور ${student.name}`}
+                  >
+                    {present && <CheckCircle2 size={16} />}
+                  </button>
+                </td>
+              );
+            })}
+            <td style={{ textAlign: "center" }}>
+              <div className="percent-cell">
+                <span className="percent-value" style={{ color: percentColor }}>{percent}%</span>
+                <div className="percent-bar-bg">
+                  <div className="percent-bar-fill" style={{ width: `${percent}%`, background: percentColor }} />
+                </div>
+              </div>
+            </td>
+            <td style={{ textAlign: "center" }}>
+              <button className="qr-cell-btn" onClick={() => onShowQR(student)} title="عرض QR">
+                <QrCode size={15} />
+              </button>
+            </td>
+          </tr>
+        );
+      })}
+    </>
+  );
+}
+
 export function AttendanceTable({
-  students, allDates, saving,
+  students, allDates, saving, selectedGroupId, groups,
   isPresent, getAttendancePercent,
   onToggle, onMarkAll, onClearSession, onShowQR,
 }: Props) {
@@ -33,104 +131,51 @@ export function AttendanceTable({
     );
   }
 
+  const sharedProps = { allDates, today, saving, isPresent, getAttendancePercent, onToggle, onShowQR };
+
+  if (selectedGroupId !== "all") {
+    return (
+      <div className="table-container">
+        <table className="students-table attendance-table">
+          <TableHeaders allDates={allDates} today={today} saving={saving} onMarkAll={onMarkAll} onClearSession={onClearSession} />
+          <tbody>
+            <StudentRows students={students} {...sharedProps} />
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
+  // Group by group_id when showing all
+  const groupedMap = new Map<string, Student[]>();
+  for (const s of students) {
+    const key = s.group_id || "no-group";
+    if (!groupedMap.has(key)) groupedMap.set(key, []);
+    groupedMap.get(key)!.push(s);
+  }
+
+  let runningIndex = 0;
   return (
     <div className="table-container">
-      <table className="students-table attendance-table">
-        <thead>
-          <tr>
-            <th style={{ width: 40, textAlign: "center" }}>#</th>
-            <th style={{ minWidth: 160 }}>الطالب</th>
-            {allDates.map(dateStr => {
-              const isPast = dateStr < today;
-              const shortDate = dateStr.slice(5).split("-").reverse().join("/");
-              return (
-                <th key={dateStr} className="session-col-header">
-                  <div className="session-header-inner">
-                    <span className="session-date-label">{shortDate}</span>
-                    <div className="session-header-actions">
-                      <button
-                        className="session-action-btn session-action-check"
-                        onClick={() => onMarkAll(dateStr)}
-                        disabled={saving || isPast}
-                        title={isPast ? "لا يمكن تعديل يوم سابق" : "تحضير الكل"}
-                      >
-                        <CheckSquare size={11} />
-                      </button>
-                      <button
-                        className="session-action-btn session-action-clear"
-                        onClick={() => onClearSession(dateStr)}
-                        disabled={saving || isPast}
-                        title={isPast ? "لا يمكن تعديل يوم سابق" : "مسح الكل"}
-                      >
-                        <XSquare size={11} />
-                      </button>
-                    </div>
-                  </div>
-                </th>
-              );
-            })}
-            <th style={{ textAlign: "center", minWidth: 80 }}>النسبة</th>
-            <th style={{ textAlign: "center", minWidth: 56 }}>QR</th>
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((student, index) => {
-            const percent = getAttendancePercent(student.id, allDates);
-            const percentColor = percent >= 75 ? "#10b981" : percent >= 50 ? "#f59e0b" : "#ef4444";
-            const rowDanger = percent < 75 && allDates.length > 0;
-            return (
-              <tr key={student.id} className={rowDanger ? "row-danger" : ""}>
-                <td style={{ textAlign: "center", color: "var(--text-muted)", fontWeight: 600 }}>
-                  {index + 1}
-                </td>
-                <td>
-                  <div className="student-name-cell">
-                    <span className="student-name">{student.name}</span>
-                  </div>
-                </td>
-                {allDates.map(dateStr => {
-                  const present = isPresent(student.id, dateStr);
-                  const isPast = dateStr < today;
-                  return (
-                    <td key={dateStr} style={{ textAlign: "center", padding: "0.5rem 0.25rem" }}>
-                      <button
-                        className={`attendance-cell-btn ${present ? "present" : "absent"} ${isPast ? "locked" : ""}`}
-                        onClick={() => !isPast && onToggle(student, dateStr)}
-                        disabled={isPast}
-                        title={
-                          isPast
-                            ? "لا يمكن تعديل يوم سابق"
-                            : present
-                            ? `إلغاء حضور ${student.name}`
-                            : `تسجيل حضور ${student.name}`
-                        }
-                      >
-                        {present && <CheckCircle2 size={16} />}
-                      </button>
-                    </td>
-                  );
-                })}
-                <td style={{ textAlign: "center" }}>
-                  <div className="percent-cell">
-                    <span className="percent-value" style={{ color: percentColor }}>{percent}%</span>
-                    <div className="percent-bar-bg">
-                      <div
-                        className="percent-bar-fill"
-                        style={{ width: `${percent}%`, background: percentColor }}
-                      />
-                    </div>
-                  </div>
-                </td>
-                <td style={{ textAlign: "center" }}>
-                  <button className="qr-cell-btn" onClick={() => onShowQR(student)} title="عرض QR">
-                    <QrCode size={15} />
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      {Array.from(groupedMap.entries()).map(([groupId, groupStudents]) => {
+        const group = groups.find(g => g.id === groupId);
+        const startIndex = runningIndex;
+        runningIndex += groupStudents.length;
+        return (
+          <div key={groupId} style={{ marginBottom: "1.5rem" }}>
+            <div style={{ padding: "0.5rem 0.75rem", background: "var(--color-teal, #0d9488)", color: "#fff", borderRadius: "6px 6px 0 0", fontWeight: 700, fontSize: "0.9rem" }}>
+              {group ? group.name : "بدون مجموعة"}
+              <span style={{ marginRight: "0.5rem", opacity: 0.8, fontWeight: 400 }}>({groupStudents.length} طالب)</span>
+            </div>
+            <table className="students-table attendance-table" style={{ borderRadius: "0 0 6px 6px" }}>
+              <TableHeaders allDates={allDates} today={today} saving={saving} onMarkAll={onMarkAll} onClearSession={onClearSession} />
+              <tbody>
+                <StudentRows students={groupStudents} {...sharedProps} startIndex={startIndex} />
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
     </div>
   );
 }

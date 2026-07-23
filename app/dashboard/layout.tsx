@@ -287,7 +287,7 @@ export default function DashboardLayout({
 
             {/* Logout button inside menu on mobile */}
             <button 
-              className={`btn btn-secondary sidebar-logout-mobile ${mobileMenuOpen ? "open" : ""}`}
+              className="btn btn-secondary sidebar-logout-mobile"
               onClick={handleLogout}
             >
               <LogOut size={16} />

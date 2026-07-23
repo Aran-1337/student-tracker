@@ -1,709 +1,129 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { BillsService } from "@/lib/services/billsService";
-import { AuthService } from "@/lib/services/authService";
-import { Bill } from "@/lib/types";
-import { 
-  Receipt, 
-  Plus, 
-  Trash2, 
-  AlertCircle,
-  Calendar,
-  FileText,
-  RefreshCw,
-  Repeat,
-  Zap,
-  Check,
-  X
-} from "lucide-react";
-
-
-const arabicMonths = [
-  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
-  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"
-];
-
-const categories = ["إيجار", "رواتب سكرتارية", "أخرى"];
-
-const catStyle: Record<string, React.CSSProperties> = {
-  "إيجار": { background: "rgba(59,130,246,0.15)", color: "#60a5fa", border: "1px solid rgba(59,130,246,0.2)" },
-  "رواتب سكرتارية": { background: "rgba(167,139,250,0.15)", color: "#c084fc", border: "1px solid rgba(167,139,250,0.2)" },
-  "أخرى": { background: "rgba(156,163,175,0.15)", color: "#9ca3af", border: "1px solid rgba(156,163,175,0.2)" }
-};
+import { AlertCircle, Check } from "lucide-react";
+import { useBills } from "./_hooks/useBills";
+import BillsHeader from "./_components/BillsHeader";
+import BillsSummaryCards from "./_components/BillsSummaryCards";
+import MonthlyOverview from "./_components/MonthlyOverview";
+import BillsTable from "./_components/BillsTable";
+import AddBillDrawer from "./_components/AddBillDrawer";
+import EditBillModal from "./_components/EditBillModal";
+import BulkActionBar from "./_components/BulkActionBar";
+import GenerateBanner from "./_components/GenerateBanner";
 
 export default function BillsManagement() {
-  const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
-
-  // App data state
-  const [bills, setBills] = useState<Bill[]>([]);
-
-  // Bulk selection state
-  const [selectedBillIds, setSelectedBillIds] = useState<Set<string>>(new Set());
-
-  // Form states
-  const [title, setTitle] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState<"إيجار" | "رواتب سكرتارية" | "أخرى">("إيجار");
-  const [billingMonth, setBillingMonth] = useState<number>(new Date().getMonth() + 1);
-  const [isRecurring, setIsRecurring] = useState(false);
-
-  // Filter state
-  const [activeFilter, setActiveFilter] = useState<string>("all");
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
-
-  const showToast = (message: string, type: "success" | "error" = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3500);
-  };
-
-  useEffect(() => {
-    async function loadBills() {
-      try {
-        const { data: { session } } = await AuthService.getSession();
-        if (!session) return;
-        setUserId(session.user.id);
-
-        const data = await BillsService.getBillsByTeacherId(session.user.id);
-        setBills(data || []);
-      } catch (err: any) {
-        showToast("حدث خطأ أثناء تحميل الفواتير.", "error");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadBills();
-  }, []);
-
-  const handleAddBill = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || !amount || !userId) {
-      showToast("يرجى ملء كافة الحقول المطلوبة.", "error");
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      const parsedAmount = Number(amount);
-      if (isNaN(parsedAmount) || parsedAmount < 0) {
-        throw new Error("يرجى إدخال قيمة مالية صحيحة.");
-      }
-
-      const newBillData = {
-        teacher_id: userId,
-        title,
-        amount: parsedAmount,
-        category: category as "إيجار" | "رواتب سكرتارية" | "أخرى",
-        billing_month: Number(billingMonth),
-        is_recurring: isRecurring
-      };
-
-      const newBill = await BillsService.addBill(newBillData);
-
-      setBills([newBill, ...bills]);
-      setTitle("");
-      setAmount("");
-      setIsRecurring(false);
-      showToast(isRecurring ? "✓ تم تسجيل الفاتورة المتكررة بنجاح." : "✓ تم تسجيل الفاتورة بنجاح.");
-    } catch (err: any) {
-      showToast(err.message || "فشل تسجيل الفاتورة.", "error");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleDeleteBill = async (billId: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذه الفاتورة/المصروف نهائياً؟")) {
-      return;
-    }
-
-    try {
-      await BillsService.deleteBill(billId);
-
-      setBills(bills.filter(b => b.id !== billId));
-      setSelectedBillIds(prev => {
-        const next = new Set(prev);
-        next.delete(billId);
-        return next;
-      });
-      showToast("تم حذف الفاتورة بنجاح.");
-    } catch (err: any) {
-      showToast(err.message || "فشل حذف الفاتورة.", "error");
-    }
-  };
-
-  // Bulk delete handler
-  const handleBulkDelete = async () => {
-    const count = selectedBillIds.size;
-    if (count === 0) return;
-
-    if (!confirm(`هل أنت متأكد من حذف ${count} فاتورة؟ هذا الإجراء لا يمكن التراجع عنه.`)) {
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      await BillsService.deleteBills(Array.from(selectedBillIds));
-
-      setBills(prev => prev.filter(b => !selectedBillIds.has(b.id)));
-      setSelectedBillIds(new Set());
-      showToast(`✓ تم حذف ${count} فاتورة بنجاح.`);
-    } catch (err: any) {
-      showToast(err.message || "فشل حذف الفواتير.", "error");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Generate recurring bills for a target month
-  const handleGenerateForMonth = async (targetMonth: number) => {
-    if (!userId) return;
-
-    setActionLoading(true);
-    try {
-      const generatedBills = await BillsService.generateRecurringBillsForMonth(targetMonth, userId, bills);
-
-      setBills([...generatedBills, ...bills]);
-      showToast(`✓ تم توليد ${generatedBills.length} فاتورة لشهر ${arabicMonths[targetMonth - 1]} بنجاح!`);
-    } catch (err: any) {
-      showToast(err.message || "فشل توليد الفواتير المتكررة.", "error");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  // Delete all recurring bills for a given month (toggle off)
-  const handleDeleteMonthBills = async (monthNum: number) => {
-    const monthName = arabicMonths[monthNum - 1];
-    if (!confirm(`هل تريد حذف كل الفواتير المتكررة لشهر ${monthName}؟`)) {
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      if (!userId) return;
-      await BillsService.deleteRecurringBillsForMonth(monthNum, userId);
-
-      setBills(prev => prev.filter(b => !(b.billing_month === monthNum && b.is_recurring)));
-      setSelectedBillIds(prev => {
-        const toRemove = bills.filter(b => b.billing_month === monthNum && b.is_recurring).map(b => b.id);
-        const next = new Set(prev);
-        toRemove.forEach(id => next.delete(id));
-        return next;
-      });
-      showToast(`✓ تم حذف جميع الفواتير المتكررة لشهر ${monthName}.`);
-    } catch (err: any) {
-      showToast(err.message || "فشل حذف فواتير الشهر.", "error");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-
-  // Fix: UNIQUE recurring templates keyed by title|category|amount
-  const recurringTemplatesMap = new Map<string, Bill>();
-  for (const b of bills) {
-    if (b.is_recurring) {
-      const key = `${b.title}|${b.category}|${b.amount}`;
-      if (!recurringTemplatesMap.has(key)) {
-        recurringTemplatesMap.set(key, b);
-      }
-    }
-  }
-  const recurringTemplates = Array.from(recurringTemplatesMap.values());
-
-  // Filter bills for the main table
-  const filteredBills = bills.filter(bill => {
-    if (activeFilter === "all") return true;
-    return bill.billing_month === Number(activeFilter);
-  });
-
-  const totalAmountFiltered = filteredBills.reduce((sum, b) => sum + Number(b.amount), 0);
-
-  // Checkbox helpers
-  const allFilteredSelected =
-    filteredBills.length > 0 && filteredBills.every(b => selectedBillIds.has(b.id));
-  const someFilteredSelected = filteredBills.some(b => selectedBillIds.has(b.id));
-
-  const handleSelectAll = () => {
-    if (allFilteredSelected) {
-      // Deselect all filtered
-      setSelectedBillIds(prev => {
-        const next = new Set(prev);
-        filteredBills.forEach(b => next.delete(b.id));
-        return next;
-      });
-    } else {
-      // Select all filtered
-      setSelectedBillIds(prev => {
-        const next = new Set(prev);
-        filteredBills.forEach(b => next.add(b.id));
-        return next;
-      });
-    }
-  };
-
-  const handleToggleRow = (id: string) => {
-    setSelectedBillIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
+  const {
+    loading, actionLoading, userId,
+    bills, filteredBills, totalFiltered, totalYear, categoryTotals,
+    templates, activeTemplatesCount,
+    selectedBillIds, allFilteredSelected, someFilteredSelected,
+    activeMonth, setActiveMonth,
+    activeYear, setActiveYear, availableYears,
+    editingBill, setEditingBill,
+    showAddForm, setShowAddForm,
+    activeTab, setActiveTab,
+    showGenerateBanner, setShowGenerateBanner,
+    toast,
+    handleAddBill, handleUpdateBill, handleDeleteBill, handleBulkDelete,
+    handleAddTemplate,
+    handleGenerateForMonth,
+    handleSelectAll, handleToggleRow,
+  } = useBills();
 
   if (loading) {
-    return (
-      <div className="loading-wrapper">
-        <div className="spinner"></div>
-      </div>
-    );
+    return <div className="loading-wrapper"><div className="spinner" /></div>;
   }
+
+  const now = new Date();
 
   return (
     <div>
-      {/* Title */}
-      <div style={{ marginBottom: "2rem" }}>
-        <h1 style={{ fontSize: "2rem", marginBottom: "0.25rem" }}>المصروفات والفواتير</h1>
-        <p style={{ color: "var(--text-secondary)" }}>تسجيل إيجار القاعات، رواتب السكرتارية، والالتزامات المالية الأخرى</p>
-      </div>
+      <BillsHeader
+        totalYear={totalYear}
+        activeYear={activeYear}
+        availableYears={availableYears}
+        onYearChange={setActiveYear}
+        onAddClick={() => setShowAddForm(true)}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
-      <div className="dashboard-grid" style={{ gridTemplateColumns: "350px 1fr" }}>
-        {/* Sidebar: Add Bill Form */}
-        <aside className="sidebar-panels" style={{ gap: "1rem" }}>
-          {/* Add New Bill Form */}
-          <div className="glass-panel panel-content">
-            <h2 className="panel-title">
-              <Receipt size={18} className="stat-icon-amber" style={{ background: "none", border: "none" }} />
-              <span>تسجيل فاتورة جديدة</span>
-            </h2>
-            <form onSubmit={handleAddBill}>
-              <div className="form-group">
-                <label className="form-label" htmlFor="bTitle">بيان الفاتورة / العنوان</label>
-                <input
-                  id="bTitle"
-                  type="text"
-                  required
-                  placeholder="مثال: إيجار قاعة أ أو سكرتارية"
-                  className="form-input"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" htmlFor="bCategory">التصنيف</label>
-                <select
-                  id="bCategory"
-                  className="form-input"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value as any)}
-                  style={{ padding: "0.7rem 0.5rem" }}
-                >
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" htmlFor="bAmount">القيمة (ج.م)</label>
-                  <input
-                    id="bAmount"
-                    type="number"
-                    min="0"
-                    required
-                    placeholder="0"
-                    className="form-input"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    style={{ direction: "ltr", textAlign: "right" }}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" htmlFor="bMonth">الشهر المالي</label>
-                  <select
-                    id="bMonth"
-                    className="form-input"
-                    value={billingMonth}
-                    onChange={(e) => setBillingMonth(Number(e.target.value))}
-                    style={{ padding: "0.7rem 0.5rem" }}
-                  >
-                    {arabicMonths.map((m, idx) => (
-                      <option key={idx} value={idx + 1}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Recurring Toggle */}
-              <div 
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  padding: "0.85rem 1rem",
-                  borderRadius: "10px",
-                  border: isRecurring 
-                    ? "1px solid rgba(16, 185, 129, 0.4)" 
-                    : "1px solid var(--border-color)",
-                  background: isRecurring 
-                    ? "rgba(16, 185, 129, 0.07)" 
-                    : "rgba(255,255,255,0.02)",
-                  cursor: "pointer",
-                  transition: "all 0.25s ease",
-                  marginBottom: "0.75rem"
-                }}
-                onClick={() => setIsRecurring(!isRecurring)}
-              >
-                <div style={{
-                  width: "42px",
-                  height: "24px",
-                  borderRadius: "12px",
-                  background: isRecurring ? "#10b981" : "rgba(255,255,255,0.1)",
-                  position: "relative",
-                  transition: "background 0.25s ease",
-                  flexShrink: 0
-                }}>
-                  <div style={{
-                    position: "absolute",
-                    top: "3px",
-                    right: isRecurring ? "3px" : "calc(100% - 21px)",
-                    width: "18px",
-                    height: "18px",
-                    borderRadius: "50%",
-                    background: "#ffffff",
-                    transition: "right 0.25s ease",
-                    boxShadow: "0 1px 4px rgba(0,0,0,0.3)"
-                  }} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: "0.9rem", color: isRecurring ? "#10b981" : "var(--text-primary)" }}>
-                    <Repeat size={13} style={{ display: "inline", marginLeft: "4px", verticalAlign: "middle" }} />
-                    فاتورة متكررة شهرياً
-                  </div>
-                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>
-                    {isRecurring ? "ستُضاف تلقائياً لكل شهر بضغطة زر" : "فاتورة لمرة واحدة فقط"}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                style={{ width: "100%", marginTop: "0.25rem" }}
-                disabled={actionLoading}
-              >
-                <Plus size={18} />
-                <span>{actionLoading ? "جاري التسجيل..." : "تسجيل الفاتورة"}</span>
-              </button>
-            </form>
-          </div>
-
-          {/* Recurring Bills Auto-Generator Panel */}
-          <div className="glass-panel panel-content" style={{ borderColor: "rgba(16,185,129,0.2)" }}>
-            <h2 className="panel-title">
-              <Zap size={18} style={{ color: "#10b981", background: "none", border: "none" }} />
-              <span style={{ color: "#10b981" }}>توليد الفواتير المتكررة</span>
-            </h2>
-
-            {recurringTemplates.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "1rem 0", color: "var(--text-muted)", fontSize: "0.85rem" }}>
-                <Repeat size={32} style={{ opacity: 0.3, display: "block", margin: "0 auto 0.5rem auto" }} />
-                لا توجد فواتير متكررة بعد.<br/>
-                سجل فاتورة وفعّل خيار &quot;متكررة شهرياً&quot;
-              </div>
-            ) : (
-              <>
-                {/* Recurring templates summary — UNIQUE count */}
-                <div style={{ marginBottom: "1rem" }}>
-                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: "0.6rem", fontWeight: 600 }}>
-                    {recurringTemplates.length} فاتورة متكررة مسجلة:
-                  </p>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-                    {recurringTemplates.map(b => (
-                      <div key={b.id} style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        padding: "6px 10px",
-                        borderRadius: "6px",
-                        background: "rgba(16,185,129,0.06)",
-                        border: "1px solid rgba(16,185,129,0.15)",
-                        fontSize: "0.82rem"
-                      }}>
-                        <span style={{ color: "#d1fae5" }}>{b.title}</span>
-                        <span className="monospace" style={{ color: "#f87171", fontWeight: 700 }}>-{b.amount} ج.م</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Month picker to generate/delete for */}
-                <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", marginBottom: "0.5rem", fontWeight: 600 }}>
-                  اختر الشهر لتوليد أو حذف فواتيره:
-                </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.4rem" }}>
-                  {arabicMonths.map((m, idx) => {
-                    const monthNum = idx + 1;
-                    
-                    const existingRecurringInMonth = bills.filter(
-                      b => b.is_recurring && b.billing_month === monthNum
-                    );
-                    
-                    const isPartiallyGenerated = existingRecurringInMonth.length > 0;
-                    
-                    const isFullyGenerated = recurringTemplates.length > 0 && recurringTemplates.every(template => 
-                      existingRecurringInMonth.some(
-                        b => b.title === template.title && 
-                             b.category === template.category && 
-                             Number(b.amount) === Number(template.amount)
-                      )
-                    );
-
-                    let btnStyle = { border: "1px solid var(--border-color)", color: "var(--text-secondary)" };
-                    if (isFullyGenerated) {
-                      btnStyle = { border: "1px solid rgba(16,185,129,0.4)", color: "#10b981" };
-                    } else if (isPartiallyGenerated) {
-                      btnStyle = { border: "1px solid rgba(245,158,11,0.4)", color: "#f59e0b" };
-                    }
-
-                    return (
-                      <button
-                        key={idx}
-                        className="btn btn-secondary"
-                        onClick={() =>
-                          isFullyGenerated
-                            ? handleDeleteMonthBills(monthNum)
-                            : handleGenerateForMonth(monthNum)
-                        }
-                        disabled={actionLoading}
-                        style={{
-                          padding: "0.4rem 0.25rem",
-                          fontSize: "0.75rem",
-                          position: "relative",
-                          ...btnStyle
-                        }}
-                        title={
-                          isFullyGenerated ? `حذف فواتير ${m} المتكررة` : 
-                          isPartiallyGenerated ? `تحديث وإضافة النواقص لشهر ${m}` : 
-                          `توليد فواتير ${m}`
-                        }
-                      >
-                        {isFullyGenerated && (
-                          <Check size={10} style={{ position: "absolute", top: "3px", left: "3px", color: "#10b981" }} />
-                        )}
-                        {(!isFullyGenerated && isPartiallyGenerated) && (
-                          <RefreshCw size={10} style={{ position: "absolute", top: "3px", left: "3px", color: "#f59e0b" }} />
-                        )}
-                        {m}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-        </aside>
-
-        {/* Left Side: Bills List */}
-        <section className="glass-panel panel-content">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-            <h2 className="panel-title" style={{ margin: 0 }}>
-              <FileText size={18} style={{ color: "var(--color-info)" }} />
-              <span>فواتير المصروفات ({filteredBills.length})</span>
-            </h2>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <span style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>إجمالي التصفية:</span>
-              <span className="monospace" style={{ fontSize: "1.1rem", fontWeight: 700, color: "#f87171" }}>{totalAmountFiltered} ج.م</span>
-            </div>
-          </div>
-
-          {/* Month Filter Chips */}
-          <div className="chips-container">
-            <button 
-              className={`chip ${activeFilter === "all" ? "active" : ""}`}
-              onClick={() => setActiveFilter("all")}
-            >
-              كل الشهور
-            </button>
-            {arabicMonths.map((m, idx) => (
-              <button 
-                key={idx}
-                className={`chip ${activeFilter === String(idx + 1) ? "active" : ""}`}
-                onClick={() => setActiveFilter(String(idx + 1))}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
-
-          {/* Bills Table */}
-          <div className="table-container">
-            {filteredBills.length === 0 ? (
-              <div className="empty-state">
-                <AlertCircle size={48} className="empty-state-icon" />
-                <p>لا توجد أي فواتير مسجلة لشهر التصفية الحالي.</p>
-              </div>
-            ) : (
-              <table className="students-table mobile-card-table">
-                <thead>
-                  <tr>
-                    <th style={{ width: "40px", textAlign: "center" }}>
-                      <input
-                        type="checkbox"
-                        checked={allFilteredSelected}
-                        ref={el => {
-                          if (el) el.indeterminate = someFilteredSelected && !allFilteredSelected;
-                        }}
-                        onChange={handleSelectAll}
-                        style={{ cursor: "pointer", width: "16px", height: "16px", accentColor: "#3b82f6" }}
-                        title="تحديد الكل"
-                      />
-                    </th>
-                    <th>بيان الفاتورة</th>
-                    <th>التصنيف</th>
-                    <th>الشهر المالي</th>
-                    <th>القيمة المالية</th>
-                    <th>إجراءات</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredBills.map(bill => (
-                    <tr
-                      key={bill.id}
-                      style={{
-                        background: selectedBillIds.has(bill.id) ? "rgba(59,130,246,0.08)" : undefined,
-                        transition: "background 0.15s ease"
-                      }}
-                    >
-                      <td data-label="تحديد" style={{ textAlign: "center" }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedBillIds.has(bill.id)}
-                          onChange={() => handleToggleRow(bill.id)}
-                          style={{ cursor: "pointer", width: "16px", height: "16px", accentColor: "#3b82f6" }}
-                        />
-                      </td>
-                      <td data-label="بيان الفاتورة">
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          {bill.is_recurring && (
-                            <span title="فاتورة متكررة">
-                              <Repeat size={13} style={{ color: "#10b981", flexShrink: 0 }} />
-                            </span>
-                          )}
-                          <span style={{ fontWeight: 600, color: "#ffffff" }}>{bill.title}</span>
-                        </div>
-                      </td>
-                      <td data-label="التصنيف">
-                        <span 
-                          style={{ 
-                            display: "inline-block", 
-                            fontSize: "0.8rem", 
-                            padding: "2px 8px", 
-                            borderRadius: "4px",
-                            ...catStyle[bill.category]
-                          }}
-                        >
-                          {bill.category}
-                        </span>
-                      </td>
-                      <td data-label="الشهر المالي">
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
-                          <Calendar size={14} style={{ color: "var(--text-muted)" }} />
-                          <span>{arabicMonths[bill.billing_month - 1]}</span>
-                        </div>
-                      </td>
-                      <td data-label="القيمة المالية">
-                        <span className="monospace" style={{ fontWeight: 700, color: "#f87171" }}>
-                          -{bill.amount} ج.م
-                        </span>
-                      </td>
-                      <td data-label="إجراءات">
-                        <button 
-                          className="btn btn-secondary btn-icon"
-                          onClick={() => handleDeleteBill(bill.id)}
-                          title="حذف الفاتورة"
-                          style={{ border: "none", background: "none" }}
-                        >
-                          <Trash2 size={16} className="color-danger" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {/* Floating Bulk Action Bar */}
-      {selectedBillIds.size > 0 && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: "2rem",
-            left: "50%",
-            transform: "translateX(-50%)",
-            background: "rgba(15,23,42,0.95)",
-            backdropFilter: "blur(12px)",
-            border: "1px solid var(--border-color)",
-            borderRadius: "12px",
-            padding: "0.75rem 1.5rem",
-            display: "flex",
-            alignItems: "center",
-            gap: "1rem",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-            zIndex: 100
-          }}
-        >
-          <span style={{ color: "var(--text-secondary)", fontSize: "0.9rem", fontWeight: 500 }}>
-            تم تحديد {selectedBillIds.size} فاتورة
-          </span>
-          <button
-            className="btn btn-primary"
-            onClick={handleBulkDelete}
-            disabled={actionLoading}
-            style={{
-              background: "rgba(239,68,68,0.15)",
-              border: "1px solid rgba(239,68,68,0.4)",
-              color: "#f87171",
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              padding: "0.45rem 1rem",
-              fontSize: "0.88rem"
-            }}
-          >
-            <Trash2 size={15} />
-            حذف المحدد
-          </button>
-          <button
-            className="btn btn-secondary"
-            onClick={() => setSelectedBillIds(new Set())}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "0.4rem",
-              padding: "0.45rem 1rem",
-              fontSize: "0.88rem"
-            }}
-          >
-            <X size={15} />
-            إلغاء التحديد
-          </button>
-        </div>
+      {showGenerateBanner && (
+        <GenerateBanner
+          activeTemplatesCount={activeTemplatesCount}
+          actionLoading={actionLoading}
+          onGenerate={() => handleGenerateForMonth(now.getMonth() + 1, now.getFullYear())}
+          onDismiss={() => setShowGenerateBanner(false)}
+        />
       )}
 
-      {/* Toast Alert */}
+      <BillsSummaryCards
+        totalYear={totalYear}
+        categoryTotals={categoryTotals}
+        activeYear={activeYear}
+        billsCount={bills.filter(b => b.billing_year === activeYear).length}
+        recurringCount={activeTemplatesCount}
+      />
+
+      {activeTab === "overview" && (
+        <MonthlyOverview
+          bills={bills}
+          activeYear={activeYear}
+          templates={templates}
+          actionLoading={actionLoading}
+          onMonthClick={month => { setActiveMonth(String(month)); setActiveTab("table"); }}
+          onGenerate={handleGenerateForMonth}
+        />
+      )}
+
+      {activeTab === "table" && (
+        <BillsTable
+          filteredBills={filteredBills}
+          allBills={bills}
+          totalFiltered={totalFiltered}
+          categoryTotals={categoryTotals}
+          totalYear={totalYear}
+          activeMonth={activeMonth}
+          setActiveMonth={setActiveMonth}
+          activeYear={activeYear}
+          setActiveYear={setActiveYear}
+          availableYears={availableYears}
+          selectedBillIds={selectedBillIds}
+          allFilteredSelected={allFilteredSelected}
+          someFilteredSelected={someFilteredSelected}
+          onSelectAll={handleSelectAll}
+          onToggleRow={handleToggleRow}
+          onDelete={handleDeleteBill}
+          onEdit={setEditingBill}
+        />
+      )}
+
+      <AddBillDrawer
+        open={showAddForm}
+        onClose={() => setShowAddForm(false)}
+        actionLoading={actionLoading}
+        defaultYear={activeYear}
+        onAdd={handleAddBill}
+        onAddTemplate={handleAddTemplate}
+        userId={userId}
+      />
+
+      {editingBill && (
+        <EditBillModal
+          bill={editingBill}
+          actionLoading={actionLoading}
+          onSave={handleUpdateBill}
+          onClose={() => setEditingBill(null)}
+        />
+      )}
+
+      <BulkActionBar
+        count={selectedBillIds.size}
+        actionLoading={actionLoading}
+        onDelete={handleBulkDelete}
+        onClear={() => handleSelectAll([])}
+      />
+
       {toast && (
         <div className={`alert-toast ${toast.type === "success" ? "alert-success" : "alert-error"}`}>
           {toast.type === "error" ? <AlertCircle size={18} /> : <Check size={18} />}

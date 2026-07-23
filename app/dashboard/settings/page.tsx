@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { 
   Settings, 
@@ -16,6 +16,7 @@ import {
 
 import { TeachersService } from "@/lib/services/teachersService";
 import { GradesService } from "@/lib/services/gradesService";
+import { GroupsService } from "@/lib/services/groupsService";
 import { StudentsService } from "@/lib/services/studentsService";
 import { Grade, BookDef, Student } from "@/lib/types";
 
@@ -44,6 +45,8 @@ export default function SettingsPage() {
   const [newGradePrefix, setNewGradePrefix] = useState("");
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const profileReady = useRef(false);
+  const gradesReady = useRef(false);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -81,69 +84,92 @@ export default function SettingsPage() {
     loadSettings();
   }, []);
 
-  const handleSaveSettings = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name || !userId) {
-      showToast("يرجى إدخال اسم المعلم.", "error");
-      return;
+  const saveProfileAndBooks = async (currentName: string, currentPhone: string, currentBooks: BookDef[], currentDeletedIds: string[], showNotification = true) => {
+    if (!currentName || !userId) return;
+    for (let b of currentBooks) {
+      if (!b.name.trim()) return;
     }
-
-    // Validate books
-    for (let b of books) {
-      if (!b.name.trim()) {
-        showToast("يرجى التأكد من ملء جميع أسماء الكتب.", "error");
-        return;
-      }
-    }
-
     setSaveLoading(true);
     try {
-      // 2. Update Existing Grades
-      await Promise.all(grades.map(g =>
-        GradesService.updateGrade(g.id, {
-          name: g.name,
-          monthly_price: g.monthly_price,
-          prefix: g.prefix || ''
-        })
-      ));
-
-      // 3. Map Books (no temp IDs anymore)
-      const mappedBooks = books;
-
-      // 5. Update Teacher Profile
       await TeachersService.updateTeacherProfile(userId, {
-        name: name,
-        phone: phone,
-        books: mappedBooks
+        name: currentName,
+        phone: currentPhone,
+        books: currentBooks
       });
 
-      setBooks(mappedBooks);
-
-      if (deletedBookIds.length > 0) {
-        const affectedStudents = students.filter(s => s.received_books?.some(bId => deletedBookIds.includes(bId)));
-        const updatePromises = affectedStudents.map(student => {
-          const newBooks = student.received_books?.filter(bId => !deletedBookIds.includes(bId)) || [];
+      if (currentDeletedIds.length > 0) {
+        const affectedStudents = students.filter(s => s.received_books?.some(bId => currentDeletedIds.includes(bId)));
+        await Promise.all(affectedStudents.map(student => {
+          const newBooks = student.received_books?.filter(bId => !currentDeletedIds.includes(bId)) || [];
           return StudentsService.updateStudent(student.id, { received_books: newBooks });
-        });
-        await Promise.all(updatePromises);
+        }));
         setDeletedBookIds([]);
-        
-        // Update local students state
-        setStudents(students.map(s => {
+        setStudents(prev => prev.map(s => {
           if (affectedStudents.some(a => a.id === s.id)) {
-            const newBooks = s.received_books?.filter(bId => !deletedBookIds.includes(bId)) || [];
-            return { ...s, received_books: newBooks };
+            return { ...s, received_books: s.received_books?.filter(bId => !currentDeletedIds.includes(bId)) || [] };
           }
           return s;
         }));
       }
 
-      showToast("تم حفظ الإعدادات بنجاح.");
+      if (showNotification) showToast("✓ تم الحفظ تلقائياً.");
     } catch (err: any) {
-      showToast(err.message || "فشل حفظ الإعدادات.", "error");
+      if (showNotification) showToast(err.message || "فشل الحفظ التلقائي.", "error");
     } finally {
       setSaveLoading(false);
     }
+  };
+
+  // Mark ready after first load
+  useEffect(() => {
+    if (!loading) {
+      setTimeout(() => {
+        profileReady.current = true;
+        gradesReady.current = true;
+      }, 0);
+    }
+  }, [loading]);
+
+  // Auto-save profile & books
+  useEffect(() => {
+    if (!profileReady.current) return;
+    const timer = setTimeout(() => {
+      saveProfileAndBooks(name, phone, books, deletedBookIds, false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [name, phone, books, deletedBookIds]);
+
+  // Auto-save grades
+  useEffect(() => {
+    if (!gradesReady.current) return;
+    const timer = setTimeout(async () => {
+      try {
+        await Promise.all(grades.map(g =>
+          Promise.all([
+            GradesService.updateGrade(g.id, { name: g.name, monthly_price: g.monthly_price, prefix: g.prefix || '' }),
+            g.monthly_price != null
+              ? GroupsService.updateGroupsByGradeId(g.id, { monthly_price: g.monthly_price })
+              : Promise.resolve()
+          ])
+        ));
+      } catch {
+        // silent auto-save
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [grades]);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await saveProfileAndBooks(name, phone, books, deletedBookIds);
+    await Promise.all(grades.map(g =>
+      Promise.all([
+        GradesService.updateGrade(g.id, { name: g.name, monthly_price: g.monthly_price, prefix: g.prefix || '' }),
+        g.monthly_price != null
+          ? GroupsService.updateGroupsByGradeId(g.id, { monthly_price: g.monthly_price })
+          : Promise.resolve()
+      ])
+    ));
   };
 
 
@@ -220,7 +246,7 @@ export default function SettingsPage() {
       </div>
 
       <div style={{ display: "flex", gap: "2rem", alignItems: "flex-start", flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 700px", maxWidth: "800px" }}>
+        <div style={{ flex: "1 1 min(100%, 700px)", maxWidth: "800px", minWidth: 0 }}>
 
       <div className="glass-panel panel-content" style={{ padding: "2.5rem 2rem" }}>
         <h2 className="panel-title">
@@ -279,45 +305,41 @@ export default function SettingsPage() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
               {grades.map(grade => (
-                <div key={grade.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: "1.1rem" }}>{grade.name}</h3>
+                <div key={grade.id} style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.05)" }}>
+                  <h3 style={{ margin: 0, fontSize: "1rem", flex: "1 1 150px" }}>{grade.name}</h3>
+                  <div style={{ flex: "1 1 100px", minWidth: "90px" }}>
+                    <Input
+                      type="text"
+                      placeholder="الكود (اختياري)"
+                      value={grade.prefix || ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const newGrades = grades.map(g => g.id === grade.id ? { ...g, prefix: val } : g);
+                        setGrades(newGrades);
+                      }}
+                    />
                   </div>
-                  <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-                    <div style={{ width: "120px" }}>
-                      <Input
-                        type="text"
-                        placeholder="الكود (اختياري)"
-                        value={grade.prefix || ""}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const newGrades = grades.map(g => g.id === grade.id ? { ...g, prefix: val } : g);
-                          setGrades(newGrades);
-                        }}
-                      />
-                    </div>
-                    <div style={{ width: "150px" }}>
-                      <Input 
-                        type="number"
-                        placeholder="السعر (شهرياً)"
-                        value={grade.monthly_price === null || grade.monthly_price === undefined ? "" : grade.monthly_price}
-                        onChange={(e) => {
-                          const val = e.target.value ? Number(e.target.value) : null;
-                          const newGrades = grades.map(g => g.id === grade.id ? { ...g, monthly_price: val } : g);
-                          setGrades(newGrades);
-                        }}
-                      />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="danger"
-                      size="sm"
-                      onClick={() => handleDeleteGrade(grade.id)}
-                      title="حذف"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
+                  <div style={{ flex: "1 1 120px", minWidth: "110px" }}>
+                    <Input 
+                      type="number"
+                      placeholder="السعر (شهرياً)"
+                      value={grade.monthly_price === null || grade.monthly_price === undefined ? "" : grade.monthly_price}
+                      onChange={(e) => {
+                        const val = e.target.value ? Number(e.target.value) : null;
+                        const newGrades = grades.map(g => g.id === grade.id ? { ...g, monthly_price: val } : g);
+                        setGrades(newGrades);
+                      }}
+                    />
                   </div>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleDeleteGrade(grade.id)}
+                    title="حذف"
+                  >
+                    <Trash2 size={16} />
+                  </Button>
                 </div>
               ))}
 
@@ -473,7 +495,7 @@ export default function SettingsPage() {
       </div>
       </div>
 
-      <div style={{ flex: "1 1 300px", maxWidth: "380px", position: "sticky", top: "2rem", minWidth: "300px" }}>
+      <div style={{ flex: "1 1 280px", maxWidth: "380px", position: "sticky", top: "2rem", minWidth: 0 }}>
         {/* Support Card */}
         <div className="glass-panel panel-content" style={{ padding: "2.5rem 2rem", textAlign: "center", background: "linear-gradient(145deg, rgba(16,185,129,0.05) 0%, rgba(16,185,129,0.1) 100%)", border: "1px solid rgba(16,185,129,0.2)" }}>
           <div style={{ width: "70px", height: "70px", borderRadius: "50%", background: "#10b981", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 1.5rem auto", boxShadow: "0 10px 25px -5px rgba(16,185,129,0.4)" }}>

@@ -90,8 +90,22 @@ export interface Bill {
   amount: number;
   category: "إيجار" | "رواتب سكرتارية" | "أخرى";
   billing_month: number;
+  billing_year: number;
   is_recurring: boolean;
+  template_id?: string | null;
   teacher_id?: string;
+  created_at?: string;
+}
+
+export interface BillTemplate {
+  id: string;
+  teacher_id: string;
+  title: string;
+  amount: number;
+  category: "إيجار" | "رواتب سكرتارية" | "أخرى";
+  is_active: boolean;
+  end_month?: number | null;  // 1-12
+  end_year?: number | null;
   created_at?: string;
 }
 

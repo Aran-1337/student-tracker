@@ -15,38 +15,17 @@ export const StudentsService = {
     return StudentsRepository.getAllStudents();
   },
 
-  async addStudentWithGeneratedCode(studentData: Omit<Student, "id" | "created_at" | "code">, allStudents: Student[]): Promise<Student> {
-    let startCode = 0;
-    let prefix = '';
+  async addStudentWithGeneratedCode(studentData: Omit<Student, "id" | "created_at" | "code">): Promise<Student> {
+    const allStudents = await StudentsRepository.getStudentsByTeacherId(studentData.teacher_id!);
 
-    if (studentData.grade_id) {
-      // In a real scenario, you might fetch only the specific grade, but we match the existing logic
-      const grades = await GradesRepository.getAllGrades();
-      const grade = grades.find(g => g.id === studentData.grade_id);
-      startCode = grade?.start_code || 0;
-      prefix = grade?.prefix || '';
-    }
-    
-    const gradeStudents = allStudents.filter(s => s.grade_id === studentData.grade_id);
-    let maxCode = -1;
-    gradeStudents.forEach(s => {
-      let codeStr = s.code || '';
-      if (prefix && codeStr.startsWith(prefix)) {
-        codeStr = codeStr.substring(prefix.length);
-      }
-      const num = parseInt(codeStr.replace(/\D/g, '') || '-1', 10);
+    let maxCode = 0;
+    allStudents.forEach(s => {
+      const num = parseInt(s.code || '0', 10);
       if (!isNaN(num) && num > maxCode) maxCode = num;
     });
 
-    const generatedNum = (maxCode < startCode) ? startCode : maxCode + 1;
-    const generatedCode = `${prefix}${generatedNum}`;
-
-    const newStudent = {
-      ...studentData,
-      code: generatedCode
-    };
-
-    return StudentsRepository.addStudent(newStudent);
+    const generatedCode = String(maxCode + 1).padStart(4, '0');
+    return StudentsRepository.addStudent({ ...studentData, code: generatedCode });
   },
 
   async updateStudent(id: string, updates: Partial<Student>): Promise<void> {
@@ -59,5 +38,23 @@ export const StudentsService = {
 
   async deleteStudents(ids: string[]): Promise<void> {
     return StudentsRepository.deleteStudents(ids);
+  },
+
+  async fixDuplicateCodes(teacherId: string): Promise<number> {
+    const allStudents = await StudentsRepository.getStudentsByTeacherId(teacherId);
+
+    // Sort by created_at to keep original order
+    const sorted = [...allStudents].sort((a, b) =>
+      (a.created_at || '').localeCompare(b.created_at || '')
+    );
+
+    const updates: { id: string; code: string }[] = [];
+    sorted.forEach((s, i) => {
+      const newCode = String(i + 1).padStart(4, '0');
+      if (s.code !== newCode) updates.push({ id: s.id, code: newCode });
+    });
+
+    await Promise.all(updates.map(u => StudentsRepository.updateStudent(u.id, { code: u.code })));
+    return updates.length;
   }
 };
