@@ -169,7 +169,7 @@
 }
 
 .sidebar-logout-mobile {
-  display: flex;
+  display: none;
   width: 100%;
   justify-content: center;
   margin-top: 0.5rem;
@@ -292,9 +292,10 @@
   }
 
   .sidebar-logout-mobile {
+    display: flex;
     width: 100%;
     justify-content: center;
-    margin-top: auto;
+    margin-top: 0.5rem;
     padding-top: 1rem;
     border-top: 1px solid var(--border-color);
   }
