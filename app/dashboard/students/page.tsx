@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { Users, CheckSquare, Square, AlertCircle, Printer, Wrench } from "lucide-react";
+import { CheckSquare, Square, AlertCircle, Printer, Wrench } from "lucide-react";
 
 import { Student, Group, Grade, BookDef } from "@/lib/types";
 import { StudentsService } from "@/lib/services/studentsService";
@@ -336,16 +336,7 @@ export default function StudentsManagement() {
             onSubmit={handleAddStudent}
           />
 
-          {/* Stats card */}
-          <div className="glass-panel panel-content stat-card">
-            <div className="stat-icon-wrapper" style={{ background: "rgba(59,130,246,0.15)", color: "#60a5fa" }}>
-              <Users size={22} />
-            </div>
-            <div>
-              <div className="stat-value">{filteredStudents.length}</div>
-              <div className="stat-label">طالب في الفلتر الحالي</div>
-            </div>
-          </div>
+
         </aside>
 
         {/* Main Table Panel */}

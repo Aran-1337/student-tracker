@@ -162,12 +162,12 @@ export function AttendanceTable({
         const startIndex = runningIndex;
         runningIndex += groupStudents.length;
         return (
-          <div key={groupId} style={{ marginBottom: "1.5rem" }}>
-            <div style={{ padding: "0.5rem 0.75rem", background: "var(--color-teal, #0d9488)", color: "#fff", borderRadius: "6px 6px 0 0", fontWeight: 700, fontSize: "0.9rem" }}>
-              {group ? group.name : "بدون مجموعة"}
-              <span style={{ marginRight: "0.5rem", opacity: 0.8, fontWeight: 400 }}>({groupStudents.length} طالب)</span>
-            </div>
-            <table className="students-table attendance-table" style={{ borderRadius: "0 0 6px 6px" }}>
+          <div key={groupId} style={{ marginBottom: "1.5rem", overflowX: "auto" }}>
+            <table className="students-table attendance-table" style={{ borderRadius: "6px" }}>
+              <caption style={{ captionSide: "top", textAlign: "right", padding: "0.6rem 1rem", background: "var(--color-teal, #0d9488)", color: "#fff", borderRadius: "6px 6px 0 0", fontWeight: 700, fontSize: "0.9rem" }}>
+                {group ? group.name : "بدون مجموعة"}
+                <span style={{ marginRight: "0.5rem", opacity: 0.8, fontWeight: 400 }}>({groupStudents.length} طالب)</span>
+              </caption>
               <TableHeaders allDates={allDates} today={today} saving={saving} onMarkAll={onMarkAll} onClearSession={onClearSession} />
               <tbody>
                 <StudentRows students={groupStudents} {...sharedProps} startIndex={startIndex} />

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { AlertCircle, Check } from "lucide-react";
 import { useBills } from "./_hooks/useBills";
 import BillsHeader from "./_components/BillsHeader";
@@ -10,6 +11,7 @@ import AddBillDrawer from "./_components/AddBillDrawer";
 import EditBillModal from "./_components/EditBillModal";
 import BulkActionBar from "./_components/BulkActionBar";
 import GenerateBanner from "./_components/GenerateBanner";
+import TemplatesManager from "./_components/TemplatesManager";
 
 export default function BillsManagement() {
   const {
@@ -25,16 +27,27 @@ export default function BillsManagement() {
     showGenerateBanner, setShowGenerateBanner,
     toast,
     handleAddBill, handleUpdateBill, handleDeleteBill, handleBulkDelete,
-    handleAddTemplate,
+    handleAddTemplate, handleUpdateTemplate, handleToggleTemplate, handleDeleteTemplate,
     handleGenerateForMonth,
     handleSelectAll, handleToggleRow,
   } = useBills();
 
+  const overviewRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const now = new Date();
+
+  const handleTabChange = (tab: "overview" | "table" | "templates") => {
+    setActiveTab(tab);
+    setTimeout(() => {
+      const ref = tab === "overview" ? overviewRef : tableRef;
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
+
   if (loading) {
     return <div className="loading-wrapper"><div className="spinner" /></div>;
   }
-
-  const now = new Date();
 
   return (
     <div>
@@ -45,7 +58,7 @@ export default function BillsManagement() {
         onYearChange={setActiveYear}
         onAddClick={() => setShowAddForm(true)}
         activeTab={activeTab}
-        onTabChange={setActiveTab}
+        onTabChange={handleTabChange}
       />
 
       {showGenerateBanner && (
@@ -66,18 +79,30 @@ export default function BillsManagement() {
       />
 
       {activeTab === "overview" && (
-        <MonthlyOverview
+        <div ref={overviewRef}><MonthlyOverview
           bills={bills}
           activeYear={activeYear}
           templates={templates}
           actionLoading={actionLoading}
           onMonthClick={month => { setActiveMonth(String(month)); setActiveTab("table"); }}
           onGenerate={handleGenerateForMonth}
+        /></div>
+      )}
+
+      {activeTab === "templates" && userId && (
+        <TemplatesManager
+          templates={templates}
+          userId={userId}
+          actionLoading={actionLoading}
+          onAdd={handleAddTemplate}
+          onUpdate={handleUpdateTemplate}
+          onToggle={handleToggleTemplate}
+          onDelete={handleDeleteTemplate}
         />
       )}
 
       {activeTab === "table" && (
-        <BillsTable
+        <div ref={tableRef}><BillsTable
           filteredBills={filteredBills}
           allBills={bills}
           totalFiltered={totalFiltered}
@@ -95,7 +120,7 @@ export default function BillsManagement() {
           onToggleRow={handleToggleRow}
           onDelete={handleDeleteBill}
           onEdit={setEditingBill}
-        />
+        /></div>
       )}
 
       <AddBillDrawer

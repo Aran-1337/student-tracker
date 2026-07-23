@@ -29,10 +29,7 @@ function QRScanPageInner() {
     handleRemoveScanned,
   } = useScanSession();
 
-  const { isOnline, pendingCount, syncing, syncQueue } = useOnlineSync((count) => {
-    // synced callback — could show a toast here if needed
-    console.log(`تم رفع ${count} سجل`);
-  });
+  const { isOnline, pendingCount, syncing, syncQueue } = useOnlineSync(() => {});
 
   if (loading) return <Spinner fullScreen />;
 

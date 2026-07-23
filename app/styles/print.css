@@ -116,10 +116,9 @@
 /* Print styles */
 @media print {
   .no-print,
-  .dashboard-sidebar,
-  .dashboard-header,
+  .sidebar,
+  .mobile-overlay,
   nav,
-  aside,
   button,
   .toast,
   ::-webkit-scrollbar {
@@ -132,100 +131,95 @@
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  .dashboard-main { margin: 0 !important; padding: 0 !important; }
+  .dashboard-layout { display: block !important; }
+  .content-area { margin: 0 !important; padding: 8px !important; }
   .print-container { background: white !important; padding: 0 !important; }
 
   .print-grid {
     display: grid !important;
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: 15px !important;
-    margin: 0 !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px !important;
     width: 100% !important;
-    page-break-inside: auto;
   }
 
   .id-card {
-    page-break-inside: avoid;
     break-inside: avoid;
-    border: 2px solid #ccc !important;
-    border-radius: 8px !important;
+    page-break-inside: avoid;
+    border: 1px solid #ccc !important;
+    border-radius: 12px !important;
     background: white !important;
     color: black !important;
-    padding: 15px !important;
-    text-align: center;
+    padding: 12px !important;
     box-shadow: none !important;
-    width: 100%;
-    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: space-between;
-    height: auto;
-    min-height: 220px;
   }
 
   .id-card-header {
-    height: 50px;
+    height: auto;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     width: 100%;
-    border-bottom: 1px solid #eee !important;
-    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd !important;
+    padding-bottom: 8px;
   }
 
-  .id-card-logo { max-height: 40px; max-width: 120px; object-fit: contain; }
-  .id-card-site-name { font-weight: bold; font-size: 1.1rem; color: #333 !important; }
+  .id-card-logo { max-height: 36px; max-width: 120px; object-fit: contain; }
+  .id-card-site-name { font-weight: bold; font-size: 1rem; color: #0d9488 !important; }
 
   .id-card-body {
-    flex: 1;
     display: flex;
     flex-direction: row-reverse;
     align-items: center;
-    justify-content: center;
-    gap: 15px;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .student-name {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 6px 0;
+    color: black !important;
+    text-align: center;
     width: 100%;
   }
 
   .student-info-wrapper { flex: 1; display: flex; flex-direction: column; text-align: right; }
-  .qr-wrapper { margin: 10px 0; padding: 5px; background: white !important; border-radius: 5px; }
 
-  .student-name {
-    font-size: 1.1rem;
-    font-weight: 700;
-    margin: 5px 0 10px 0;
-    color: black !important;
-    text-align: center;
-    width: 100%;
+  .qr-wrapper {
+    padding: 6px;
+    background: white !important;
+    border-radius: 6px;
+    flex-shrink: 0;
   }
 
   .student-details {
     width: 100%;
-    font-size: 0.85rem;
-    color: #444 !important;
-    background: #f9f9f9 !important;
-    padding: 8px;
+    font-size: 0.8rem;
+    color: #333 !important;
+    background: #f5f5f5 !important;
+    padding: 6px 8px;
     border-radius: 6px;
-    border: 1px solid #eee !important;
+    border: 1px solid #e0e0e0 !important;
   }
 
   .detail-row {
     display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    align-items: baseline;
     gap: 6px;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     border-bottom: 1px dashed #ddd !important;
     padding-bottom: 4px;
   }
 
   .detail-row:last-child { border-bottom: none !important; margin-bottom: 0; padding-bottom: 0; }
-  .detail-label { font-size: 0.75rem; font-weight: normal; color: #666 !important; }
+  .detail-label { font-size: 0.75rem; color: #666 !important; }
   .detail-value { font-weight: 700; color: #000 !important; }
-  .code-value { font-family: monospace; font-weight: 900; font-size: 0.95rem; }
+  .code-value { font-family: monospace; font-weight: 900; }
 }

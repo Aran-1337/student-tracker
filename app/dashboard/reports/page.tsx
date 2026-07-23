@@ -202,22 +202,6 @@ export default function ReportsPage() {
     };
   });
 
-  // ── CSV export ────────────────────────────────────────────────────────────
-  const handleExportCSV = () => {
-    const headers = ["الشهر", "عدد المدفوعات", "إيراد الاشتراك", "المصروفات", "صافي الربح", "نسبة السداد"];
-    const rows = monthsReport.map((m) => [
-      m.name, m.paidCount, m.subscriptionEarnings, m.monthExpenses, m.netProfit, `${m.percentage}%`,
-    ]);
-    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `تقرير_${selectedYear}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   // ── render ────────────────────────────────────────────────────────────────
   if (loading) {
     return <div className="loading-wrapper"><div className="spinner" /></div>;
@@ -309,7 +293,7 @@ export default function ReportsPage() {
       />
 
       {/* ── Monthly Table ── */}
-      <MonthlyTable monthsReport={monthsReport} onExportCSV={handleExportCSV} />
+      <MonthlyTable monthsReport={monthsReport} />
 
       {/* ── Toast ── */}
       {toast && (

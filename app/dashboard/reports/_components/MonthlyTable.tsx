@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, Download } from "lucide-react";
+import { Calendar, Printer } from "lucide-react";
 
 export interface MonthReport {
   name: string;
@@ -15,10 +15,27 @@ export interface MonthReport {
 
 interface Props {
   monthsReport: MonthReport[];
-  onExportCSV: () => void;
+  onExportCSV?: () => void;
 }
 
-export function MonthlyTable({ monthsReport, onExportCSV }: Props) {
+export function MonthlyTable({ monthsReport }: Props) {
+  function handlePrint() {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    const rows = monthsReport.map((m) => `
+      <tr>
+        <td>${m.name}${m.isCurrentMonth ? " (الحالي)" : ""}</td>
+        <td>${(m.subscriptionEarnings + m.bookEarnings).toLocaleString()} ج.م</td>
+        <td>${m.paidCount} طالب</td>
+        <td>${m.bookEarnings > 0 ? m.bookEarnings.toLocaleString() + " ج.م" : "—"}</td>
+        <td>${m.monthExpenses > 0 ? "-" + m.monthExpenses.toLocaleString() + " ج.م" : "—"}</td>
+        <td>${m.netProfit.toLocaleString()} ج.م</td>
+        <td>${m.percentage}%</td>
+      </tr>`).join("");
+    printWindow.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>التقرير المالي الشهري</title><style>body{font-family:Arial,sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px;text-align:right}th{background:#f0f0f0;font-weight:bold}h2{margin-bottom:16px}</style></head><body><h2>التقرير المالي الشهري</h2><table><thead><tr><th>الشهر</th><th>الإيرادات</th><th>المدفوعات</th><th>الكتب</th><th>المصروفات</th><th>صافي الربح</th><th>نسبة السداد</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
+    printWindow.document.close();
+    printWindow.print();
+  }
   const maxEarnings = Math.max(...monthsReport.map((m) => m.subscriptionEarnings + m.bookEarnings), 1);
 
   return (
@@ -29,12 +46,12 @@ export function MonthlyTable({ monthsReport, onExportCSV }: Props) {
           التقرير المالي الشهري
         </h2>
         <button
-          onClick={onExportCSV}
+          onClick={handlePrint}
           className="export-btn"
           style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.82rem" }}
         >
-          <Download size={14} />
-          تصدير CSV
+          <Printer size={14} />
+          طباعة
         </button>
       </div>
 
@@ -44,8 +61,8 @@ export function MonthlyTable({ monthsReport, onExportCSV }: Props) {
             <tr>
               <th style={{ width: "80px" }}>الشهر</th>
               <th>الإيرادات</th>
-              <th className="col-hide-mobile">المدفوعات</th>
-              <th className="col-hide-mobile">الكتب</th>
+              <th>الطلاب الدافعين</th>
+              <th>الكتب</th>
               <th>المصروفات</th>
               <th>صافي الربح</th>
               <th style={{ width: "120px" }}>نسبة السداد</th>
@@ -93,11 +110,11 @@ export function MonthlyTable({ monthsReport, onExportCSV }: Props) {
                     </div>
                   </td>
 
-                  <td className="col-hide-mobile monospace" style={{ color: "var(--text-secondary)" }}>
+                  <td className="monospace" style={{ color: "var(--text-secondary)" }}>
                     {month.paidCount} طالب
                   </td>
 
-                  <td className="col-hide-mobile monospace" style={{ color: month.bookEarnings > 0 ? "var(--color-amber)" : "var(--text-muted)" }}>
+                  <td className="monospace" style={{ color: month.bookEarnings > 0 ? "var(--color-amber)" : "var(--text-muted)" }}>
                     {month.bookEarnings > 0 ? `${month.bookEarnings.toLocaleString()} ج.م` : "—"}
                   </td>
 

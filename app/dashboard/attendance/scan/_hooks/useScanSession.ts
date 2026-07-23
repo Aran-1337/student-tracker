@@ -21,17 +21,14 @@ function detectCurrentGroup(groups: Group[]): Group | null {
   const now = new Date();
   const todayAr = DAYS_AR[now.getDay()];
   const nowMins = now.getHours() * 60 + now.getMinutes();
-  console.log("[AutoDetect] now:", now.toLocaleTimeString(), "todayAr:", todayAr, "nowMins:", nowMins);
   const match = groups.find(g => {
     if (!g.day_of_week || !g.time) return false;
     const days = g.day_of_week.split(/\s*[,،]\s*|\s+،\s+/).map(d => d.trim());
     if (!days.includes(todayAr)) return false;
     const [h, m] = g.time.split(":").map(Number);
     const gMins = h * 60 + m;
-    console.log("[AutoDetect] group:", g.name, "gMins:", gMins, "window:", gMins - 5, "-", gMins + 20);
     return nowMins >= gMins - 5 && nowMins <= gMins + 20;
   });
-  console.log("[AutoDetect] matched:", match?.name ?? "none");
   return match ?? null;
 }
 
@@ -204,7 +201,6 @@ export function useScanSession() {
         setGrades(grdData);
         stateRef.current.students = stData;
         stateRef.current.groups = grpData;
-        console.log("[Load] groups loaded:", grpData.length, grpData.map(g => g.name + "|" + g.day_of_week + "|" + g.time));
       } catch (e) {
         console.error("[Load] error:", e);
         const grpData = OfflineCache.loadGroups();
@@ -242,7 +238,6 @@ export function useScanSession() {
   // ── Fire auto-detect once data is ready ──────────────────────
   useEffect(() => {
     if (loading || groups.length === 0 || manualOverrideRef.current) return;
-    console.log("[AutoDetect] triggering with", groups.length, "groups");
     applyAutoDetectRef.current(groups);
   }, [loading, groups]);
 

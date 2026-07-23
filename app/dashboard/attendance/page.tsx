@@ -126,7 +126,8 @@ export default function AttendancePage() {
                 className="export-btn"
                 onClick={() => exportAttendancePrint(
                   data.filteredStudents, data.allDates, data.attendance,
-                  data.selectedMonth, data.selectedYear, selectedGroup?.name || "الكل"
+                  data.selectedMonth, data.selectedYear, selectedGroup?.name || "الكل",
+                  data.selectedGroupId === "all" ? data.groups : undefined
                 )}
                 title="طباعة الكشف"
               >

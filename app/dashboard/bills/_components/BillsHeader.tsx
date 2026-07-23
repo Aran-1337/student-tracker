@@ -8,8 +8,8 @@ interface Props {
   availableYears: number[];
   onYearChange: (y: number) => void;
   onAddClick: () => void;
-  activeTab: "overview" | "table";
-  onTabChange: (t: "overview" | "table") => void;
+  activeTab: "overview" | "table" | "templates";
+  onTabChange: (t: "overview" | "table" | "templates") => void;
 }
 
 export default function BillsHeader({
@@ -84,7 +84,7 @@ export default function BillsHeader({
           display: "flex", background: "var(--bg-card)",
           border: "1px solid var(--border-color)", borderRadius: "10px", padding: "3px", gap: "3px",
         }}>
-          {(["overview", "table"] as const).map(tab => (
+          {(["overview", "table", "templates"] as const).map(tab => (
             <button
               key={tab}
               onClick={() => onTabChange(tab)}
@@ -96,7 +96,7 @@ export default function BillsHeader({
                 transition: "all 0.2s ease",
               }}
             >
-              {tab === "overview" ? "نظرة عامة" : "جدول الفواتير"}
+              {tab === "overview" ? "نظرة عامة" : tab === "table" ? "جدول الفواتير" : "القوالب المتكررة"}
             </button>
           ))}
         </div>

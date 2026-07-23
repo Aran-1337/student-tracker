@@ -34,7 +34,7 @@ export function useBills() {
 
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [activeTab, setActiveTab] = useState<"overview" | "table">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "table" | "templates">("overview");
 
   // Banner: هل الشهر الحالي لسه ما اتولدش؟
   const [showGenerateBanner, setShowGenerateBanner] = useState(false);

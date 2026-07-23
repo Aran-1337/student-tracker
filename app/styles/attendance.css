@@ -94,6 +94,18 @@
 }
 
 /* Attendance Table Header */
+/* Attendance Table Header */
+.attendance-table caption {
+  caption-side: top;
+  text-align: right;
+  padding: 0.6rem 1rem;
+  background: var(--color-teal, #0d9488);
+  color: #fff;
+  border-radius: 6px 6px 0 0;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
 .attendance-table-header {
   display: flex;
   justify-content: space-between;
