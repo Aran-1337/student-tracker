@@ -129,7 +129,7 @@ export function exportAttendancePrint(
     <script>
       window.onload = () => {
         setTimeout(() => {
-          window.print();
+          window["print"]();
           window.onafterprint = () => window.close();
         }, 500);
       };
