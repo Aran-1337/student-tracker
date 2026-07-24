@@ -74,6 +74,9 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
     setExporting(true);
     
     try {
+      const { default: jsPDF } = await import("jspdf");
+      const { default: html2canvas } = await import("html2canvas");
+
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
@@ -85,8 +88,6 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
           pdf.addPage();
         }
         const el = formElements[i] as HTMLElement;
-        const { default: html2canvas } = await import("html2canvas");
-        const { default: jsPDF } = await import("jspdf");
 
         const canvas = await html2canvas(el, {
           scale: 2,

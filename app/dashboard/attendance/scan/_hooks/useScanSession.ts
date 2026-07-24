@@ -143,7 +143,7 @@ export function useScanSession() {
       try {
         await qr.start({ facingMode: "environment" }, config, onScan, () => {});
       } catch {
-        const cameras = await Html5Qrcode.getCameras();
+        const cameras = await QrcodeClass.getCameras();
         if (!cameras?.length) throw new Error("لا توجد كاميرا");
         const back = cameras.find(c => /back|rear|environment/i.test(c.label));
         await qr.start(back ? back.id : cameras[cameras.length - 1].id, config, onScan, () => {});
