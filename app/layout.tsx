@@ -34,9 +34,13 @@ export const viewport: Viewport = {
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
+import Script from "next/script";
+
 function ServiceWorkerRegister() {
   return (
-    <script
+    <Script
+      id="sw-register"
+      strategy="afterInteractive"
       dangerouslySetInnerHTML={{
         __html: `
           if ('serviceWorker' in navigator) {
