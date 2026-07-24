@@ -17,14 +17,32 @@ export const StudentsService = {
 
   async addStudentWithGeneratedCode(studentData: Omit<Student, "id" | "created_at" | "code">): Promise<Student> {
     const allStudents = await StudentsRepository.getStudentsByTeacherId(studentData.teacher_id!);
+    const allGrades = await GradesRepository.getGradesByTeacherId(studentData.teacher_id!);
+    
+    const grade = allGrades.find(g => g.id === studentData.grade_id);
+    const prefix = grade?.prefix || '';
+
+    // Filter students by this grade
+    const gradeStudents = allStudents.filter(s => s.grade_id === studentData.grade_id);
 
     let maxCode = 0;
-    allStudents.forEach(s => {
-      const num = parseInt(s.code || '0', 10);
+    gradeStudents.forEach(s => {
+      const codeStr = s.code || '';
+      let numPart = codeStr;
+      if (prefix && codeStr.startsWith(prefix)) {
+        numPart = codeStr.substring(prefix.length);
+      }
+      const num = parseInt(numPart, 10);
       if (!isNaN(num) && num > maxCode) maxCode = num;
     });
 
-    const generatedCode = String(maxCode + 1).padStart(4, '0');
+    // Generate sequence, if no prefix pad to 4 zeros, if prefix just pad to 3 (e.g. 1000 + 001 = 1000001, but the user expects 1001, etc. Let's just append the sequence)
+    // Actually, look at the screenshot, 100 is the prefix, the student should be 1001? Or 10001?
+    // Let's pad to 4 digits if no prefix, and 3 digits if there is a prefix, or just 4 digits always.
+    // If prefix is "100", sequence 1 -> "1000001" is too long. They usually want 4 digits total if prefix is small, but let's safely pad sequence to 4 digits.
+    const seqStr = String(maxCode + 1).padStart(4, '0');
+    const generatedCode = `${prefix}${seqStr}`;
+    
     return StudentsRepository.addStudent({ ...studentData, code: generatedCode });
   },
 
@@ -42,15 +60,30 @@ export const StudentsService = {
 
   async fixDuplicateCodes(teacherId: string): Promise<number> {
     const allStudents = await StudentsRepository.getStudentsByTeacherId(teacherId);
+    const allGrades = await GradesRepository.getGradesByTeacherId(teacherId);
 
-    // Sort by created_at to keep original order
+    // Group students by grade
+    const updates: { id: string; code: string }[] = [];
+    
+    // Sort all students by created_at
     const sorted = [...allStudents].sort((a, b) =>
       (a.created_at || '').localeCompare(b.created_at || '')
     );
 
-    const updates: { id: string; code: string }[] = [];
-    sorted.forEach((s, i) => {
-      const newCode = String(i + 1).padStart(4, '0');
+    // Track sequence per grade
+    const gradeSequences: Record<string, number> = {};
+
+    sorted.forEach((s) => {
+      const grade = allGrades.find(g => g.id === s.grade_id);
+      const prefix = grade?.prefix || '';
+      const gId = s.grade_id || 'unassigned';
+      
+      if (!gradeSequences[gId]) gradeSequences[gId] = 0;
+      gradeSequences[gId]++;
+      
+      const seqStr = String(gradeSequences[gId]).padStart(4, '0');
+      const newCode = `${prefix}${seqStr}`;
+      
       if (s.code !== newCode) updates.push({ id: s.id, code: newCode });
     });
 
