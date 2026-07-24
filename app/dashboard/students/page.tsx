@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { CheckSquare, Square, AlertCircle, Printer, Wrench } from "lucide-react";
+import { CheckSquare, Square, AlertCircle, Printer, CreditCard } from "lucide-react";
 
 import { Student, Group, Grade, BookDef } from "@/lib/types";
 import { StudentsService } from "@/lib/services/studentsService";
@@ -23,6 +23,7 @@ import { StudentsFilters } from "./_components/StudentsFilters";
 import { BulkActionBar } from "./_components/BulkActionBar";
 import { Pagination } from "./_components/Pagination";
 import { ConfirmDeleteDialog } from "./_components/ConfirmDeleteDialog";
+import { PaymentScanModal } from "./_components/PaymentScanModal";
 
 const PAGE_SIZE = 20;
 
@@ -53,6 +54,7 @@ export default function StudentsManagement() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [showPaymentScan, setShowPaymentScan] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" = "success") =>
     setToast({ message, type });
@@ -239,25 +241,6 @@ export default function StudentsManagement() {
 
   const allSelected = pagedStudents.length > 0 && selectedIds.size === pagedStudents.length;
 
-  const handleFixCodes = async () => {
-    if (!userId) return;
-    setActionLoading(true);
-    try {
-      const count = await StudentsService.fixDuplicateCodes(userId);
-      const updated = await StudentsService.getStudentsByTeacherId(userId);
-      setStudents(updated.map((s) => ({
-        ...s,
-        months: Array.isArray(s.months) && s.months.length === 12 ? s.months : Array(12).fill(false),
-        received_books: Array.isArray(s.received_books) ? s.received_books : [],
-      })));
-      showToast(count > 0 ? `تم إصلاح ${count} كود بنجاح.` : "الأكواد سليمة، لا يوجد تكرار.");
-    } catch {
-      showToast("فشل إصلاح الأكواد.", "error");
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   // ─── Print ────────────────────────────────────────────────────────────────
   const handlePrint = () => {
     const arabicMonthsArr = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"];
@@ -315,8 +298,8 @@ export default function StudentsManagement() {
           <p style={{ color: "var(--text-secondary)" }}>إضافة الطلاب وإدارة الاشتراكات والكتب المستلمة</p>
         </div>
         <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <Button variant="secondary" onClick={handleFixCodes} isLoading={actionLoading} leftIcon={<Wrench size={16} />}>
-            إصلاح الأكواد
+          <Button variant="primary" onClick={() => setShowPaymentScan(true)} leftIcon={<CreditCard size={16} />}>
+            سكان الدفع
           </Button>
           <Link href={`/dashboard/students/print-qr?gradeId=${filterGradeId}&groupId=${activeFilter}`} style={{ textDecoration: "none" }}>
             <Button variant="secondary" leftIcon={<Printer size={16} />}>طباعة بطاقات QR</Button>
@@ -432,6 +415,16 @@ export default function StudentsManagement() {
           message={pendingConfirm.message}
           onConfirm={handleConfirmDelete}
           onCancel={() => setPendingConfirm(null)}
+        />
+      )}
+
+      {showPaymentScan && (
+        <PaymentScanModal
+          students={students}
+          onClose={() => setShowPaymentScan(false)}
+          onStudentUpdated={(studentId, months) =>
+            setStudents(prev => prev.map(s => s.id === studentId ? { ...s, months } : s))
+          }
         />
       )}
 
