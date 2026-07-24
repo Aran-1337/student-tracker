@@ -25,6 +25,9 @@ export const StudentsService = {
     // Filter students by this grade
     const gradeStudents = allStudents.filter(s => s.grade_id === studentData.grade_id);
 
+    let maxCode = 0;
+    gradeStudents.forEach(s => {
+      const codeStr = s.code || '';
       let num = 0;
       if (prefix) {
         const baseNum = parseInt(prefix, 10);
