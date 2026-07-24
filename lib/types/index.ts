@@ -157,5 +157,9 @@ export interface Question {
   content: string;
   options?: string[] | null;
   correct_answer?: string | null;
+  question_type?: "mcq" | "essay" | null;
+  essay_lines?: number | null;
+  section_name?: string | null;
+  image_base64?: string | null;
   created_at?: string;
 }

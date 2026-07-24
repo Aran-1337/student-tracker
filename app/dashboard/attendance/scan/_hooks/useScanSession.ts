@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { Html5Qrcode } from "html5-qrcode";
+// html5-qrcode is dynamically imported later to save bundle size
+import type { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/lib/supabaseClient";
 import { Group, Student, Grade, ScannedEntry } from "@/lib/types";
 import { GroupsService } from "@/lib/services/groupsService";

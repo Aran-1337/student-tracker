@@ -512,9 +512,13 @@ create table if not exists public.questions (
     id uuid primary key default gen_random_uuid(),
     bank_id uuid references public.question_banks(id) on delete cascade not null,
     content text not null,
-    options jsonb, -- array of strings for multiple choice
+    options jsonb, -- ["أ", "ب"]
     correct_answer text,
-    created_at timestamp with time zone default now() not null
+    question_type text default 'mcq',
+    essay_lines integer default 0,
+    section_name text,
+    image_base64 text,
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
 -- RLS Policies for new tables

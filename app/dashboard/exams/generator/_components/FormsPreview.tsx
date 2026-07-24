@@ -5,8 +5,7 @@ import { Question } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Printer, RefreshCw } from "lucide-react";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+// Dynamic imports used inside export function to optimize bundle size
 
 interface FormsPreviewProps {
   questions: Question[];
@@ -38,21 +37,34 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
 
   const generateForms = () => {
     if (questions.length === 0) return;
+    
+    // Extract unique sections
+    const sections: string[] = [];
+    questions.forEach(q => {
+      const sec = q.section_name || "";
+      if (!sections.includes(sec)) sections.push(sec);
+    });
+
     const newForms: Form[] = [];
     for (let i = 0; i < numForms; i++) {
-      let shuffledQs = shuffleArray(questions);
+      let finalQs: Question[] = [];
       
-      // Shuffle options and keep track of correct answer string if needed, 
-      // but the `options` array inside `q` is what we use to render and find the index.
-      // So if we shuffle options, q.options.indexOf(q.correct_answer) will point to the new location!
-      shuffledQs = shuffledQs.map(q => {
-        if (q.options && q.options.length > 0) {
-          return { ...q, options: shuffleArray(q.options) };
-        }
-        return q;
+      // Shuffle within each section, then append
+      sections.forEach(sec => {
+        const secQs = questions.filter(q => (q.section_name || "") === sec);
+        let shuffledQs = shuffleArray(secQs);
+        
+        shuffledQs = shuffledQs.map(q => {
+          if (q.options && q.options.length > 0) {
+            return { ...q, options: shuffleArray(q.options) };
+          }
+          return q;
+        });
+        
+        finalQs = [...finalQs, ...shuffledQs];
       });
       
-      newForms.push({ id: i + 1, questions: shuffledQs });
+      newForms.push({ id: i + 1, questions: finalQs });
     }
     setForms(newForms);
   };
@@ -62,6 +74,9 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
     setExporting(true);
     
     try {
+      const html2canvas = (await import("html2canvas")).default;
+      const { default: jsPDF } = await import("jspdf");
+      
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
@@ -174,25 +189,53 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                     
                     {/* Questions */}
                     <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-                      {form.questions.map((q, idx) => (
+                      {form.questions.map((q, idx) => {
+                        const showSectionHeader = q.section_name && (idx === 0 || form.questions[idx - 1].section_name !== q.section_name);
+                        return (
                         <div key={q.id} style={{ breakInside: "avoid" }}>
+                          {showSectionHeader && (
+                            <div style={{ background: "#f1f5f9", padding: "8px 12px", borderRadius: "6px", fontWeight: "bold", fontSize: "16px", marginBottom: "1rem", color: "#0f172a", borderRight: "4px solid #059669" }}>
+                              {q.section_name}
+                            </div>
+                          )}
                           <div style={{ fontWeight: "bold", fontSize: "15px", marginBottom: "0.4rem", color: "#000" }}>
                             س{idx + 1}: {q.content}
                           </div>
-                          {q.options && q.options.length > 0 && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem", paddingRight: "1.25rem" }}>
-                              {q.options.map((opt, oIdx) => (
-                                <div key={oIdx} style={{ fontSize: "14px", color: "#222", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                  <div style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid #000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold" }}>
-                                    {modelLetters[oIdx % modelLetters.length]}
-                                  </div>
-                                  <div>{opt}</div>
-                                </div>
-                              ))}
+                          {q.image_base64 && (
+                            <div style={{ margin: "0.75rem 0", maxWidth: "500px", border: "1px solid #cbd5e1", borderRadius: "6px", overflow: "hidden", padding: "4px", backgroundColor: "#fff" }}>
+                              <img src={q.image_base64} style={{ width: "100%", maxHeight: "250px", objectFit: "contain", display: "block" }} alt="مرفق" />
                             </div>
                           )}
+                          {q.question_type === "essay" ? (
+                            <div style={{ marginTop: "1rem", marginBottom: "1rem", border: "2px solid #94a3b8", borderRadius: "8px", padding: "0.5rem 1rem", backgroundColor: "#f8fafc" }}>
+                              {Array.from({ length: q.essay_lines || 3 }).map((_, i) => (
+                                <div key={i} style={{ borderBottom: "1px dashed #cbd5e1", height: "1.8rem", marginBottom: "0.2rem" }} />
+                              ))}
+                            </div>
+                          ) : (
+                            q.options && q.options.length > 0 && (
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", paddingRight: "1.25rem" }}>
+                                {q.options.map((opt, oIdx) => {
+                                  const isVeryLong = q.options!.some(o => o.length > 40);
+                                  const isMedium = q.options!.some(o => o.length > 15);
+                                  const width = isVeryLong ? "100%" : isMedium ? "calc(50% - 0.5rem)" : "calc(25% - 0.75rem)";
+                                  return (
+                                    <div key={oIdx} style={{ width, fontSize: "14px", color: "#222", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                                      <div style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid #000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>
+                                        {modelLetters[oIdx % modelLetters.length]}
+                                      </div>
+                                      <div style={{ flex: 1, wordBreak: "break-word" }}>
+                                        {opt.startsWith("data:image/") ? <img src={opt} style={{ maxHeight: "60px", maxWidth: "100%", display: "block" }} alt="خيار" /> : opt}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )
+                          )}
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -236,7 +279,9 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                               <tr key={q.id} style={{ borderBottom: "1px solid #e2e8f0" }}>
                                 <td style={{ padding: "4px", textAlign: "center", fontWeight: "bold" }}>{idx + 1}</td>
                                 <td style={{ padding: "4px", textAlign: "center", color: q.correct_answer ? "#059669" : "#64748b", fontWeight: 600 }}>
-                                  {q.options?.indexOf(q.correct_answer!) !== -1 ? modelLetters[q.options!.indexOf(q.correct_answer!)] : (q.correct_answer || "غير محددة")}
+                                  {q.options && q.correct_answer && q.options.indexOf(q.correct_answer) !== -1 
+                                    ? modelLetters[q.options.indexOf(q.correct_answer)] 
+                                    : (q.correct_answer?.startsWith("data:image/") ? "صورة (مرفقة)" : (q.correct_answer || "مقالى / غير محددة"))}
                                 </td>
                               </tr>
                             ))}
