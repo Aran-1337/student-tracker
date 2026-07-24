@@ -5,7 +5,8 @@ import { Question } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Printer, RefreshCw } from "lucide-react";
-// Dynamic imports used inside export function to optimize bundle size
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 
 interface FormsPreviewProps {
   questions: Question[];
@@ -74,9 +75,6 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
     setExporting(true);
     
     try {
-      const html2canvas = (await import("html2canvas")).default;
-      const { default: jsPDF } = await import("jspdf");
-      
       const pdf = new jsPDF("p", "mm", "a4");
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
