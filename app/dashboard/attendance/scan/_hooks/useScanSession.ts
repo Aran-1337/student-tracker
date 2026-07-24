@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { Html5Qrcode } from "html5-qrcode";
+import type { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "@/lib/supabaseClient";
 import { Group, Student, Grade, ScannedEntry } from "@/lib/types";
 import { GroupsService } from "@/lib/services/groupsService";
@@ -84,8 +84,9 @@ export function useScanSession() {
     if (!gid || scannerRef.current) return; // already running
     try {
       const config = { fps: 6, qrbox: { width: 220, height: 220 } };
-      const qr = new Html5Qrcode(scannerDivId);
-      scannerRef.current = qr;
+      const { Html5Qrcode: QrcodeClass } = await import("html5-qrcode");
+      const qr = new QrcodeClass(scannerDivId);
+      scannerRef.current = qr as unknown as Html5Qrcode;
 
       const onScan = async (decodedText: string) => {
         const { userId, scannerPaused, students, groups, scannedToday, sessionDate, selectedGroupId } = stateRef.current;

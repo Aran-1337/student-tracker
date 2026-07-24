@@ -5,8 +5,7 @@ import { Question } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Printer, RefreshCw } from "lucide-react";
-import html2canvas from "html2canvas";
-import jsPDF from "jspdf";
+// jsPDF and html2canvas are dynamically imported in handleExportPDF
 
 interface FormsPreviewProps {
   questions: Question[];
@@ -86,6 +85,9 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
           pdf.addPage();
         }
         const el = formElements[i] as HTMLElement;
+        const { default: html2canvas } = await import("html2canvas");
+        const { default: jsPDF } = await import("jspdf");
+
         const canvas = await html2canvas(el, {
           scale: 2,
           useCORS: true,
