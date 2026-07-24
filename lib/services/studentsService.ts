@@ -26,8 +26,16 @@ export const StudentsService = {
     const gradeStudents = allStudents.filter(s => s.grade_id === studentData.grade_id);
 
       let num = 0;
-      if (prefix && codeStr.startsWith(prefix)) {
-        num = parseInt(codeStr.substring(prefix.length), 10);
+      if (prefix) {
+        const baseNum = parseInt(prefix, 10);
+        if (!isNaN(baseNum)) {
+           const studentNum = parseInt(codeStr, 10);
+           if (!isNaN(studentNum) && studentNum > baseNum) {
+             num = studentNum - baseNum;
+           }
+        } else if (codeStr.startsWith(prefix)) {
+           num = parseInt(codeStr.substring(prefix.length), 10);
+        }
       } else {
         num = parseInt(codeStr, 10);
       }
@@ -37,7 +45,12 @@ export const StudentsService = {
 
     let generatedCode = "";
     if (prefix) {
-       generatedCode = `${prefix}${String(maxCode + 1).padStart(3, '0')}`;
+       const baseNum = parseInt(prefix, 10);
+       if (!isNaN(baseNum)) {
+         generatedCode = String(baseNum + maxCode + 1);
+       } else {
+         generatedCode = `${prefix}${String(maxCode + 1).padStart(3, '0')}`;
+       }
     } else {
        generatedCode = String(maxCode + 1).padStart(4, '0');
     }
@@ -82,7 +95,12 @@ export const StudentsService = {
       
       let newCode = "";
       if (prefix) {
-        newCode = `${prefix}${String(gradeSequences[gId]).padStart(3, '0')}`;
+        const baseNum = parseInt(prefix, 10);
+        if (!isNaN(baseNum)) {
+          newCode = String(baseNum + gradeSequences[gId]);
+        } else {
+          newCode = `${prefix}${String(gradeSequences[gId]).padStart(3, '0')}`;
+        }
       } else {
         newCode = String(gradeSequences[gId]).padStart(4, '0');
       }

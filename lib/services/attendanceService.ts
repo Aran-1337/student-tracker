@@ -30,7 +30,20 @@ export const AttendanceService = {
     if (selectedGradeId && selectedGradeId !== "all") {
       const grade = grades.find(g => g.id === selectedGradeId);
       if (grade?.prefix && !searchCode.startsWith(grade.prefix)) {
-        searchCode = `${grade.prefix}${searchCode}`;
+        const baseNum = parseInt(grade.prefix, 10);
+        if (!isNaN(baseNum)) {
+           const codeNum = parseInt(searchCode, 10);
+           if (!isNaN(codeNum)) {
+             // Only auto-add if the typed code is much smaller than baseNum (e.g. they typed 1 instead of 101)
+             // Or we just add it. If baseNum is 100 and they typed 1, we get 101.
+             // But if they typed 101, codeNum (101) > baseNum (100). We shouldn't add it again!
+             if (codeNum < baseNum) {
+               searchCode = String(baseNum + codeNum);
+             }
+           }
+        } else {
+           searchCode = `${grade.prefix}${searchCode}`;
+        }
       }
     }
     
