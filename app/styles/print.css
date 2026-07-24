@@ -113,7 +113,7 @@
   font-weight: bold;
 }
 
-/* Print styles */
+/* Print QR screen styles */
 @media print {
   .no-print,
   .sidebar,

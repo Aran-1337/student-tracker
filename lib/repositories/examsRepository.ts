@@ -22,6 +22,14 @@ export const examsRepository = {
     return data;
   },
 
+  async updateExam(id: string, updates: Partial<Omit<import("@/lib/types").Exam, "id" | "created_at">>): Promise<void> {
+    const { error } = await supabase
+      .from("exams")
+      .update(updates)
+      .eq("id", id);
+    if (error) throw error;
+  },
+
   async deleteExam(id: string): Promise<void> {
     const { error } = await supabase
       .from("exams")
