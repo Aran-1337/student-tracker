@@ -9,6 +9,8 @@ import { GroupsService } from "@/lib/services/groupsService";
 import { GradesService } from "@/lib/services/gradesService";
 import { TeachersService } from "@/lib/services/teachersService";
 import { AuthService } from "@/lib/services/authService";
+import { AttendanceService } from "@/lib/services/attendanceService";
+import { AttendanceRecord } from "@/lib/types";
 
 import { Toast } from "@/components/ui/Toast";
 import { Spinner } from "@/components/ui/Spinner";
@@ -19,6 +21,7 @@ import { StudentContactCard } from "./_components/StudentContactCard";
 import { StudentFinancialCard } from "./_components/StudentFinancialCard";
 import { StudentPaymentCard } from "./_components/StudentPaymentCard";
 import { StudentBooksCard } from "./_components/StudentBooksCard";
+import { StudentAttendanceCard } from "./_components/StudentAttendanceCard";
 import { exportStudentPDF } from "./_components/exportStudentPDF";
 
 export default function StudentDetailPage() {
@@ -31,6 +34,7 @@ export default function StudentDetailPage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [teacherBooks, setTeacherBooks] = useState<BookDef[]>([]);
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<Partial<Student>>({});
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -44,11 +48,12 @@ export default function StudentDetailPage() {
         const { data: { session } } = await AuthService.getSession();
         if (!session) { router.replace("/login"); return; }
 
-        const [studentData, groupsData, gradesData, teacherProfile] = await Promise.all([
+        const [studentData, groupsData, gradesData, teacherProfile, attData] = await Promise.all([
           StudentsService.getStudentById(id),
           GroupsService.getGroupsByTeacherId(session.user.id),
           GradesService.getGradesByTeacherId(session.user.id),
           TeachersService.getTeacherProfile(session.user.id),
+          AttendanceService.getAttendanceByStudentId(id),
         ]);
 
         if (!studentData) { router.replace("/dashboard/students"); return; }
@@ -65,6 +70,7 @@ export default function StudentDetailPage() {
         setGroups(groupsData);
         setGrades(gradesData);
         setTeacherBooks(teacherProfile?.books || []);
+        setAttendance(attData || []);
       } catch {
         showToast("حدث خطأ أثناء تحميل البيانات.", "error");
       } finally {
@@ -175,6 +181,7 @@ export default function StudentDetailPage() {
           student={student}
           onToggleMonth={handleToggleMonth}
         />
+        <StudentAttendanceCard attendance={attendance} />
         <StudentBooksCard
           student={student}
           books={studentBooks}

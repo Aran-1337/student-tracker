@@ -6,6 +6,10 @@ export const AttendanceService = {
     return AttendanceRepository.getAttendanceRecords(month, year);
   },
 
+  async getAttendanceByStudentId(studentId: string): Promise<AttendanceRecord[]> {
+    return AttendanceRepository.getAttendanceByStudentId(studentId);
+  },
+
   async addAttendanceRecord(record: Omit<AttendanceRecord, "id" | "created_at">): Promise<AttendanceRecord> {
     return AttendanceRepository.addAttendanceRecord(record);
   },

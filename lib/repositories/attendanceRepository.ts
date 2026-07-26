@@ -16,6 +16,16 @@ export const AttendanceRepository = {
     return data || [];
   },
 
+  async getAttendanceByStudentId(studentId: string): Promise<AttendanceRecord[]> {
+    const { data, error } = await supabase
+      .from("attendance_records")
+      .select("*")
+      .eq("student_id", studentId)
+      .order("session_date", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
   async addAttendanceRecord(record: Omit<AttendanceRecord, "id" | "created_at">): Promise<AttendanceRecord> {
     const { data, error } = await supabase
       .from("attendance_records")
