@@ -83,8 +83,8 @@ export default function LoginPage() {
             {sysSettings?.site_logo ? (
               <img 
                 src={sysSettings.site_logo} 
-                alt="Logo" 
-                style={{ width: "4rem", height: "4rem", objectFit: "contain", borderRadius: "12px" }}
+                alt="Logo"
+                style={{ width: "10rem", height: "auto", maxHeight: "5rem", objectFit: "contain", borderRadius: "12px" }}
               />
             ) : (
               <div className="stat-icon-wrapper stat-icon-teal">
