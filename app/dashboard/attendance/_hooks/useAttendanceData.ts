@@ -87,34 +87,30 @@ export function useAttendanceData() {
         
         const earliestTime = Math.min(...dateRecords.map(r => new Date(r.created_at!).getTime()));
         if (nowMs - earliestTime > oneHourMs) {
-          const groupIds = Array.from(new Set(dateRecords.map(r => r.group_id || 'unassigned')));
-          for (const gid of groupIds) {
-            const groupStudents = students.filter(s => (s.group_id || 'unassigned') === gid);
-            for (const student of groupStudents) {
-              const hasRecord = merged.some(r => r.student_id === student.id && r.session_date === date);
-              if (!hasRecord) {
-                recordsToInsert.push({
-                  teacher_id: userId,
-                  student_id: student.id,
-                  group_id: student.group_id,
-                  session_date: date,
-                  month: selectedMonth,
-                  year: selectedYear,
-                  status: "absent",
-                });
-                // Optimistically add to merged so we don't insert again
-                merged.push({
-                  id: `auto-${student.id}-${date}`,
-                  teacher_id: userId,
-                  student_id: student.id,
-                  group_id: student.group_id,
-                  session_date: date,
-                  month: selectedMonth,
-                  year: selectedYear,
-                  status: "absent",
-                  created_at: new Date().toISOString(),
-                });
-              }
+          for (const student of students) {
+            const hasRecord = merged.some(r => r.student_id === student.id && r.session_date === date);
+            if (!hasRecord) {
+              recordsToInsert.push({
+                teacher_id: userId,
+                student_id: student.id,
+                group_id: student.group_id,
+                session_date: date,
+                month: selectedMonth,
+                year: selectedYear,
+                status: "absent",
+              });
+              // Optimistically add to merged so we don't insert again
+              merged.push({
+                id: `auto-${student.id}-${date}`,
+                teacher_id: userId,
+                student_id: student.id,
+                group_id: student.group_id,
+                session_date: date,
+                month: selectedMonth,
+                year: selectedYear,
+                status: "absent",
+                created_at: new Date().toISOString(),
+              });
             }
           }
         }
