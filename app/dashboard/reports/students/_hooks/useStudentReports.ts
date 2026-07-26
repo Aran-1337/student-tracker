@@ -7,10 +7,11 @@ import { StudentsService } from "@/lib/services/studentsService";
 import { GroupsService } from "@/lib/services/groupsService";
 import { GradesService } from "@/lib/services/gradesService";
 import { AttendanceService } from "@/lib/services/attendanceService";
-import { Student, Group, Grade, AttendanceRecord } from "@/lib/types";
+import { examsService } from "@/lib/services/examsService";
+import { Student, Group, Grade, AttendanceRecord, Exam, ExamGrade } from "@/lib/types";
 
 const DEFAULT_TEMPLATE =
-  "مرحباً ولي أمر الطالب [اسم_الطالب]،\nنود إعلامكم بتقرير الطالب كالتالي:\nأيام الحضور: [الحضور]\nأيام الغياب: [الغياب]\nحالة الدفع: [حالة_الدفع]\nشكراً لتعاونكم.";
+  "مرحباً ولي أمر الطالب [اسم_الطالب]،\nنود إعلامكم بتقرير الطالب كالتالي:\nأيام الحضور: [الحضور]\nأيام الغياب: [الغياب]\nدرجات الامتحانات: [الامتحانات]\nحالة الدفع: [حالة_الدفع]\nشكراً لتعاونكم.";
 
 export const PAGE_SIZE = 20;
 
@@ -22,6 +23,8 @@ export function useStudentReports() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
+  const [examGrades, setExamGrades] = useState<ExamGrade[]>([]);
   const [whatsappTemplate, setWhatsappTemplate] = useState(DEFAULT_TEMPLATE);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -38,15 +41,30 @@ export function useStudentReports() {
 
   // Re-fetch attendance when month/year changes
   useEffect(() => {
-    async function fetchAttendance() {
+    async function fetchMonthData() {
       try {
-        const data = await AttendanceService.getAttendanceRecords(monthNum, selectedYear);
-        setAttendanceRecords(data || []);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        
+        const [attData, exData] = await Promise.all([
+          AttendanceService.getAttendanceRecords(monthNum, selectedYear),
+          examsService.getExamsByTeacherAndMonth(session.user.id, monthNum, selectedYear)
+        ]);
+        setAttendanceRecords(attData || []);
+        setExams(exData || []);
+
+        if (exData && exData.length > 0) {
+          const eIds = exData.map(e => e.id);
+          const gradesData = await examsService.getGradesByExamIds(eIds);
+          setExamGrades(gradesData || []);
+        } else {
+          setExamGrades([]);
+        }
       } catch {
         // silent — main load already shows error
       }
     }
-    if (!loading) fetchAttendance();
+    if (!loading) fetchMonthData();
   }, [monthNum, selectedYear]);
 
   // Initial load
@@ -56,19 +74,28 @@ export function useStudentReports() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        const [teacher, studentsData, groupsData, gradesData, attendanceData] = await Promise.all([
+        const [teacher, studentsData, groupsData, gradesData, attendanceData, exData] = await Promise.all([
           TeachersService.getTeacherProfile(session.user.id),
           StudentsService.getStudentsByTeacherId(session.user.id),
           GroupsService.getGroupsByTeacherId(session.user.id),
           GradesService.getGradesByTeacherId(session.user.id),
           AttendanceService.getAttendanceRecords(monthNum, selectedYear),
+          examsService.getExamsByTeacherAndMonth(session.user.id, monthNum, selectedYear),
         ]);
+
+        let gData: ExamGrade[] = [];
+        if (exData && exData.length > 0) {
+          const eIds = exData.map(e => e.id);
+          gData = await examsService.getGradesByExamIds(eIds);
+        }
 
         setWhatsappTemplate(teacher?.whatsapp_template || DEFAULT_TEMPLATE);
         setStudents(studentsData || []);
         setGroups(groupsData || []);
         setGrades(gradesData || []);
         setAttendanceRecords(attendanceData || []);
+        setExams(exData || []);
+        setExamGrades(gData);
       } catch {
         setToast({ message: "حدث خطأ أثناء تحميل البيانات.", type: "error" });
       } finally {
@@ -141,13 +168,24 @@ export function useStudentReports() {
   }), [filteredStudents, selectedMonthIndex]);
 
   // WhatsApp helpers
+  const getStudentExamsText = (studentId: string) => {
+    if (exams.length === 0) return "لا توجد امتحانات";
+    const studentGrades = exams.map(exam => {
+      const g = examGrades.find(eg => eg.exam_id === exam.id && eg.student_id === studentId);
+      return `${exam.title}: ${g ? g.score : 0}/${exam.max_score}`;
+    });
+    return studentGrades.join(" ، ");
+  };
+
   const buildMessage = (student: Student) => {
     const att = getStudentAttendance(student.id);
+    const examsText = getStudentExamsText(student.id);
     const isPaid = student.months?.[selectedMonthIndex] === true;
     return whatsappTemplate
       .replace(/\[اسم_الطالب\]/g, student.name)
       .replace(/\[الحضور\]/g, String(att.present))
       .replace(/\[الغياب\]/g, String(att.absent))
+      .replace(/\[الامتحانات\]/g, examsText)
       .replace(/\[حالة_الدفع\]/g, isPaid ? "تم الدفع ✅" : "لم يتم الدفع بعد ❌");
   };
 
@@ -193,7 +231,10 @@ export function useStudentReports() {
     filteredGroups,
     stats,
     attendanceMap,
+    exams,
+    examGrades,
     getStudentAttendance,
+    getStudentExamsText,
     whatsappTemplate,
     setWhatsappTemplate,
     toast,

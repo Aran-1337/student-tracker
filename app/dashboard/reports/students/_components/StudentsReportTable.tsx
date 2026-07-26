@@ -11,6 +11,7 @@ interface Props {
   grades: Grade[];
   groups: Group[];
   getAttendance: (id: string) => { present: number; absent: number };
+  getStudentExamsText: (id: string) => string;
   selectedMonthIndex: number;
   onSendWhatsApp: (s: Student) => void;
   page: number;
@@ -20,7 +21,7 @@ interface Props {
 }
 
 export default function StudentsReportTable({
-  students, grades, groups, getAttendance,
+  students, grades, groups, getAttendance, getStudentExamsText,
   selectedMonthIndex, onSendWhatsApp,
   page, totalPages, setPage, totalFiltered,
 }: Props) {
@@ -36,6 +37,7 @@ export default function StudentsReportTable({
               <th>السنة / المجموعة</th>
               <th>الحضور</th>
               <th>الغياب</th>
+              <th>الامتحانات</th>
               <th>نسبة الحضور</th>
               <th>الدفع</th>
               <th>واتساب</th>
@@ -44,7 +46,7 @@ export default function StudentsReportTable({
           <tbody>
             {students.length === 0 ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={9}>
                   <div className="sr-empty">
                     <MdOutlineInbox size={40} />
                     <span>لا يوجد طلاب مطابقين للفلتر</span>
@@ -80,6 +82,11 @@ export default function StudentsReportTable({
                     </td>
                     <td>
                       <span className={att.absent > 0 ? "sr-absent" : "sr-zero"}>{att.absent}</span>
+                    </td>
+                    <td>
+                      <div className="sr-exams-text" style={{ fontSize: "0.85rem", color: "var(--text-muted)", maxWidth: "150px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={getStudentExamsText(student.id)}>
+                        {getStudentExamsText(student.id)}
+                      </div>
                     </td>
                     <td>
                       <div className="sr-progress-wrap">

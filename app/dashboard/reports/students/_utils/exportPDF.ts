@@ -10,6 +10,7 @@ export function exportStudentsReportPDF(
   grades: Grade[],
   groups: Group[],
   getAttendance: (id: string) => { present: number; absent: number },
+  getStudentExamsText: (id: string) => string,
   monthIndex: number,
   year: number
 ) {
@@ -31,6 +32,7 @@ export function exportStudentsReportPDF(
         <td>${groupName}</td>
         <td class="present">${att.present}</td>
         <td class="absent">${att.absent}</td>
+        <td class="exams">${getStudentExamsText(s.id)}</td>
         <td>${pct}%</td>
         <td class="${isPaid ? "paid" : "unpaid"}">${isPaid ? "مدفوع" : "غير مدفوع"}</td>
         <td class="phone">${s.parent_phone ?? "-"}</td>
@@ -89,6 +91,7 @@ export function exportStudentsReportPDF(
     .phone { direction: ltr; }
     .present { color: #10b981; font-weight: 700; }
     .absent  { color: #ef4444; font-weight: 700; }
+    .exams   { font-size: 11px; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .paid    { color: #10b981; font-weight: 700; }
     .unpaid  { color: #ef4444; font-weight: 700; }
     @media print {
@@ -109,14 +112,16 @@ export function exportStudentsReportPDF(
         <th>الطالب</th>
         <th>السنة</th>
         <th>المجموعة</th>
-        <th>حضور</th>
-        <th>غياب</th>
-        <th>النسبة</th>
+        <th>الحضور</th>
+        <th>الغياب</th>
+        <th>الامتحانات</th>
+        <th>نسبة الحضور</th>
         <th>الدفع</th>
-        <th>الهاتف</th>
+        <th>واتساب</th>
       </tr>
     </thead>
-    <tbody>${rows}</tbody>
+    <tbody>
+      ${rows}</tbody>
   </table>
   <script>
     window.onload = function() {

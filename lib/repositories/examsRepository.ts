@@ -12,6 +12,23 @@ export const examsRepository = {
     return data || [];
   },
 
+  async getExamsByTeacherAndMonth(teacherId: string, month: number, year: number): Promise<Exam[]> {
+    const startStr = `${year}-${String(month).padStart(2, "0")}-01`;
+    const nextMonth = month === 12 ? 1 : month + 1;
+    const nextYear = month === 12 ? year + 1 : year;
+    const endStr = `${nextYear}-${String(nextMonth).padStart(2, "0")}-01`;
+
+    const { data, error } = await supabase
+      .from("exams")
+      .select("*")
+      .eq("teacher_id", teacherId)
+      .gte("exam_date", startStr)
+      .lt("exam_date", endStr)
+      .order("exam_date", { ascending: false });
+    if (error) throw error;
+    return data || [];
+  },
+
   async addExam(exam: Omit<Exam, "id" | "created_at">): Promise<Exam> {
     const { data, error } = await supabase
       .from("exams")
@@ -43,6 +60,16 @@ export const examsRepository = {
       .from("exam_grades")
       .select("*")
       .eq("exam_id", examId);
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getGradesByExamIds(examIds: string[]): Promise<ExamGrade[]> {
+    if (examIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from("exam_grades")
+      .select("*")
+      .in("exam_id", examIds);
     if (error) throw error;
     return data || [];
   },

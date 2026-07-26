@@ -24,6 +24,7 @@ export default function StudentReportsPage() {
     filteredStudents, pagedStudents, filteredGroups,
     stats,
     getStudentAttendance,
+    getStudentExamsText,
     whatsappTemplate, setWhatsappTemplate,
     toast, setToast,
     searchQuery, setSearchQuery,
@@ -42,6 +43,7 @@ export default function StudentReportsPage() {
     exportStudentsReportPDF(
       filteredStudents, grades, groups,
       getStudentAttendance,
+      getStudentExamsText,
       selectedMonthIndex, selectedYear
     );
 
@@ -91,6 +93,7 @@ export default function StudentReportsPage() {
         grades={grades}
         groups={groups}
         getAttendance={getStudentAttendance}
+        getStudentExamsText={getStudentExamsText}
         selectedMonthIndex={selectedMonthIndex}
         onSendWhatsApp={sendWhatsApp}
         page={page}

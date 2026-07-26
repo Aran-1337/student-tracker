@@ -6,6 +6,10 @@ export const examsService = {
     return await examsRepository.getExamsByGroupId(groupId);
   },
 
+  async getExamsByTeacherAndMonth(teacherId: string, month: number, year: number): Promise<Exam[]> {
+    return await examsRepository.getExamsByTeacherAndMonth(teacherId, month, year);
+  },
+
   async addExam(exam: Omit<Exam, "id" | "created_at">): Promise<Exam> {
     return await examsRepository.addExam(exam);
   },
@@ -16,6 +20,10 @@ export const examsService = {
 
   async getGradesByExamId(examId: string): Promise<ExamGrade[]> {
     return await examsRepository.getGradesByExamId(examId);
+  },
+
+  async getGradesByExamIds(examIds: string[]): Promise<ExamGrade[]> {
+    return await examsRepository.getGradesByExamIds(examIds);
   },
 
   async upsertGrades(grades: Omit<ExamGrade, "id" | "created_at">[]): Promise<void> {
