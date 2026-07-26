@@ -41,7 +41,7 @@ export default function DashboardLayout({
   const [isBlocked, setIsBlocked] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sysSettings, setSysSettings] = useState<SystemSettings | null>(null);
+  const [sysSettings, setSysSettings] = useState<SystemSettings | null>(() => typeof window !== "undefined" ? OfflineCache.loadSysSettings() : null);
 
   const [hasCenterMode, setHasCenterMode] = useState(false);
 
@@ -246,8 +246,8 @@ export default function DashboardLayout({
       <aside className="sidebar">
         <div className="sidebar-inner">
           {/* Logo + Hamburger row */}
-          <div className="sidebar-top-row">
-            <div className="logo" style={sysSettings?.hide_sidebar_name ? { width: "100%", justifyContent: "center" } : {}}>
+          <div className="sidebar-top-row" suppressHydrationWarning>
+            <div className="logo" style={sysSettings?.hide_sidebar_name ? { width: "100%", justifyContent: "center" } : {}} suppressHydrationWarning>
               {sysSettings?.site_logo ? (
                 <img 
                   src={sysSettings.site_logo} 
