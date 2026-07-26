@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { LogIn, Mail, Lock, BookOpen } from "lucide-react";
+import { SystemSettingsService, SystemSettings } from "@/lib/services/systemSettingsService";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -13,6 +14,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [sysSettings, setSysSettings] = useState<SystemSettings | null>(null);
 
   useEffect(() => {
     async function checkUser() {
@@ -23,6 +25,12 @@ export default function LoginPage() {
         setCheckingAuth(false);
         return;
       }
+      
+      const settings = await SystemSettingsService.getSettings();
+      if (settings) {
+        setSysSettings(settings);
+      }
+      
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         router.replace("/dashboard");
@@ -72,12 +80,22 @@ export default function LoginPage() {
       <div className="auth-card glass-panel">
         <div className="auth-header">
           <div style={{ display: "flex", justifyContent: "center", marginBottom: "1rem" }}>
-            <div className="stat-icon-wrapper stat-icon-teal">
-              <BookOpen size={24} />
-            </div>
+            {sysSettings?.site_logo ? (
+              <img 
+                src={sysSettings.site_logo} 
+                alt="Logo" 
+                style={{ width: "4rem", height: "4rem", objectFit: "contain", borderRadius: "12px" }}
+              />
+            ) : (
+              <div className="stat-icon-wrapper stat-icon-teal">
+                <BookOpen size={24} />
+              </div>
+            )}
           </div>
           <h1 className="auth-title">تسجيل الدخول</h1>
-          <p className="auth-subtitle">مرحباً بك في نظام إدارة السناتر والمعلمين</p>
+          <p className="auth-subtitle">
+            {sysSettings?.site_name ? `مرحباً بك في ${sysSettings.site_name}` : "مرحبا بك فى نظام Nazmha"}
+          </p>
         </div>
 
         <form onSubmit={handleLogin}>
