@@ -75,9 +75,62 @@ export function useAttendanceData() {
           merged.push({ ...q, id: `offline-${q.student_id}-${q.session_date}`, created_at: q._queuedAt } as AttendanceRecord);
         }
       }
+      // Auto-absent logic
+      const oneHourMs = 60 * 60 * 1000;
+      const nowMs = Date.now();
+      const recordsToInsert: Omit<AttendanceRecord, "id" | "created_at">[] = [];
+      const dates = Array.from(new Set(merged.map(r => r.session_date)));
+
+      for (const date of dates) {
+        const dateRecords = merged.filter(r => r.session_date === date && r.created_at);
+        if (dateRecords.length === 0) continue;
+        
+        const earliestTime = Math.min(...dateRecords.map(r => new Date(r.created_at!).getTime()));
+        if (nowMs - earliestTime > oneHourMs) {
+          const groupIds = Array.from(new Set(dateRecords.map(r => r.group_id || 'unassigned')));
+          for (const gid of groupIds) {
+            const groupStudents = students.filter(s => (s.group_id || 'unassigned') === gid);
+            for (const student of groupStudents) {
+              const hasRecord = merged.some(r => r.student_id === student.id && r.session_date === date);
+              if (!hasRecord) {
+                recordsToInsert.push({
+                  teacher_id: userId,
+                  student_id: student.id,
+                  group_id: student.group_id,
+                  session_date: date,
+                  month: selectedMonth,
+                  year: selectedYear,
+                  status: "absent",
+                });
+                // Optimistically add to merged so we don't insert again
+                merged.push({
+                  id: `auto-${student.id}-${date}`,
+                  teacher_id: userId,
+                  student_id: student.id,
+                  group_id: student.group_id,
+                  session_date: date,
+                  month: selectedMonth,
+                  year: selectedYear,
+                  status: "absent",
+                  created_at: new Date().toISOString(),
+                });
+              }
+            }
+          }
+        }
+      }
+
+      if (recordsToInsert.length > 0 && navigator.onLine) {
+        try {
+          await AttendanceService.addAttendanceRecords(recordsToInsert);
+        } catch (e) {
+          console.error("Auto absent failed", e);
+        }
+      }
+
       setAttendance(merged);
     } catch {}
-  }, [userId, selectedMonth, selectedYear]);
+  }, [userId, selectedMonth, selectedYear, students]);
 
   useEffect(() => {
     if (userId) loadAttendance();

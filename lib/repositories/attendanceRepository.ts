@@ -44,7 +44,7 @@ export const AttendanceRepository = {
   async addAttendanceRecords(records: Omit<AttendanceRecord, "id" | "created_at">[]): Promise<AttendanceRecord[]> {
     const { data, error } = await supabase
       .from("attendance_records")
-      .insert(records)
+      .upsert(records, { onConflict: "student_id,session_date" })
       .select();
     if (error) throw error;
     return data || [];

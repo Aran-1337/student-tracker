@@ -14,6 +14,8 @@ export interface Teacher {
   is_admin: boolean;
   has_bills_feature: boolean;
   has_attendance_feature: boolean;
+  has_reports_feature: boolean;
+  has_exams_feature: boolean;
   is_center_mode: boolean;
   whatsapp_template?: string;
   plan_id?: string | null;

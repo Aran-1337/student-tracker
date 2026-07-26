@@ -1,7 +1,7 @@
 "use client";
 
 import { Student, AttendanceRecord, Group } from "@/lib/types";
-import { CheckCircle2, AlertCircle, QrCode, CheckSquare, XSquare } from "lucide-react";
+import { CheckCircle2, AlertCircle, QrCode, CheckSquare, XSquare, XCircle } from "lucide-react";
 
 interface Props {
   students: Student[];
@@ -10,7 +10,7 @@ interface Props {
   saving: boolean;
   selectedGroupId: string;
   groups: Group[];
-  isPresent: (sid: string, date: string) => boolean;
+  getRecordStatus: (sid: string, date: string) => string | null;
   getAttendancePercent: (sid: string, dates: string[]) => number;
   onToggle: (student: Student, date: string) => void;
   onMarkAll: (date: string) => void;
@@ -54,9 +54,9 @@ function TableHeaders({ allDates, today, saving, onMarkAll, onClearSession }: {
   );
 }
 
-function StudentRows({ students, allDates, today, saving, isPresent, getAttendancePercent, onToggle, onShowQR, startIndex = 0 }: {
+function StudentRows({ students, allDates, today, saving, getRecordStatus, getAttendancePercent, onToggle, onShowQR, startIndex = 0 }: {
   students: Student[]; allDates: string[]; today: string; saving: boolean; startIndex?: number;
-  isPresent: (sid: string, date: string) => boolean;
+  getRecordStatus: (sid: string, date: string) => string | null;
   getAttendancePercent: (sid: string, dates: string[]) => number;
   onToggle: (student: Student, date: string) => void;
   onShowQR: (student: Student) => void;
@@ -79,17 +79,18 @@ function StudentRows({ students, allDates, today, saving, isPresent, getAttendan
               </div>
             </td>
             {allDates.map(dateStr => {
-              const present = isPresent(student.id, dateStr);
+              const status = getRecordStatus(student.id, dateStr);
               const isPast = dateStr < today;
               return (
                 <td key={dateStr} style={{ textAlign: "center", padding: "0.5rem 0.25rem" }}>
                   <button
-                    className={`attendance-cell-btn ${present ? "present" : "absent"} ${isPast ? "locked" : ""}`}
+                    className={`attendance-cell-btn ${status === 'present' ? 'present' : status === 'absent' ? 'absent-cell' : 'empty-cell'} ${isPast ? 'locked' : ''}`}
                     onClick={() => !isPast && onToggle(student, dateStr)}
                     disabled={isPast}
-                    title={isPast ? "لا يمكن تعديل يوم سابق" : present ? `إلغاء حضور ${student.name}` : `تسجيل حضور ${student.name}`}
+                    title={isPast ? "لا يمكن تعديل يوم سابق" : status === 'present' ? `تغيير إلى غياب ${student.name}` : status === 'absent' ? `مسح سجل ${student.name}` : `تسجيل حضور ${student.name}`}
+                    style={status === 'absent' ? { color: "var(--color-danger)", borderColor: "var(--color-danger)", background: "rgba(239, 68, 68, 0.1)" } : {}}
                   >
-                    {present && <CheckCircle2 size={16} />}
+                    {status === 'present' ? <CheckCircle2 size={16} /> : status === 'absent' ? <XCircle size={16} /> : null}
                   </button>
                 </td>
               );
@@ -116,7 +117,7 @@ function StudentRows({ students, allDates, today, saving, isPresent, getAttendan
 
 export function AttendanceTable({
   students, allDates, saving, selectedGroupId, groups,
-  isPresent, getAttendancePercent,
+  getRecordStatus, getAttendancePercent,
   onToggle, onMarkAll, onClearSession, onShowQR,
 }: Props) {
   const now = new Date();
@@ -131,7 +132,7 @@ export function AttendanceTable({
     );
   }
 
-  const sharedProps = { allDates, today, saving, isPresent, getAttendancePercent, onToggle, onShowQR };
+  const sharedProps = { allDates, today, saving, getRecordStatus, getAttendancePercent, onToggle, onShowQR };
 
   if (selectedGroupId !== "all") {
     return (

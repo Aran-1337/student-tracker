@@ -39,6 +39,11 @@ export function useAttendanceActions({
   const getRecord = (studentId: string, dateStr: string) =>
     attendance.find(a => a.student_id === studentId && a.session_date === dateStr);
 
+  const getRecordStatus = (studentId: string, dateStr: string) => {
+    const record = getRecord(studentId, dateStr);
+    return record ? record.status : null;
+  };
+
   const getAttendancePercent = (studentId: string, allDates: string[]) => {
     if (allDates.length === 0) return 0;
     const present = attendance.filter(
@@ -50,8 +55,24 @@ export function useAttendanceActions({
   const handleToggle = async (student: Student, dateStr: string) => {
     if (!userId) return;
     const existing = getRecord(student.id, dateStr);
+    
     if (existing) {
-      setPendingDelete({ record: existing, studentName: student.name });
+      if (existing.status === "present") {
+        // Update to absent
+        try {
+          const updatedRecord = { ...existing, status: "absent" as const };
+          // Optimistic update
+          setAttendance(attendance.map(a => a.id === existing.id ? updatedRecord : a));
+          await AttendanceService.upsertAttendanceRecord(updatedRecord);
+        } catch {
+          // Revert on error
+          setAttendance(attendance);
+          showToast("فشل تحديث الحضور", "error");
+        }
+      } else {
+        // It's absent, prompt to delete
+        setPendingDelete({ record: existing, studentName: student.name });
+      }
     } else {
       const sessionMonth = parseInt(dateStr.split("-")[1], 10);
       const currentYear = parseInt(dateStr.split("-")[0], 10);
@@ -135,7 +156,7 @@ export function useAttendanceActions({
 
   return {
     saving, pendingDelete, setPendingDelete,
-    isPresent, getAttendancePercent,
+    getRecordStatus, getAttendancePercent,
     handleToggle, confirmDelete,
     handleMarkAllSession, handleClearSession,
   };

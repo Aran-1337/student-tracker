@@ -36,6 +36,8 @@ interface Teacher {
   is_active: boolean;
   has_bills_feature: boolean;
   has_attendance_feature: boolean;
+  has_reports_feature: boolean;
+  has_exams_feature: boolean;
   is_center_mode?: boolean;
   plan_id: string | null;
   subscription_started_at?: string;
@@ -66,6 +68,8 @@ interface Plan {
   duration_months: number;
   has_bills: boolean;
   has_attendance: boolean;
+  has_reports: boolean;
+  has_exams: boolean;
   has_center_mode?: boolean;
   color: string;
   is_active: boolean;
@@ -90,6 +94,9 @@ export default function AdminPanel() {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [featureModalTeacher, setFeatureModalTeacher] = useState<Teacher | null>(null);
   const [isPlanDropdownOpen, setIsPlanDropdownOpen] = useState(false);
+  const [passwordModalTeacher, setPasswordModalTeacher] = useState<Teacher | null>(null);
+  const [newPasswordInput, setNewPasswordInput] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -352,6 +359,38 @@ export default function AdminPanel() {
     }
   };
 
+  const handleToggleReports = async (teacherId: string, currentStatus: boolean) => {
+    setUpdatingId(teacherId);
+    try {
+      const newStatus = !currentStatus;
+      const { error } = await supabase.from("teachers").update({ has_reports_feature: newStatus }).eq("id", teacherId);
+      if (error) throw error;
+
+      setTeachers(teachers.map(t => t.id === teacherId ? { ...t, has_reports_feature: newStatus } : t));
+      showToast("تم تحديث ميزة تقارير الطلاب بنجاح.");
+    } catch (err: any) {
+      showToast("حدث خطأ أثناء تحديث ميزة التقارير.", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleToggleExams = async (teacherId: string, currentStatus: boolean) => {
+    setUpdatingId(teacherId);
+    try {
+      const newStatus = !currentStatus;
+      const { error } = await supabase.from("teachers").update({ has_exams_feature: newStatus }).eq("id", teacherId);
+      if (error) throw error;
+
+      setTeachers(teachers.map(t => t.id === teacherId ? { ...t, has_exams_feature: newStatus } : t));
+      showToast("تم تحديث ميزة الامتحانات بنجاح.");
+    } catch (err: any) {
+      showToast("حدث خطأ أثناء تحديث ميزة الامتحانات.", "error");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
   const handleToggleCenterMode = async (teacherId: string, currentStatus: boolean) => {
     setUpdatingId(teacherId);
     try {
@@ -365,6 +404,38 @@ export default function AdminPanel() {
       showToast("حدث خطأ أثناء تحديث ميزة السنتر.", "error");
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordModalTeacher || !newPasswordInput.trim()) return;
+    
+    setIsChangingPassword(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("no-session");
+
+      const response = await fetch("/api/admin/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          teacherId: passwordModalTeacher.id,
+          newPassword: newPasswordInput,
+          adminId: session.user.id
+        })
+      });
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Failed to change password");
+
+      showToast("✓ تم تغيير كلمة المرور بنجاح");
+      setPasswordModalTeacher(null);
+      setNewPasswordInput("");
+    } catch (err: any) {
+      showToast(err.message || "حدث خطأ أثناء تغيير كلمة المرور", "error");
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -389,6 +460,8 @@ export default function AdminPanel() {
         plan_id: plan.id,
         has_bills_feature: plan.has_bills,
         has_attendance_feature: plan.has_attendance,
+        has_reports_feature: plan.has_reports,
+        has_exams_feature: plan.has_exams,
         is_center_mode: plan.has_center_mode || false,
         subscription_started_at: new Date().toISOString(),
         subscription_expires_at: newExpiry.toISOString()
@@ -1189,6 +1262,46 @@ export default function AdminPanel() {
                   {(featureModalTeacher.is_center_mode ?? false) ? <ToggleRight size={44} /> : <ToggleLeft size={44} />}
                 </button>
               </div>
+
+              {/* Reports Toggle */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                <div>
+                  <h3 style={{ fontSize: "1rem", marginBottom: "4px" }}>تقارير الطلاب</h3>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>تفعيل نظام التقارير المالية والإحصائيات الخاصة بالطلاب.</p>
+                </div>
+                <button
+                  className="toggle-button"
+                  onClick={() => {
+                    const current = featureModalTeacher.has_reports_feature ?? true;
+                    handleToggleReports(featureModalTeacher.id, current);
+                    setFeatureModalTeacher({ ...featureModalTeacher, has_reports_feature: !current });
+                  }}
+                  disabled={updatingId === featureModalTeacher.id}
+                  style={{ color: (featureModalTeacher.has_reports_feature ?? true) ? "var(--color-teal)" : "var(--text-muted)" }}
+                >
+                  {(featureModalTeacher.has_reports_feature ?? true) ? <ToggleRight size={44} /> : <ToggleLeft size={44} />}
+                </button>
+              </div>
+
+              {/* Exams Toggle */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "1rem", background: "rgba(255,255,255,0.03)", borderRadius: "8px", border: "1px solid var(--border-color)" }}>
+                <div>
+                  <h3 style={{ fontSize: "1rem", marginBottom: "4px" }}>الامتحانات والنماذج</h3>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>تفعيل نظام إدارة وتصحيح الامتحانات وتوليد النماذج.</p>
+                </div>
+                <button
+                  className="toggle-button"
+                  onClick={() => {
+                    const current = featureModalTeacher.has_exams_feature ?? true;
+                    handleToggleExams(featureModalTeacher.id, current);
+                    setFeatureModalTeacher({ ...featureModalTeacher, has_exams_feature: !current });
+                  }}
+                  disabled={updatingId === featureModalTeacher.id}
+                  style={{ color: (featureModalTeacher.has_exams_feature ?? true) ? "var(--color-teal)" : "var(--text-muted)" }}
+                >
+                  {(featureModalTeacher.has_exams_feature ?? true) ? <ToggleRight size={44} /> : <ToggleLeft size={44} />}
+                </button>
+              </div>
             </div>
 
             {(!featureModalTeacher.is_active && !featureModalTeacher.subscription_started_at) ? (
@@ -1218,13 +1331,27 @@ export default function AdminPanel() {
                 </button>
               </div>
             ) : (
-              <button 
-                className="btn btn-secondary" 
-                style={{ width: "100%", justifyContent: "center" }}
-                onClick={() => setFeatureModalTeacher(null)}
-              >
-                إغلاق
-              </button>
+              <div style={{ display: "flex", gap: "1rem" }}>
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ flex: 1, justifyContent: "center", background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", borderColor: "rgba(239, 68, 68, 0.2)" }}
+                  onClick={() => {
+                    setFeatureModalTeacher(null);
+                    setPasswordModalTeacher(featureModalTeacher);
+                  }}
+                >
+                  <Lock size={18} />
+                  تغيير الباسورد
+                </button>
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ flex: 1, justifyContent: "center" }}
+                  onClick={() => setFeatureModalTeacher(null)}
+                >
+                  <X size={18} />
+                  إغلاق
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -1235,6 +1362,62 @@ export default function AdminPanel() {
         <div className={`alert-toast ${toast.type === "success" ? "alert-success" : "alert-error"}`}>
           {toast.type === "success" ? <Check size={18} /> : <AlertCircle size={18} />}
           <span>{toast.message}</span>
+        </div>
+      )}
+      {/* Password Change Modal */}
+      {passwordModalTeacher && (
+        <div className="modal-overlay" onClick={() => !isChangingPassword && setPasswordModalTeacher(null)}>
+          <div className="modal-content glass-panel" onClick={e => e.stopPropagation()} style={{ maxWidth: "450px" }}>
+            <div className="modal-header">
+              <h2 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <Lock size={20} className="text-teal" />
+                تغيير الباسورد
+              </h2>
+              <button className="close-btn" onClick={() => !isChangingPassword && setPasswordModalTeacher(null)} disabled={isChangingPassword}>
+                <X size={24} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleChangePassword}>
+              <div className="form-group" style={{ marginBottom: "1.5rem" }}>
+                <label style={{ marginBottom: "0.5rem", display: "block" }}>
+                  كلمة المرور الجديدة للمعلم ({passwordModalTeacher.name}):
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={newPasswordInput}
+                  onChange={(e) => setNewPasswordInput(e.target.value)}
+                  placeholder="أدخل كلمة المرور الجديدة"
+                  required
+                  minLength={6}
+                  disabled={isChangingPassword}
+                  style={{ width: "100%" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "1rem" }}>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary" 
+                  style={{ flex: 1, justifyContent: "center" }}
+                  disabled={isChangingPassword || !newPasswordInput.trim()}
+                >
+                  {isChangingPassword ? <div className="spinner" style={{ width: "18px", height: "18px", borderBottomColor: "white" }} /> : <Check size={18} />}
+                  حفظ الكلمة الجديدة
+                </button>
+                <button 
+                  type="button"
+                  className="btn btn-secondary" 
+                  style={{ flex: 1, justifyContent: "center" }}
+                  onClick={() => setPasswordModalTeacher(null)}
+                  disabled={isChangingPassword}
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

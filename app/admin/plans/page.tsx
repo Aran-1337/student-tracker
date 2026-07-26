@@ -29,6 +29,8 @@ interface Plan {
   duration_months: number;
   has_bills: boolean;
   has_attendance: boolean;
+  has_reports: boolean;
+  has_exams: boolean;
   has_center_mode?: boolean;
   color: string;
   is_active: boolean;
@@ -50,6 +52,8 @@ const defaultForm = {
   duration_months: 1,
   has_bills: false,
   has_attendance: false,
+  has_reports: false,
+  has_exams: false,
   has_center_mode: false,
   color: "#14b8a6",
   is_active: true
@@ -72,6 +76,8 @@ function parseDescription(desc: string | null): { summary: string; customFeature
 const featureList = [
   { key: "has_bills", label: "المصروفات والفواتير", icon: Receipt, color: "#a78bfa" },
   { key: "has_attendance", label: "الحضور والغياب", icon: ClipboardCheck, color: "#14b8a6" },
+  { key: "has_reports", label: "تقارير الطلاب", icon: TrendingUp, color: "#f43f5e" },
+  { key: "has_exams", label: "الامتحانات والنماذج", icon: ClipboardCheck, color: "#3b82f6" },
   { key: "has_center_mode", label: "نظام السنتر (إضافة معلمين)", icon: Users, color: "#f59e0b" }
 ];
 
@@ -118,6 +124,8 @@ export default function PlansPage() {
             duration_months: 1,
             has_bills: false,
             has_attendance: false,
+            has_reports: false,
+            has_exams: false,
             has_center_mode: false,
             color: "#14b8a6",
             is_active: true
@@ -131,6 +139,8 @@ export default function PlansPage() {
             duration_months: 1,
             has_bills: true,
             has_attendance: true,
+            has_reports: true,
+            has_exams: true,
             has_center_mode: false,
             color: "#3b82f6",
             is_active: true
@@ -144,6 +154,8 @@ export default function PlansPage() {
             duration_months: 1,
             has_bills: true,
             has_attendance: true,
+            has_reports: true,
+            has_exams: true,
             has_center_mode: true,
             color: "#f59e0b",
             is_active: true
@@ -175,10 +187,12 @@ export default function PlansPage() {
       description: summary,
       customFeatures: customFeatures,
       price: plan.price,
-      annual_price: plan.annual_price || 0,
+      annual_price: plan.annual_price || "",
       duration_months: plan.duration_months,
       has_bills: plan.has_bills,
       has_attendance: plan.has_attendance,
+      has_reports: plan.has_reports,
+      has_exams: plan.has_exams,
       has_center_mode: plan.has_center_mode || false,
       color: plan.color,
       is_active: plan.is_active
@@ -215,6 +229,8 @@ export default function PlansPage() {
           duration_months: form.duration_months,
           has_bills: form.has_bills,
           has_attendance: form.has_attendance,
+          has_reports: form.has_reports,
+          has_exams: form.has_exams,
           has_center_mode: form.has_center_mode,
           color: form.color,
           is_active: form.is_active

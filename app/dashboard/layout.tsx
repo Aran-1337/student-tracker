@@ -35,6 +35,8 @@ export default function DashboardLayout({
   const [teacherName, setTeacherName] = useState("");
   const [hasBills, setHasBills] = useState(true);
   const [hasAttendance, setHasAttendance] = useState(true);
+  const [hasReports, setHasReports] = useState(true);
+  const [hasExams, setHasExams] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [isPending, setIsPending] = useState(false);
@@ -53,7 +55,7 @@ export default function DashboardLayout({
 
         let { data: teacherData, error: teacherError } = await supabase
           .from("teachers")
-          .select("name, is_active, has_bills_feature, has_attendance_feature, is_center_mode, is_admin, subscription_expires_at, subscription_started_at")
+          .select("name, is_active, has_bills_feature, has_attendance_feature, has_reports_feature, has_exams_feature, is_center_mode, is_admin, subscription_expires_at, subscription_started_at")
           .eq("id", user.id)
           .single();
 
@@ -68,6 +70,8 @@ export default function DashboardLayout({
               ...fallback,
               has_bills_feature: true,
               has_attendance_feature: true,
+              has_reports_feature: true,
+              has_exams_feature: true,
               is_center_mode: false,
               subscription_expires_at: "",
               subscription_started_at: "",
@@ -88,6 +92,8 @@ export default function DashboardLayout({
               ...newProfile,
               has_bills_feature: true,
               has_attendance_feature: true,
+              has_reports_feature: true,
+              has_exams_feature: true,
               is_center_mode: false,
               subscription_expires_at: "",
               subscription_started_at: "",
@@ -124,6 +130,10 @@ export default function DashboardLayout({
       setHasBills(billsEnabled);
       const attendanceEnabled = teacherData.has_attendance_feature !== false;
       setHasAttendance(attendanceEnabled);
+      const reportsEnabled = teacherData.has_reports_feature !== false;
+      setHasReports(reportsEnabled);
+      const examsEnabled = teacherData.has_exams_feature !== false;
+      setHasExams(examsEnabled);
       const active = teacherData.is_active !== false;
       const expired = teacherData.subscription_expires_at
         ? new Date(teacherData.subscription_expires_at) < new Date()
@@ -137,6 +147,8 @@ export default function DashboardLayout({
       setIsAdmin(teacherData.is_admin === true);
       if (pathname === "/dashboard/bills" && !billsEnabled) { router.replace("/dashboard"); return; }
       if ((pathname === "/dashboard/attendance" || pathname === "/dashboard/attendance/scan") && !attendanceEnabled) { router.replace("/dashboard"); return; }
+      if (pathname.startsWith("/dashboard/reports") && !reportsEnabled) { router.replace("/dashboard"); return; }
+      if (pathname.startsWith("/dashboard/exams") && !examsEnabled) { router.replace("/dashboard"); return; }
       if (pathname === "/dashboard/teachers" && !centerMode) { router.replace("/dashboard"); return; }
     }
     
@@ -222,10 +234,14 @@ export default function DashboardLayout({
     { name: "إدارة الطلاب", path: "/dashboard/students", icon: Users },
     ...(hasAttendance ? [{ name: "الحضور والغياب", path: "/dashboard/attendance", icon: ClipboardCheck }] : []),
     ...(hasBills ? [{ name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt }] : []),
-    { name: "التقارير المالية", path: "/dashboard/reports", icon: TrendingUp },
-    { name: "تقارير الطلاب", path: "/dashboard/reports/students", icon: FileText },
-    { name: "درجات الامتحانات", path: "/dashboard/exams", icon: Award },
-    { name: "نماذج الامتحانات", path: "/dashboard/exams/generator", icon: FileQuestion },
+    ...(hasReports ? [
+      { name: "التقارير المالية", path: "/dashboard/reports", icon: TrendingUp },
+      { name: "تقارير الطلاب", path: "/dashboard/reports/students", icon: FileText }
+    ] : []),
+    ...(hasExams ? [
+      { name: "درجات الامتحانات", path: "/dashboard/exams", icon: Award },
+      { name: "نماذج الامتحانات", path: "/dashboard/exams/generator", icon: FileQuestion }
+    ] : []),
     { name: "الإعدادات", path: "/dashboard/settings", icon: Settings },
     ...(isAdmin ? [{ name: "لوحة المدير العام", path: "/admin", icon: Shield }] : [])
   ];
