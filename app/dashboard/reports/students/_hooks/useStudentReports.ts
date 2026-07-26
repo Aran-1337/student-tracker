@@ -8,6 +8,7 @@ import { GroupsService } from "@/lib/services/groupsService";
 import { GradesService } from "@/lib/services/gradesService";
 import { AttendanceService } from "@/lib/services/attendanceService";
 import { examsService } from "@/lib/services/examsService";
+import { OfflineCache } from "@/lib/offlineQueue";
 import { Student, Group, Grade, AttendanceRecord, Exam, ExamGrade } from "@/lib/types";
 
 const DEFAULT_TEMPLATE =
@@ -74,14 +75,27 @@ export function useStudentReports() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
 
-        const [teacher, studentsData, groupsData, gradesData, attendanceData, exData] = await Promise.all([
-          TeachersService.getTeacherProfile(session.user.id),
-          StudentsService.getStudentsByTeacherId(session.user.id),
-          GroupsService.getGroupsByTeacherId(session.user.id),
-          GradesService.getGradesByTeacherId(session.user.id),
-          AttendanceService.getAttendanceRecords(monthNum, selectedYear),
-          examsService.getExamsByTeacherAndMonth(session.user.id, monthNum, selectedYear),
-        ]);
+        // Optimistic UI: load from cache immediately
+        const cachedGroups = OfflineCache.loadGroups();
+        const cachedStudents = OfflineCache.loadStudents();
+        const cachedGrades = OfflineCache.loadGrades();
+        if (cachedStudents?.length > 0) {
+          setGroups(cachedGroups);
+          setStudents(cachedStudents);
+          setGrades(cachedGrades);
+          // Don't set loading to false yet because attendance and exams are critical for this page
+        }
+
+        if (navigator.onLine) {
+          const [teacher, studentsData, groupsData, gradesData, attendanceData, exData] = await Promise.all([
+            TeachersService.getTeacherProfile(session.user.id),
+            StudentsService.getStudentsByTeacherId(session.user.id),
+            GroupsService.getGroupsByTeacherId(session.user.id),
+            GradesService.getGradesByTeacherId(session.user.id),
+            AttendanceService.getAttendanceRecords(monthNum, selectedYear),
+            examsService.getExamsByTeacherAndMonth(session.user.id, monthNum, selectedYear),
+          ]);
+
 
         let gData: ExamGrade[] = [];
         if (exData && exData.length > 0) {
@@ -95,7 +109,14 @@ export function useStudentReports() {
         setGrades(gradesData || []);
         setAttendanceRecords(attendanceData || []);
         setExams(exData || []);
-        setExamGrades(gData);
+          setExamGrades(gData);
+          
+          OfflineCache.saveStudents(studentsData || []);
+          OfflineCache.saveGroups(groupsData || []);
+          OfflineCache.saveGrades(gradesData || []);
+        } else {
+          setToast({ message: "أنت في وضع عدم الاتصال.", type: "error" });
+        }
       } catch {
         setToast({ message: "حدث خطأ أثناء تحميل البيانات.", type: "error" });
       } finally {

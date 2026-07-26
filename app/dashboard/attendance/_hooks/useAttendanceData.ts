@@ -29,6 +29,18 @@ export function useAttendanceData() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         setUserId(session.user.id);
+        
+        // Optimistic UI: load from cache immediately
+        const cachedGroups = OfflineCache.loadGroups();
+        const cachedStudents = OfflineCache.loadStudents();
+        const cachedGrades = OfflineCache.loadGrades();
+        if (cachedStudents?.length > 0) {
+          setGroups(cachedGroups);
+          setStudents(cachedStudents);
+          setGrades(cachedGrades);
+          setLoading(false);
+        }
+
         if (navigator.onLine) {
           const [grpData, stData, grdData] = await Promise.all([
             GroupsService.getGroupsByTeacherId(session.user.id),
@@ -42,15 +54,9 @@ export function useAttendanceData() {
           OfflineCache.saveGroups(grpData);
           OfflineCache.saveGrades(grdData);
           OfflineCache.setLastSync();
-        } else {
-          setGroups(OfflineCache.loadGroups());
-          setStudents(OfflineCache.loadStudents());
-          setGrades(OfflineCache.loadGrades());
         }
       } catch {
-        setGroups(OfflineCache.loadGroups());
-        setStudents(OfflineCache.loadStudents());
-        setGrades(OfflineCache.loadGrades());
+        // Fallback to cache if already done, else handled by initial load
       } finally {
         setLoading(false);
       }

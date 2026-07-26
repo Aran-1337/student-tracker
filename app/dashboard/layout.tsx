@@ -166,13 +166,7 @@ export default function DashboardLayout({
     router.replace("/login");
   };
 
-  if (loading) {
-    return (
-      <div className="loading-wrapper">
-        <div className="spinner"></div>
-      </div>
-    );
-  }
+  // Removed loading block to prevent waterfall and allow parallel data fetching
 
   if (isPending) {
     return (
