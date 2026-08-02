@@ -4,7 +4,9 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { Printer, ArrowRight, Download } from "lucide-react";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
+import QRCode from "qrcode";
 import { supabase } from "@/lib/supabaseClient";
 import { StudentsService } from "@/lib/services/studentsService";
 import { SystemSettingsService } from "@/lib/services/systemSettingsService";
@@ -89,33 +91,76 @@ function PrintQRContent() {
     loadData();
   }, [gradeId, groupId]);
 
-  const exportToExcel = () => {
-    const data = students.map((s, index) => ({
-      "م": index + 1,
-      "اسم الطالب": s.name,
-      "الصف": s.grade_id ? (grades[s.grade_id] || "غير محدد") : "غير محدد",
-      "المجموعة": s.group_id ? (groups[s.group_id] || "غير محدد") : "بدون مجموعة",
-      "رقم هاتف ولي الأمر": s.parent_phone || "-",
-      "رابط التقرير (QR)": baseUrl ? `${baseUrl}/report/${s.id}` : s.id,
-      "كود الطالب (ID)": s.id
-    }));
+  const exportToExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet("Students QR Data");
+      
+      worksheet.columns = [
+        { header: "م", key: "index", width: 6 },
+        { header: "اسم الطالب", key: "name", width: 25 },
+        { header: "الصف", key: "grade", width: 15 },
+        { header: "المجموعة", key: "group", width: 15 },
+        { header: "هاتف ولي الأمر", key: "parent_phone", width: 18 },
+        { header: "كود الطالب", key: "code", width: 15 },
+        { header: "QR Code", key: "qr", width: 15 } 
+      ];
 
-    const worksheet = XLSX.utils.json_to_sheet(data);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Students QR Data");
-    
-    // Set column widths
-    worksheet["!cols"] = [
-      { wch: 5 },  // م
-      { wch: 25 }, // اسم الطالب
-      { wch: 15 }, // الصف
-      { wch: 15 }, // المجموعة
-      { wch: 15 }, // هاتف ولي الأمر
-      { wch: 40 }, // رابط التقرير
-      { wch: 40 }  // كود الطالب
-    ];
+      for (let i = 0; i < students.length; i++) {
+        const s = students[i];
+        // Use s.code if available, otherwise just use a fallback like short ID
+        const studentCode = s.code || s.id.split('-')[0];
+        
+        const row = worksheet.addRow({
+          index: i + 1,
+          name: s.name,
+          grade: s.grade_id ? (grades[s.grade_id] || "غير محدد") : "غير محدد",
+          group: s.group_id ? (groups[s.group_id] || "غير محدد") : "بدون مجموعة",
+          parent_phone: s.parent_phone || "-",
+          code: studentCode
+        });
+        
+        // Increase row height to fit the QR code image
+        row.height = 75;
+        
+        // Center the text vertically and horizontally
+        row.eachCell((cell) => {
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        });
+        
+        // Generate QR Code base64
+        const qrValue = baseUrl ? `${baseUrl}/report/${s.id}` : s.id;
+        const qrDataUrl = await QRCode.toDataURL(qrValue, { margin: 1, width: 100 });
+        
+        // Add image to workbook
+        const imageId = workbook.addImage({
+          base64: qrDataUrl,
+          extension: 'png',
+        });
+        
+        // Embed image in the "QR Code" column (column index 6, row index i+1)
+        // ExcelJS uses 0-based indexing for positioning: col 6 is the 7th column (QR Code)
+        worksheet.addImage(imageId, {
+          tl: { col: 6, row: i + 1 },
+          ext: { width: 100, height: 100 },
+          editAs: 'oneCell'
+        });
+      }
 
-    XLSX.writeFile(workbook, "students_qr_data.xlsx");
+      // Make headers bold and centered
+      const headerRow = worksheet.getRow(1);
+      headerRow.font = { bold: true };
+      headerRow.eachCell((cell) => {
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+      headerRow.height = 25;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      saveAs(new Blob([buffer]), "students_qr_data.xlsx");
+    } catch (err) {
+      console.error("Failed to export Excel", err);
+      alert("حدث خطأ أثناء تصدير ملف الإكسل");
+    }
   };
 
   if (loading) {
@@ -184,7 +229,7 @@ function PrintQRContent() {
                   </div>
                   <div className="detail-row">
                     <span className="detail-label">الكود:</span>
-                    <span className="detail-value code-value">{student.code}</span>
+                    <span className="detail-value code-value monospace">{student.code || student.id.split('-')[0]}</span>
                   </div>
                 </div>
                 </div>
