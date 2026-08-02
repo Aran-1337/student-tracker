@@ -3,7 +3,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, ArrowRight } from "lucide-react";
+import { Printer, ArrowRight, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import { supabase } from "@/lib/supabaseClient";
 import { StudentsService } from "@/lib/services/studentsService";
 import { SystemSettingsService } from "@/lib/services/systemSettingsService";
@@ -88,6 +89,35 @@ function PrintQRContent() {
     loadData();
   }, [gradeId, groupId]);
 
+  const exportToExcel = () => {
+    const data = students.map((s, index) => ({
+      "م": index + 1,
+      "اسم الطالب": s.name,
+      "الصف": s.grade_id ? (grades[s.grade_id] || "غير محدد") : "غير محدد",
+      "المجموعة": s.group_id ? (groups[s.group_id] || "غير محدد") : "بدون مجموعة",
+      "رقم هاتف ولي الأمر": s.parent_phone || "-",
+      "رابط التقرير (QR)": baseUrl ? `${baseUrl}/report/${s.id}` : s.id,
+      "كود الطالب (ID)": s.id
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Students QR Data");
+    
+    // Set column widths
+    worksheet["!cols"] = [
+      { wch: 5 },  // م
+      { wch: 25 }, // اسم الطالب
+      { wch: 15 }, // الصف
+      { wch: 15 }, // المجموعة
+      { wch: 15 }, // هاتف ولي الأمر
+      { wch: 40 }, // رابط التقرير
+      { wch: 40 }  // كود الطالب
+    ];
+
+    XLSX.writeFile(workbook, "students_qr_data.xlsx");
+  };
+
   if (loading) {
     return <Spinner fullScreen />;
   }
@@ -105,6 +135,9 @@ function PrintQRContent() {
         <div style={{ display: "flex", gap: "1rem" }}>
           <Button variant="secondary" onClick={() => router.back()} leftIcon={<ArrowRight size={18} />}>
             رجوع
+          </Button>
+          <Button variant="secondary" onClick={exportToExcel} leftIcon={<Download size={18} />} style={{ borderColor: "#10b981", color: "#10b981" }}>
+            تصدير كملف إكسل
           </Button>
           <Button variant="primary" onClick={() => window.print()} leftIcon={<Printer size={18} />}>
             طباعة الآن
