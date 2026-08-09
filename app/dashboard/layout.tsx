@@ -46,6 +46,10 @@ export default function DashboardLayout({
   const [hasCenterMode, setHasCenterMode] = useState(false);
 
   useEffect(() => {
+    // Hydrate from cache immediately (client-only, inside effect)
+    const cachedSettings = OfflineCache.loadSysSettings();
+    if (cachedSettings) setSysSettings(cachedSettings);
+
     async function checkSession() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
