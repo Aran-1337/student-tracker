@@ -25,6 +25,11 @@ function PrintQRContent() {
 
   const [loading, setLoading] = useState(true);
   const [students, setStudents] = useState<Student[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterGradeId, setFilterGradeId] = useState(gradeId);
+  const [filterGroupId, setFilterGroupId] = useState(groupId);
+  const [allGradesList, setAllGradesList] = useState<Grade[]>([]);
+  const [allGroupsList, setAllGroupsList] = useState<Group[]>([]);
   const [grades, setGrades] = useState<Record<string, string>>({});
   const [groups, setGroups] = useState<Record<string, string>>({});
   const [siteLogo, setSiteLogo] = useState<string>("");
@@ -66,21 +71,9 @@ function PrintQRContent() {
         const groupsMap = allGroups.reduce((acc, g) => ({ ...acc, [g.id]: g.name }), {});
         setGrades(gradesMap);
         setGroups(groupsMap);
-
-        // Filter students
-        let filtered = allStudents;
-        if (gradeId !== "all") {
-          filtered = filtered.filter(s => s.grade_id === gradeId);
-        }
-        if (groupId !== "all") {
-          if (groupId === "none") {
-            filtered = filtered.filter(s => !s.group_id);
-          } else {
-            filtered = filtered.filter(s => s.group_id === groupId);
-          }
-        }
-
-        setStudents(filtered);
+        setAllGradesList(allGrades);
+        setAllGroupsList(allGroups);
+        setStudents(allStudents);
       } catch (error) {
         console.error("Error loading data for print:", error);
       } finally {
@@ -91,11 +84,20 @@ function PrintQRContent() {
     loadData();
   }, [gradeId, groupId]);
 
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()) || (s.code && s.code.includes(searchQuery));
+    const matchesGrade = filterGradeId === "all" || s.grade_id === filterGradeId;
+    const matchesGroup = filterGroupId === "all" ? true : filterGroupId === "none" ? !s.group_id : s.group_id === filterGroupId;
+    return matchesSearch && matchesGrade && matchesGroup;
+  });
+
+  const filteredGroupsList = filterGradeId === "all" ? allGroupsList : allGroupsList.filter(g => g.grade_id === filterGradeId);
+
   const exportToExcel = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet("Students QR Data");
-      
+
       worksheet.columns = [
         { header: "م", key: "index", width: 6 },
         { header: "اسم الطالب", key: "name", width: 25 },
@@ -106,8 +108,8 @@ function PrintQRContent() {
         { header: "QR Code", key: "qr", width: 15 } 
       ];
 
-      for (let i = 0; i < students.length; i++) {
-        const s = students[i];
+      for (let i = 0; i < filteredStudents.length; i++) {
+        const s = filteredStudents[i];
         // Use s.code if available, otherwise just use a fallback like short ID
         const studentCode = s.code || s.id.split('-')[0];
         
@@ -170,23 +172,39 @@ function PrintQRContent() {
   return (
     <div className="print-container">
       {/* Non-printable header */}
-      <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem", padding: "1rem", background: "var(--panel-bg)", borderRadius: "10px", border: "1px solid var(--border-color)" }}>
-        <div>
-          <h1 style={{ fontSize: "1.5rem", marginBottom: "0.5rem" }}>طباعة بطاقات QR</h1>
-          <p style={{ color: "var(--text-secondary)", margin: 0 }}>
-            تم تصفية {students.length} طالب جاهز للطباعة.
-          </p>
+      <div className="no-print pqr-header">
+        <div className="pqr-header-top">
+          <div>
+            <h1 className="pqr-title">طباعة بطاقات QR</h1>
+            <p className="pqr-subtitle">{filteredStudents.length} طالب جاهز للطباعة</p>
+          </div>
+          <div className="pqr-actions">
+            <Button variant="secondary" onClick={() => router.back()} leftIcon={<ArrowRight size={18} />}>رجوع</Button>
+            <Button variant="secondary" onClick={exportToExcel} leftIcon={<Download size={18} />} className="pqr-btn-excel">تصدير إكسل</Button>
+            <Button variant="primary" onClick={() => window.print()} leftIcon={<Printer size={18} />}>طباعة الآن</Button>
+          </div>
         </div>
-        <div style={{ display: "flex", gap: "1rem" }}>
-          <Button variant="secondary" onClick={() => router.back()} leftIcon={<ArrowRight size={18} />}>
-            رجوع
-          </Button>
-          <Button variant="secondary" onClick={exportToExcel} leftIcon={<Download size={18} />} style={{ borderColor: "#10b981", color: "#10b981" }}>
-            تصدير كملف إكسل
-          </Button>
-          <Button variant="primary" onClick={() => window.print()} leftIcon={<Printer size={18} />}>
-            طباعة الآن
-          </Button>
+
+        <div className="pqr-filters">
+          <div className="pqr-search-wrapper">
+            <span className="pqr-search-icon">🔍</span>
+            <input
+              type="text"
+              placeholder="بحث باسم الطالب أو الكود..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pqr-search-input"
+            />
+          </div>
+          <select value={filterGradeId} onChange={e => { setFilterGradeId(e.target.value); setFilterGroupId("all"); }} className="pqr-select">
+            <option value="all">📚 كل الصفوف</option>
+            {allGradesList.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+          <select value={filterGroupId} onChange={e => setFilterGroupId(e.target.value)} className="pqr-select">
+            <option value="all">👥 كل المجموعات</option>
+            <option value="none">بدون مجموعة</option>
+            {filteredGroupsList.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
         </div>
       </div>
 
@@ -196,7 +214,7 @@ function PrintQRContent() {
         </div>
       ) : (
         <div className="print-grid">
-          {students.map(student => (
+          {filteredStudents.map(student => (
             <div key={student.id} className="id-card">
               <div className="id-card-header">
                 {siteLogo ? (

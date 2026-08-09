@@ -5,6 +5,138 @@
   gap: 1.5rem;
 }
 
+/* ── Print QR Header ─────────────────────────────────────── */
+.pqr-header {
+  margin-bottom: 2rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--bg-card);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: var(--glass-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.pqr-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.pqr-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.25rem;
+}
+
+.pqr-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.pqr-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pqr-btn-excel {
+  border-color: var(--color-success) !important;
+  color: var(--color-success) !important;
+}
+
+.pqr-btn-excel:hover {
+  background: rgba(16, 185, 129, 0.1) !important;
+}
+
+/* ── Filters Row ─────────────────────────────────────────── */
+.pqr-filters {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.pqr-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+
+.pqr-search-icon {
+  position: absolute;
+  top: 50%;
+  right: 0.85rem;
+  transform: translateY(-50%);
+  font-size: 0.85rem;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.pqr-search-input {
+  width: 100%;
+  padding: 0.6rem 2.25rem 0.6rem 1rem;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: var(--transition-smooth);
+  direction: rtl;
+}
+
+.pqr-search-input:focus {
+  border-color: var(--color-teal);
+  box-shadow: 0 0 0 2px var(--color-teal-glow);
+}
+
+.pqr-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.pqr-select {
+  padding: 0.6rem 1rem;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  min-width: 160px;
+  direction: rtl;
+}
+
+.pqr-select:focus {
+  border-color: var(--color-teal);
+  box-shadow: 0 0 0 2px var(--color-teal-glow);
+}
+
+.pqr-select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+@media (max-width: 640px) {
+  .pqr-header-top { flex-direction: column; align-items: flex-start; }
+  .pqr-actions { width: 100%; justify-content: flex-end; }
+  .pqr-search-wrapper { min-width: 100%; }
+  .pqr-select { flex: 1; min-width: 0; }
+}
+
+
 .id-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border-color);
