@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
-import { Printer, ArrowRight, Download } from "lucide-react";
+import { Printer, ArrowRight, Download, CheckSquare, Square } from "lucide-react";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import QRCode from "qrcode";
@@ -30,6 +30,7 @@ function PrintQRContent() {
   const [filterGroupId, setFilterGroupId] = useState(groupId);
   const [allGradesList, setAllGradesList] = useState<Grade[]>([]);
   const [allGroupsList, setAllGroupsList] = useState<Group[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [grades, setGrades] = useState<Record<string, string>>({});
   const [groups, setGroups] = useState<Record<string, string>>({});
   const [siteLogo, setSiteLogo] = useState<string>("");
@@ -92,6 +93,23 @@ function PrintQRContent() {
   });
 
   const filteredGroupsList = filterGradeId === "all" ? allGroupsList : allGroupsList.filter(g => g.grade_id === filterGradeId);
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const allFilteredSelected = filteredStudents.length > 0 && filteredStudents.every(s => selectedIds.has(s.id));
+  const toggleSelectAll = () =>
+    setSelectedIds(allFilteredSelected ? new Set() : new Set(filteredStudents.map(s => s.id)));
+
+  const printSelected = () => {
+    const ids = selectedIds;
+    // hide non-selected cards via CSS class before printing
+    document.querySelectorAll<HTMLElement>(".id-card").forEach(el => {
+      el.classList.toggle("pqr-hide-print", !ids.has(el.dataset.id || ""));
+    });
+    window.print();
+    document.querySelectorAll<HTMLElement>(".id-card").forEach(el => el.classList.remove("pqr-hide-print"));
+  };
 
   const exportToExcel = async () => {
     try {
@@ -181,11 +199,21 @@ function PrintQRContent() {
           <div className="pqr-actions">
             <Button variant="secondary" onClick={() => router.back()} leftIcon={<ArrowRight size={18} />}>رجوع</Button>
             <Button variant="secondary" onClick={exportToExcel} leftIcon={<Download size={18} />} className="pqr-btn-excel">تصدير إكسل</Button>
-            <Button variant="primary" onClick={() => window.print()} leftIcon={<Printer size={18} />}>طباعة الآن</Button>
+            {selectedIds.size > 0 && (
+              <Button variant="secondary" onClick={printSelected} leftIcon={<Printer size={18} />} className="pqr-btn-selected">
+                طباعة المحددين ({selectedIds.size})
+              </Button>
+            )}
+            <Button variant="primary" onClick={() => window.print()} leftIcon={<Printer size={18} />}>طباعة الكل</Button>
           </div>
         </div>
 
         <div className="pqr-filters">
+          <button className="pqr-select-all-btn" onClick={toggleSelectAll}>
+            {allFilteredSelected
+              ? <><CheckSquare size={16} /> إلغاء تحديد الكل</>
+              : <><Square size={16} /> تحديد الكل</>}
+          </button>
           <div className="pqr-search-wrapper">
             <span className="pqr-search-icon">🔍</span>
             <input
@@ -215,7 +243,15 @@ function PrintQRContent() {
       ) : (
         <div className="print-grid">
           {filteredStudents.map(student => (
-            <div key={student.id} className="id-card">
+            <div
+              key={student.id}
+              data-id={student.id}
+              className={`id-card pqr-card ${selectedIds.has(student.id) ? "pqr-card-selected" : ""}`}
+              onClick={() => toggleSelect(student.id)}
+            >
+              <div className="pqr-card-check no-print">
+                {selectedIds.has(student.id) ? <CheckSquare size={18} className="pqr-check-icon active" /> : <Square size={18} className="pqr-check-icon" />}
+              </div>
               <div className="id-card-header">
                 {siteLogo ? (
                   <img src={siteLogo} alt="Logo" className="id-card-logo" />

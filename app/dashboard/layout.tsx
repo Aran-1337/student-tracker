@@ -41,7 +41,7 @@ export default function DashboardLayout({
   const [isBlocked, setIsBlocked] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [sysSettings, setSysSettings] = useState<SystemSettings | null>(() => typeof window !== "undefined" ? OfflineCache.loadSysSettings() : null);
+  const [sysSettings, setSysSettings] = useState<SystemSettings | null>(null);
 
   const [hasCenterMode, setHasCenterMode] = useState(false);
 
