@@ -2,7 +2,7 @@
 
 import "@/app/styles/payment-scan.css";
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X, CheckCircle2, AlertCircle, CreditCard, Camera, CameraOff, ChevronDown } from "lucide-react";
+import { X, CheckCircle2, AlertCircle, CreditCard, Camera, CameraOff, ChevronDown, Hash } from "lucide-react";
 import { Student } from "@/lib/types";
 import { StudentsService } from "@/lib/services/studentsService";
 import type { Html5Qrcode } from "html5-qrcode";
@@ -34,6 +34,8 @@ export function PaymentScanModal({ students, onClose, onStudentUpdated }: Props)
   const [lastScan, setLastScan]     = useState<ScanResult | null>(null);
   const [paidList, setPaidList]     = useState<PaidEntry[]>([]);
 
+  const [manualCode, setManualCode] = useState("");
+
   const scannerRef    = useRef<Html5Qrcode | null>(null);
   const cooldownRef   = useRef<Map<string, number>>(new Map());
   const processingRef = useRef<Set<string>>(new Set());
@@ -60,7 +62,7 @@ export function PaymentScanModal({ students, onClose, onStudentUpdated }: Props)
       studentId = parts[parts.length - 1];
     }
 
-    const student = students.find(s => s.id === studentId);
+    const student = students.find(s => s.id === studentId || s.code === rawCode);
     if (!student) {
       showResult({ name: "طالب غير معروف!", status: "not_found" });
       processingRef.current.delete(rawCode);
@@ -235,6 +237,33 @@ export function PaymentScanModal({ students, onClose, onStudentUpdated }: Props)
                 <span className="psm-corner psm-corner-br" />
               </>
             )}
+          </div>
+
+          {/* Manual code input */}
+          <div className="psm-manual-row">
+            <div className="psm-manual-input-wrap">
+              <Hash size={14} className="psm-manual-icon" />
+              <input
+                className="psm-manual-input"
+                type="text"
+                placeholder="أدخل كود الطالب يدوياً…"
+                value={manualCode}
+                onChange={e => setManualCode(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter" && manualCode.trim()) {
+                    processCode(manualCode.trim());
+                    setManualCode("");
+                  }
+                }}
+              />
+            </div>
+            <button
+              className="psm-manual-btn"
+              disabled={!manualCode.trim()}
+              onClick={() => { processCode(manualCode.trim()); setManualCode(""); }}
+            >
+              دفع
+            </button>
           </div>
 
           {/* Camera toggle button */}
