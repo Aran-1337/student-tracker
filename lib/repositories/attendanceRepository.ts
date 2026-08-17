@@ -27,12 +27,22 @@ export const AttendanceRepository = {
   },
 
   async addAttendanceRecord(record: Omit<AttendanceRecord, "id" | "created_at">): Promise<AttendanceRecord> {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      AttendanceQueue.add(record);
+      return { ...record, id: `temp-${Date.now()}` } as AttendanceRecord;
+    }
     const { data, error } = await supabase
       .from("attendance_records")
-      .insert([record])
+      .upsert([record], { onConflict: "student_id,session_date" })
       .select()
       .single();
-    if (error) throw error;
+    if (error) {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        AttendanceQueue.add(record);
+        return { ...record, id: `temp-${Date.now()}` } as AttendanceRecord;
+      }
+      throw error;
+    }
     return data;
   },
 
