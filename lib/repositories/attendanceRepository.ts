@@ -6,14 +6,29 @@ export const AttendanceRepository = {
   async getAttendanceRecords(month: number, year: number): Promise<AttendanceRecord[]> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return [];
-    const { data, error } = await supabase
-      .from("attendance_records")
-      .select("*")
-      .eq("teacher_id", session.user.id)
-      .eq("month", month)
-      .eq("year", year);
-    if (error) throw error;
-    return data || [];
+    
+    let allData: AttendanceRecord[] = [];
+    let page = 0;
+    const limit = 1000;
+    
+    while (true) {
+      const { data, error } = await supabase
+        .from("attendance_records")
+        .select("*")
+        .eq("teacher_id", session.user.id)
+        .eq("month", month)
+        .eq("year", year)
+        .range(page * limit, (page + 1) * limit - 1);
+        
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      
+      allData = [...allData, ...data];
+      if (data.length < limit) break;
+      page++;
+    }
+    
+    return allData;
   },
 
   async getAttendanceByStudentId(studentId: string): Promise<AttendanceRecord[]> {
