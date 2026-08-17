@@ -76,6 +76,18 @@ export function useAttendanceActions({
     } else {
       const sessionMonth = parseInt(dateStr.split("-")[1], 10);
       const currentYear = parseInt(dateStr.split("-")[0], 10);
+      const optimisticRecord: AttendanceRecord = {
+        id: `temp-${Date.now()}`,
+        teacher_id: userId,
+        student_id: student.id,
+        group_id: student.group_id,
+        session_date: dateStr,
+        month: sessionMonth,
+        year: currentYear,
+        status: "present",
+        created_at: new Date().toISOString(),
+      };
+      setAttendance([...attendance, optimisticRecord]);
       try {
         const newRecord = await AttendanceService.addAttendanceRecord({
           teacher_id: userId,
@@ -86,8 +98,9 @@ export function useAttendanceActions({
           year: currentYear,
           status: "present",
         });
-        setAttendance([...attendance, newRecord]);
+        setAttendance(prev => prev.map(a => a.id === optimisticRecord.id ? newRecord : a));
       } catch {
+        setAttendance(attendance);
         showToast("فشل تسجيل الحضور", "error");
       }
     }

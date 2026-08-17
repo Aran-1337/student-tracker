@@ -439,9 +439,21 @@ export function useScanSession() {
     setScannerPaused(false);
   }, [crossGroupConfirm]);
 
-  const handleRemoveScanned = useCallback((studentId: string) => {
+  const handleRemoveScanned = useCallback(async (studentId: string) => {
     setScannedToday(prev => prev.filter(e => e.studentId !== studentId));
     scannedIdsRef.current.delete(studentId);
+    const { sessionDate, selectedGroupId, userId } = stateRef.current;
+    if (!userId) return;
+    try {
+      const { data } = await supabase
+        .from("attendance_records")
+        .select("id")
+        .eq("student_id", studentId)
+        .eq("session_date", sessionDate)
+        .eq("group_id", selectedGroupId)
+        .single();
+      if (data?.id) await AttendanceService.deleteAttendanceRecord(data.id);
+    } catch {}
   }, []);
 
   const manualPlaceholder = (() => {
