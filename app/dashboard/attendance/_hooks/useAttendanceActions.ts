@@ -98,7 +98,7 @@ export function useAttendanceActions({
           year: currentYear,
           status: "present",
         });
-        setAttendance(prev => prev.map(a => a.id === optimisticRecord.id ? newRecord : a));
+        setAttendance(attendance.map((a: AttendanceRecord) => a.id === optimisticRecord.id ? newRecord : a));
       } catch {
         setAttendance(attendance);
         showToast("فشل تسجيل الحضور", "error");
