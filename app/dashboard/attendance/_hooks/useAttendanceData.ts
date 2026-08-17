@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Group, Student, Grade, AttendanceRecord } from "@/lib/types";
 import { GroupsService } from "@/lib/services/groupsService";
@@ -64,7 +65,7 @@ export function useAttendanceData() {
     load();
   }, []);
 
-  const loadAttendance = useCallback(async () => {
+  const loadAttendance = async () => {
     if (!userId) return;
     try {
       const records = await AttendanceService.getAttendanceRecords(selectedMonth, selectedYear);
@@ -87,6 +88,8 @@ export function useAttendanceData() {
       const recordsToInsert: Omit<AttendanceRecord, "id" | "created_at">[] = [];
       const dates = Array.from(new Set(merged.map(r => r.session_date)));
 
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
       for (const date of dates) {
         const dateRecords = merged.filter(r => r.session_date === date && r.created_at);
         if (dateRecords.length === 0) continue;
@@ -94,6 +97,7 @@ export function useAttendanceData() {
         const earliestTime = Math.min(...dateRecords.map(r => new Date(r.created_at!).getTime()));
         if (nowMs - earliestTime > oneHourMs) {
           for (const student of students) {
+            if (!uuidRegex.test(student.id)) continue;
             const hasRecord = merged.some(r => r.student_id === student.id && r.session_date === date);
             if (!hasRecord) {
               recordsToInsert.push({
@@ -132,11 +136,12 @@ export function useAttendanceData() {
 
       setAttendance(merged);
     } catch {}
-  }, [userId, selectedMonth, selectedYear, students]);
+  };
 
   useEffect(() => {
     if (userId) loadAttendance();
-  }, [loadAttendance, userId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, selectedMonth, selectedYear, students]);
 
   // Reset manual dates when month/year/group changes
   useEffect(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import React from "react";
 import { Student, AttendanceRecord } from "@/lib/types";
 import { AttendanceService } from "@/lib/services/attendanceService";
 import { AttendanceQueue } from "@/lib/offlineQueue";
@@ -18,7 +19,7 @@ const deleteRecord = async (record: AttendanceRecord) => {
 interface UseAttendanceActionsProps {
   userId: string | null;
   attendance: AttendanceRecord[];
-  setAttendance: (records: AttendanceRecord[]) => void;
+  setAttendance: React.Dispatch<React.SetStateAction<AttendanceRecord[]>>;
   filteredStudents: Student[];
   showToast: (msg: string, type?: "success" | "error") => void;
 }
@@ -66,7 +67,7 @@ export function useAttendanceActions({
           await AttendanceService.upsertAttendanceRecord(updatedRecord);
         } catch {
           // Revert on error
-          setAttendance(attendance);
+          setAttendance(prev => prev.map(a => a.id === existing.id ? existing : a));
           showToast("فشل تحديث الحضور", "error");
         }
       } else {
@@ -98,9 +99,9 @@ export function useAttendanceActions({
           year: currentYear,
           status: "present",
         });
-        setAttendance(attendance.map((a: AttendanceRecord) => a.id === optimisticRecord.id ? newRecord : a));
+        setAttendance(prev => prev.map((a: AttendanceRecord) => a.id === optimisticRecord.id ? newRecord : a));
       } catch {
-        setAttendance(attendance);
+        setAttendance(prev => prev.filter(a => a.id !== optimisticRecord.id));
         showToast("فشل تسجيل الحضور", "error");
       }
     }
@@ -114,7 +115,7 @@ export function useAttendanceActions({
     try {
       await deleteRecord(pendingDelete.record);
     } catch {
-      setAttendance(attendance);
+      setAttendance(prev => [...prev, pendingDelete.record]);
       showToast("فشل حذف الحضور", "error");
     }
   };
