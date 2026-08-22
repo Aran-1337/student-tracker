@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ClipboardCheck, ScanLine, FileDown } from "lucide-react";
+import { ClipboardCheck, ScanLine, FileDown, ChevronRight, ChevronLeft } from "lucide-react";
 
 import { Spinner } from "@/components/ui/Spinner";
 import { Toast } from "@/components/ui/Toast";
@@ -26,7 +26,6 @@ const arabicMonths = [
 export default function AttendancePage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [qrStudent, setQrStudent] = useState<Student | null>(null);
-  const [newSessionDate, setNewSessionDate] = useState(new Date().toISOString().split("T")[0]);
 
   const showToast = (message: string, type: "success" | "error" = "success") =>
     setToast({ message, type });
@@ -34,7 +33,7 @@ export default function AttendancePage() {
   const data = useAttendanceData();
 
   useOnlineSync((count) => {
-    if (count > 0) data.loadAttendance();
+    if (count > 0 && data.loadAttendance) data.loadAttendance();
   });
 
   const actions = useAttendanceActions({
@@ -47,19 +46,14 @@ export default function AttendancePage() {
 
   const selectedGroup = data.groups.find(g => g.id === data.selectedGroupId);
 
-  const handleAddSession = () => {
-    if (data.selectedGroupId === "all") {
-      showToast("يرجى اختيار مجموعة محددة أولاً", "error");
-      return;
-    }
-    if (!newSessionDate) return;
-    if (data.allDates.includes(newSessionDate)) {
-      showToast("هذا التاريخ موجود بالفعل");
-      return;
-    }
-    data.setManualDates([...data.manualDates, newSessionDate]);
-    showToast(`تم فتح حصة بتاريخ ${newSessionDate.split("-").reverse().join("/")}`);
-  };
+  const currentSaturday = (() => {
+    const d = new Date();
+    const diff = d.getDay() === 6 ? 0 : d.getDay() + 1;
+    d.setDate(d.getDate() - diff);
+    d.setHours(0,0,0,0);
+    return d;
+  })();
+  const isPastWeek = data.selectedWeekStart.getTime() < currentSaturday.getTime();
 
   if (data.loading) return <Spinner fullScreen />;
 
@@ -88,25 +82,49 @@ export default function AttendancePage() {
         groups={data.groups}
         selectedGradeId={data.selectedGradeId}
         selectedGroupId={data.selectedGroupId}
-        selectedMonth={data.selectedMonth}
-        selectedYear={data.selectedYear}
-        newSessionDate={newSessionDate}
         onGradeChange={v => { data.setSelectedGradeId(v); data.setSelectedGroupId("all"); }}
         onGroupChange={data.setSelectedGroupId}
-        onMonthChange={data.setSelectedMonth}
-        onYearChange={data.setSelectedYear}
-        onSessionDateChange={setNewSessionDate}
-        onAddSession={handleAddSession}
       />
 
       {/* ── Stats ── */}
       <AttendanceStats
         students={data.filteredStudents}
-        allDates={data.allDates}
-        attendance={data.attendance}
-        month={data.selectedMonth}
-        year={data.selectedYear}
+        allDates={data.monthlyDates}
+        attendance={data.monthlyAttendance}
+        selectedWeekStart={data.selectedWeekStart}
       />
+
+      {/* ── Week Navigator ── */}
+      {data.selectedGroupId !== "all" && (
+        <div className="glass-panel panel-content" style={{ display: "flex", justifyContent: "center", padding: "0.5rem" }}>
+          <div className="week-navigation" style={{ display: "flex", alignItems: "center", gap: "2rem", width: "100%", justifyContent: "space-between" }}>
+            <button className="btn btn-secondary" style={{ padding: "0.5rem 1rem" }} onClick={() => {
+              const d = new Date(data.selectedWeekStart);
+              d.setDate(d.getDate() - 7);
+              data.setSelectedWeekStart(d);
+            }}>
+              <ChevronRight size={18} />
+            </button>
+            
+            <div style={{ fontWeight: 600, color: "var(--color-primary)", fontSize: "1.1rem" }}>
+              {data.selectedWeekStart.getDate()} - {(() => {
+                const e = new Date(data.selectedWeekStart);
+                e.setDate(e.getDate() + 6);
+                return e.getDate();
+              })()} {arabicMonths[data.selectedWeekStart.getMonth()]}
+              {data.selectedWeekStart.getTime() === currentSaturday.getTime() ? ' (الأسبوع الحالي)' : ''}
+            </div>
+
+            <button className="btn btn-secondary" style={{ padding: "0.5rem 1rem" }} onClick={() => {
+              const d = new Date(data.selectedWeekStart);
+              d.setDate(d.getDate() + 7);
+              data.setSelectedWeekStart(d);
+            }}>
+              <ChevronLeft size={18} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Table Panel ── */}
       <div className="glass-panel panel-content">
@@ -114,7 +132,7 @@ export default function AttendancePage() {
           <div className="attendance-table-title">
             <ClipboardCheck size={17} style={{ color: "var(--color-teal)" }} />
             <span>
-              كشف الحضور — {arabicMonths[data.selectedMonth - 1]} {data.selectedYear}
+              كشف الحضور الأسبوعي
               {selectedGroup ? ` — ${selectedGroup.name}` : ""}
             </span>
             <span className="student-count-badge">{data.filteredStudents.length} طالب</span>
@@ -126,7 +144,7 @@ export default function AttendancePage() {
                 className="export-btn"
                 onClick={() => exportAttendancePrint(
                   data.filteredStudents, data.allDates, data.attendance,
-                  data.selectedMonth, data.selectedYear, selectedGroup?.name || "الكل",
+                  data.selectedWeekStart.getMonth() + 1, data.selectedWeekStart.getFullYear(), selectedGroup?.name || "الكل",
                   data.selectedGroupId === "all" ? data.groups : undefined
                 )}
                 title="طباعة الكشف"
@@ -145,10 +163,12 @@ export default function AttendancePage() {
           saving={actions.saving}
           selectedGroupId={data.selectedGroupId}
           groups={data.groups}
+          isPastWeek={isPastWeek}
           getRecordStatus={actions.getRecordStatus}
           getAttendancePercent={actions.getAttendancePercent}
           onToggle={actions.handleToggle}
           onMarkAll={actions.handleMarkAllSession}
+          onMarkAllAbsent={actions.handleMarkAllAbsent}
           onClearSession={actions.handleClearSession}
           onShowQR={setQrStudent}
         />

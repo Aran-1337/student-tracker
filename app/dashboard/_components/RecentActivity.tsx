@@ -57,8 +57,8 @@ export function RecentActivity({ userId, groups }: RecentActivityProps) {
   }, [userId]);
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("ar-EG", { day: "numeric", month: "short", weekday: "short" });
+    const d = new Date(`${dateStr}T12:00:00`);
+    return d.toLocaleDateString("ar-EG", { day: "numeric", month: "long", weekday: "long" });
   };
 
   return (

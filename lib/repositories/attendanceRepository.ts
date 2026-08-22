@@ -3,6 +3,23 @@ import { AttendanceRecord } from "@/lib/types";
 import { AttendanceQueue } from "@/lib/offlineQueue";
 
 export const AttendanceRepository = {
+  async getAttendanceRecordsByGroupAndDateRange(groupId: string, startDate: string, endDate: string): Promise<AttendanceRecord[]> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return [];
+    
+    const { data, error } = await supabase
+      .from("attendance_records")
+      .select("*")
+      .eq("teacher_id", session.user.id)
+      .eq("group_id", groupId)
+      .gte("session_date", startDate)
+      .lte("session_date", endDate)
+      .limit(1000); // 1000 is enough for a single week for a single group
+      
+    if (error) throw error;
+    return data || [];
+  },
+
   async getAttendanceRecords(month: number, year: number): Promise<AttendanceRecord[]> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return [];

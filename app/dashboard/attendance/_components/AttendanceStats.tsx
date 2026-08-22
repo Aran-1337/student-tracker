@@ -7,8 +7,7 @@ interface Props {
   students: Student[];
   allDates: string[];
   attendance: AttendanceRecord[];
-  month: number;
-  year: number;
+  selectedWeekStart: Date;
 }
 
 const arabicMonths = [
@@ -16,7 +15,7 @@ const arabicMonths = [
   "يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر",
 ];
 
-export function AttendanceStats({ students, allDates, attendance, month, year }: Props) {
+export function AttendanceStats({ students, allDates, attendance, selectedWeekStart }: Props) {
   if (students.length === 0 || allDates.length === 0) return null;
 
   const isPresent = (sid: string, d: string) =>
@@ -67,18 +66,26 @@ export function AttendanceStats({ students, allDates, attendance, month, year }:
   ];
 
   return (
-    <div className="attendance-stats-grid">
-      {stats.map((s, i) => (
-        <div key={i} className="attendance-stat-card" style={{ borderColor: s.border }}>
-          <div className="attendance-stat-icon" style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
-            {s.icon}
+    <div style={{ display: "flex", flexDirection: "column", gap: "1rem", marginBottom: "1.5rem" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", padding: "0 0.5rem" }}>
+        <div style={{ width: "4px", height: "16px", background: "var(--color-teal)", borderRadius: "2px" }} />
+        <h3 style={{ margin: 0, fontSize: "0.95rem", color: "var(--color-text)", fontWeight: 600 }}>
+          بيانات شهر {arabicMonths[selectedWeekStart.getMonth()]} {selectedWeekStart.getFullYear()}
+        </h3>
+      </div>
+      <div className="attendance-stats-grid" style={{ marginBottom: 0 }}>
+        {stats.map((s, i) => (
+          <div key={i} className="attendance-stat-card" style={{ borderColor: s.border }}>
+            <div className="attendance-stat-icon" style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
+              {s.icon}
+            </div>
+            <div>
+              <div className="attendance-stat-value" style={{ color: s.color }}>{s.value}</div>
+              <div className="attendance-stat-label">{s.label}</div>
+            </div>
           </div>
-          <div>
-            <div className="attendance-stat-value" style={{ color: s.color }}>{s.value}</div>
-            <div className="attendance-stat-label">{s.label}</div>
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

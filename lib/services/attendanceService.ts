@@ -2,6 +2,10 @@ import { AttendanceRepository } from "@/lib/repositories/attendanceRepository";
 import { AttendanceRecord, Student, Grade } from "@/lib/types";
 
 export const AttendanceService = {
+  async getAttendanceRecordsByGroupAndDateRange(groupId: string, startDate: string, endDate: string): Promise<AttendanceRecord[]> {
+    return AttendanceRepository.getAttendanceRecordsByGroupAndDateRange(groupId, startDate, endDate);
+  },
+
   async getAttendanceRecords(month: number, year: number): Promise<AttendanceRecord[]> {
     return AttendanceRepository.getAttendanceRecords(month, year);
   },

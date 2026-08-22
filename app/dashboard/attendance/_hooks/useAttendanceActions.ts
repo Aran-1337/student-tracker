@@ -151,6 +151,41 @@ export function useAttendanceActions({
     }
   };
 
+  const handleMarkAllAbsent = async (dateStr: string) => {
+    if (!userId) return;
+    setSaving(true);
+    try {
+      const sessionMonth = parseInt(dateStr.split("-")[1], 10);
+      const sessionYear = parseInt(dateStr.split("-")[0], 10);
+      
+      // Delete existing 'present' records first to avoid conflicts or just upsert?
+      // Since our addAttendanceRecords might not handle upsert cleanly if we have unique constraints,
+      // it's safer to upsert through the service, but currently we use `addAttendanceRecords` which uses `insert`.
+      // Let's use `upsert` for bulk if possible. Wait, AttendanceService doesn't have a bulk upsert yet.
+      // So let's delete existing records for this date and then insert absent records.
+      const toDelete = attendance.filter(a => a.session_date === dateStr && filteredStudents.some(s => s.id === a.student_id));
+      await Promise.all(toDelete.map(r => deleteRecord(r)));
+
+      const toInsert = filteredStudents.map(s => ({
+        teacher_id: userId,
+        student_id: s.id,
+        group_id: s.group_id,
+        session_date: dateStr,
+        month: sessionMonth,
+        year: sessionYear,
+        status: "absent" as const,
+      }));
+      
+      const newRecords = await AttendanceService.addAttendanceRecords(toInsert);
+      setAttendance([...attendance.filter(a => !toDelete.some(d => d.id === a.id)), ...newRecords]);
+      showToast(`تم تغييب ${toInsert.length} طالب`);
+    } catch (err: any) {
+      showToast(err.message || "فشل التغييب الجماعي", "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleClearSession = async (dateStr: string) => {
     if (!userId) return;
     setSaving(true);
@@ -172,6 +207,6 @@ export function useAttendanceActions({
     saving, pendingDelete, setPendingDelete,
     getRecordStatus, getAttendancePercent,
     handleToggle, confirmDelete,
-    handleMarkAllSession, handleClearSession,
+    handleMarkAllSession, handleMarkAllAbsent, handleClearSession,
   };
 }
