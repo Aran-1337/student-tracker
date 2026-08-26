@@ -63,5 +63,14 @@ export const questionsService = {
       console.error('Error deleting question:', error);
       throw error;
     }
+  },
+
+  async updateQuestion(id: string, updates: Partial<Question>): Promise<Question> {
+    try {
+      return await questionsRepository.updateQuestion(id, updates);
+    } catch (error) {
+      console.error('Error updating question:', error);
+      throw error;
+    }
   }
 };

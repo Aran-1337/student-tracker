@@ -8,11 +8,12 @@ import { Plus, Trash2, Save, Type, AlignLeft, CheckCircle2, Image as ImageIcon, 
 
 interface QuestionsEditorProps {
   questions: Question[];
-  onAddQuestion: (q: Omit<Question, "id" | "bank_id" | "created_at">) => void;
-  onDeleteQuestion: (id: string) => void;
+  onUpdateQuestion: (id: string, updates: Partial<Question>) => void;
 }
 
-export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion }: QuestionsEditorProps) {
+export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion, onUpdateQuestion }: QuestionsEditorProps) {
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+
   const [content, setContent] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
   const [correctAnswer, setCorrectAnswer] = useState("");
@@ -22,12 +23,12 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion }: 
   const [sectionName, setSectionName] = useState("");
   const [imageBase64, setImageBase64] = useState<string | null>(null);
 
-  const handleAdd = () => {
+  const handleAddOrUpdate = () => {
     if (!content.trim() && !imageBase64) return;
     
     const validOptions = options.filter(opt => opt.trim() !== "");
     
-    onAddQuestion({
+    const questionData = {
       content,
       options: questionType === "mcq" && validOptions.length > 0 ? validOptions : null,
       correct_answer: questionType === "mcq" ? (correctAnswer.trim() || null) : null,
@@ -35,14 +36,43 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion }: 
       essay_lines: questionType === "essay" ? essayLines : 0,
       section_name: sectionName.trim() || null,
       image_base64: imageBase64
-    });
+    };
+
+    if (editingQuestionId) {
+      onUpdateQuestion(editingQuestionId, questionData);
+      setEditingQuestionId(null);
+    } else {
+      onAddQuestion(questionData);
+    }
     
     setContent("");
-    setOptions(Array(options.length).fill(""));
+    setOptions(["", "", "", ""]);
     setCorrectAnswer("");
     setImageBase64(null);
+    setSectionName("");
     // Keep the same questionType to make adding multiple of the same type easier
   };
+
+  const handleEditClick = (q: Question) => {
+    setEditingQuestionId(q.id);
+    setContent(q.content);
+    setQuestionType(q.question_type || "mcq");
+    setEssayLines(q.essay_lines || 3);
+    setSectionName(q.section_name || "");
+    setImageBase64(q.image_base64 || null);
+    
+    if (q.options && q.options.length > 0) {
+      const paddedOptions = [...q.options];
+      while (paddedOptions.length < 4) paddedOptions.push("");
+      setOptions(paddedOptions);
+    } else {
+      setOptions(["", "", "", ""]);
+    }
+    setCorrectAnswer(q.correct_answer || "");
+    
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
 
 
 
@@ -73,7 +103,7 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion }: 
 
   return (
     <div className="glass-panel panel-content" style={{ padding: "1.5rem" }}>
-      <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-primary)" }}>إضافة سؤال جديد</h3>
+      <h3 style={{ margin: "0 0 1rem 0", color: "var(--text-primary)" }}>{editingQuestionId ? "تعديل السؤال" : "إضافة سؤال جديد"}</h3>
       
       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
         {/* Section Name */}
@@ -281,10 +311,22 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion }: 
           </div>
         )}
 
-        <div style={{ alignSelf: "flex-start" }}>
-          <Button onClick={handleAdd} leftIcon={<Plus size={16} />} disabled={!content.trim()}>
-            إضافة السؤال
+        <div style={{ alignSelf: "flex-start", display: "flex", gap: "1rem" }}>
+          <Button onClick={handleAddOrUpdate} leftIcon={editingQuestionId ? <Save size={16} /> : <Plus size={16} />} disabled={!content.trim() && !imageBase64}>
+            {editingQuestionId ? "حفظ التعديلات" : "إضافة السؤال"}
           </Button>
+          {editingQuestionId && (
+            <Button variant="secondary" onClick={() => {
+              setEditingQuestionId(null);
+              setContent("");
+              setOptions(["", "", "", ""]);
+              setCorrectAnswer("");
+              setImageBase64(null);
+              setSectionName("");
+            }}>
+              إلغاء
+            </Button>
+          )}
         </div>
       </div>
 
@@ -338,13 +380,24 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion }: 
                   )
                 )}
               </div>
-              <Button 
-                variant="secondary" 
-                style={{ padding: "0 10px", color: "var(--color-danger)" }}
-                onClick={() => onDeleteQuestion(q.id)}
-              >
-                <Trash2 size={16} />
-              </Button>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <Button 
+                  variant="secondary" 
+                  style={{ padding: "0 10px", color: "var(--text-secondary)" }}
+                  onClick={() => handleEditClick(q)}
+                  title="تعديل السؤال"
+                >
+                  <Type size={16} />
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  style={{ padding: "0 10px", color: "var(--color-danger)" }}
+                  onClick={() => onDeleteQuestion(q.id)}
+                  title="حذف السؤال"
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
             </div>
           ))}
         </div>

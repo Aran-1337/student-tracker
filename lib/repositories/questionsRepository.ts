@@ -74,5 +74,17 @@ export const questionsRepository = {
       .eq('id', id);
       
     if (error) throw error;
+  },
+
+  async updateQuestion(id: string, updates: Partial<Question>): Promise<Question> {
+    const { data, error } = await supabase
+      .from('questions')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
   }
 };

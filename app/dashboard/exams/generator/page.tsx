@@ -109,6 +109,15 @@ export default function GeneratorPage() {
     }
   };
 
+  const handleUpdateQuestion = async (id: string, updates: Partial<Question>) => {
+    try {
+      const updatedQ = await questionsService.updateQuestion(id, updates);
+      setQuestions(prev => prev.map(q => q.id === id ? updatedQ : q));
+    } catch (e) {
+      alert("خطأ أثناء تعديل السؤال");
+    }
+  };
+
   const handleDeleteQuestion = async (id: string) => {
     try {
       await questionsService.deleteQuestion(id);
@@ -192,6 +201,7 @@ export default function GeneratorPage() {
             questions={questions}
             onAddQuestion={handleAddQuestion}
             onDeleteQuestion={handleDeleteQuestion}
+            onUpdateQuestion={handleUpdateQuestion}
           />
           
           <FormsPreview 
