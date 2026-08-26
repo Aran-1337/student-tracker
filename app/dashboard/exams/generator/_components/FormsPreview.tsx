@@ -267,9 +267,10 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                             q.options && q.options.length > 0 && (
                               <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", paddingRight: "1.25rem", marginTop: "0.5rem" }}>
                                 {q.options.map((opt, oIdx) => {
-                                  // Adjust threshold to fit more options per line
-                                  const isVeryLong = q.options!.some(o => o.length > 75);
-                                  const isMedium = q.options!.some(o => o.length > 30);
+                                  // Ignore base64 images when calculating length so they can be placed side by side
+                                  const getLen = (o: string) => o.startsWith("data:image/") ? 0 : o.length;
+                                  const isVeryLong = q.options!.some(o => getLen(o) > 75);
+                                  const isMedium = q.options!.some(o => getLen(o) > 30);
                                   const width = isVeryLong ? "100%" : isMedium ? "calc(50% - 0.5rem)" : "calc(25% - 0.75rem)";
                                   return (
                                     <div key={oIdx} style={{ width, fontSize: "13px", color: "#222", display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
