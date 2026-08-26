@@ -90,25 +90,26 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
         const el = formElements[i] as HTMLElement;
 
         const canvas = await html2canvas(el, {
-          scale: 2,
+          scale: 1.5, // Reduced scale to significantly lower file size while keeping text readable
           useCORS: true,
           logging: false
         });
         
-        const imgData = canvas.toDataURL("image/png");
+        // Use JPEG with 0.8 quality instead of uncompressed PNG to drastically reduce PDF size
+        const imgData = canvas.toDataURL("image/jpeg", 0.8);
         const imgProps = pdf.getImageProperties(imgData);
         const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
         
         let heightLeft = imgHeight;
         let position = 0;
         
-        pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
+        pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
         heightLeft -= pdfHeight;
         
         while (heightLeft > 0) {
           position -= pdfHeight;
           pdf.addPage();
-          pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
+          pdf.addImage(imgData, "JPEG", 0, position, pdfWidth, imgHeight);
           heightLeft -= pdfHeight;
         }
       }
@@ -208,32 +209,33 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                     background: "#fff", 
                     width: "210mm", 
                     minHeight: "297mm",
-                    padding: "18mm", 
+                    padding: "5mm", 
                     boxSizing: "border-box",
                     margin: "0 auto",
-                    border: "1px solid #ccc",
+                    border: "none",
                     boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
                     direction: "rtl",
                     color: "#000",
                     position: "relative"
                   }}>
-                    {/* Header */}
-                    <div style={{ border: "2px solid #000", padding: "12px 16px", borderRadius: "8px", marginBottom: "1.5rem" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                        <div style={{ fontSize: "20px", fontWeight: "bold", color: "#000" }}>{bankTitle}</div>
-                        <div style={{ fontSize: "22px", fontWeight: "bold", background: "#000", color: "#fff", padding: "2px 14px", borderRadius: "6px" }}>
-                          نموذج ({modelLetter})
+                    <div style={{ border: "2px dashed #000", padding: "13mm", minHeight: "calc(297mm - 10mm)", boxSizing: "border-box" }}>
+                      {/* Header */}
+                      <div style={{ border: "2px solid #000", padding: "12px 16px", borderRadius: "8px", marginBottom: "1.5rem" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                          <div style={{ fontSize: "20px", fontWeight: "bold", color: "#000" }}>{bankTitle}</div>
+                          <div style={{ fontSize: "22px", fontWeight: "bold", background: "#000", color: "#fff", padding: "2px 14px", borderRadius: "6px" }}>
+                            نموذج ({modelLetter})
+                          </div>
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "10px", fontSize: "14px", borderTop: "1px solid #ccc", paddingTop: "8px" }}>
+                          <div>اسم الطالب: ................................................</div>
+                          <div>الكود: ...............</div>
+                          <div>الدرجة: ..... / .....</div>
                         </div>
                       </div>
-                      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "10px", fontSize: "14px", borderTop: "1px solid #ccc", paddingTop: "8px" }}>
-                        <div>اسم الطالب: ................................................</div>
-                        <div>الكود: ...............</div>
-                        <div>الدرجة: ..... / .....</div>
-                      </div>
-                    </div>
-                    
-                    {/* Questions */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                      
+                      {/* Questions */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
                       {form.questions.map((q, idx) => {
                         const showSectionHeader = q.section_name && (idx === 0 || form.questions[idx - 1].section_name !== q.section_name);
                         return (
@@ -283,6 +285,7 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                         );
                       })}
                     </div>
+                    </div>
                   </div>
                 );
               })}
@@ -292,21 +295,22 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                 background: "#fff", 
                 width: "210mm", 
                 minHeight: "297mm",
-                padding: "18mm", 
+                padding: "5mm", 
                 boxSizing: "border-box",
                 margin: "0 auto",
-                border: "2px solid #10b981",
+                border: "none",
                 boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
                 direction: "rtl",
                 color: "#000"
               }}>
-                <div style={{ textAlign: "center", marginBottom: "1.5rem", borderBottom: "3px double #10b981", paddingBottom: "10px" }}>
-                  <h2 style={{ fontSize: "22px", color: "#059669", margin: "0 0 5px 0", fontWeight: 800 }}>🔑 مفتاح الإجابات النموذجية لكل النماذج (خاص بالمدرس)</h2>
-                  <div style={{ fontSize: "14px", color: "#475569" }}>{bankTitle}</div>
-                </div>
+                <div style={{ border: "2px dashed #10b981", padding: "13mm", minHeight: "calc(297mm - 10mm)", boxSizing: "border-box" }}>
+                  <div style={{ textAlign: "center", marginBottom: "1.5rem", borderBottom: "3px double #10b981", paddingBottom: "10px" }}>
+                    <h2 style={{ fontSize: "22px", color: "#059669", margin: "0 0 5px 0", fontWeight: 800 }}>🔑 مفتاح الإجابات النموذجية لكل النماذج (خاص بالمدرس)</h2>
+                    <div style={{ fontSize: "14px", color: "#475569" }}>{bankTitle}</div>
+                  </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(forms.length, 4)}, 1fr)`, gap: "12px" }}>
-                  {forms.map(form => {
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(forms.length, 4)}, 1fr)`, gap: "12px" }}>
+                    {forms.map(form => {
                     const modelLetter = modelLetters[(form.id - 1) % modelLetters.length];
                     return (
                       <div key={form.id} style={{ border: "1px solid #cbd5e1", borderRadius: "8px", overflow: "hidden" }}>
@@ -336,6 +340,7 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                       </div>
                     );
                   })}
+                </div>
                 </div>
               </div>
             </div>
