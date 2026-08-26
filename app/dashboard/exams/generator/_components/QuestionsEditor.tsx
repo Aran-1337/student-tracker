@@ -5,6 +5,7 @@ import { Question } from "@/lib/types";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Plus, Trash2, Save, Type, AlignLeft, CheckCircle2, Image as ImageIcon, Upload } from "lucide-react";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 
 interface QuestionsEditorProps {
   questions: Question[];
@@ -120,21 +121,10 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion, on
 
         <div>
           <label className="form-label" style={{ margin: 0, display: "block", marginBottom: "0.5rem" }}>نص السؤال *</label>
-          <textarea 
+          <RichTextEditor 
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            onChange={setContent}
             placeholder="اكتب السؤال هنا... (يمكنك إدراج صور لحل مسائل معقدة بالأسفل)"
-            style={{
-              width: "100%",
-              minHeight: "80px",
-              padding: "0.75rem",
-              borderRadius: "8px",
-              background: "rgba(255,255,255,0.05)",
-              border: "1px solid var(--border-color)",
-              color: "var(--text-primary)",
-              fontFamily: "inherit",
-              resize: "vertical"
-            }}
           />
         </div>
 
@@ -360,8 +350,9 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion, on
                     القسم: {q.section_name}
                   </div>
                 )}
-                <div style={{ fontWeight: "bold", marginBottom: "0.5rem", whiteSpace: "pre-wrap" }}>
-                  {idx + 1}. {q.content}
+                <div style={{ fontWeight: "bold", marginBottom: "0.5rem" }}>
+                  <span style={{ float: "right", marginLeft: "4px" }}>{idx + 1}.</span>
+                  <div className="rich-text" dangerouslySetInnerHTML={{ __html: q.content }} style={{ display: "inline" }} />
                 </div>
                 {q.image_base64 && (
                   <div style={{ margin: "0.5rem 0", maxWidth: "150px", border: "1px solid var(--border-color)", borderRadius: "4px", overflow: "hidden" }}>

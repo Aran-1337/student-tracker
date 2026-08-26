@@ -157,6 +157,21 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
           .print-inner-border {
             min-height: auto !important;
           }
+          /* Rich Text Styles */
+          .rich-text p {
+            margin: 0;
+            display: inline;
+          }
+          .rich-text ul {
+            list-style-type: disc;
+            padding-right: 1.5rem;
+            margin: 0.5rem 0;
+          }
+          .rich-text ol {
+            list-style-type: decimal;
+            padding-right: 1.5rem;
+            margin: 0.5rem 0;
+          }
           .hide-on-print {
             display: none !important;
           }
@@ -249,8 +264,9 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                               {q.section_name}
                             </div>
                           )}
-                          <div style={{ fontWeight: "bold", fontSize: "14px", marginBottom: "0.4rem", color: "#000", whiteSpace: "pre-wrap", lineHeight: "1.6" }}>
-                            س{idx + 1}: {q.content}
+                          <div style={{ fontWeight: "bold", fontSize: "14px", marginBottom: "0.4rem", color: "#000", lineHeight: "1.6" }}>
+                            <span style={{ float: "right", marginLeft: "4px" }}>س{idx + 1}:</span>
+                            <div className="rich-text" dangerouslySetInnerHTML={{ __html: q.content }} style={{ display: "inline" }} />
                           </div>
                           {q.image_base64 && (
                             <div style={{ margin: "0.75rem 0", maxWidth: "500px", border: "1px solid #cbd5e1", borderRadius: "6px", overflow: "hidden", padding: "4px", backgroundColor: "#fff" }}>
