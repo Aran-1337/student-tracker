@@ -99,7 +99,18 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
         const imgProps = pdf.getImageProperties(imgData);
         const imgHeight = (imgProps.height * pdfWidth) / imgProps.width;
         
-        pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, Math.min(imgHeight, pdfHeight));
+        let heightLeft = imgHeight;
+        let position = 0;
+        
+        pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
+        heightLeft -= pdfHeight;
+        
+        while (heightLeft > 0) {
+          position -= pdfHeight;
+          pdf.addPage();
+          pdf.addImage(imgData, "PNG", 0, position, pdfWidth, imgHeight);
+          heightLeft -= pdfHeight;
+        }
       }
       
       pdf.save(`نماذج_امتحان_${bankTitle}.pdf`);
@@ -113,6 +124,39 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
 
   return (
     <div className="glass-panel panel-content" style={{ padding: "1.5rem" }}>
+      <style>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #printable-exam, #printable-exam * {
+            visibility: visible;
+          }
+          #printable-exam {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+          .exam-scroll-wrapper {
+            overflow: visible !important;
+            max-height: none !important;
+            border: none !important;
+            background: none !important;
+            padding: 0 !important;
+          }
+          .exam-form-page {
+            box-shadow: none !important;
+            margin: 0 !important;
+            page-break-after: always;
+            min-height: auto !important;
+            width: 100% !important;
+          }
+          .hide-on-print {
+            display: none !important;
+          }
+        }
+      `}</style>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
         <h3 style={{ margin: 0, color: "var(--text-primary)" }}>توليد النماذج للتجميع والطباعة</h3>
         <div style={{ display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap" }}>
@@ -142,7 +186,7 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
 
       {forms.length > 0 && (
         <div style={{ marginTop: "2rem" }}>
-          <div style={{ 
+          <div className="exam-scroll-wrapper" style={{ 
             background: "#525659", 
             padding: "1.5rem", 
             borderRadius: "12px", 
@@ -150,11 +194,11 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
             overflowY: "auto",
             border: "1px solid var(--border-color)"
           }}>
-            <p style={{ textAlign: "center", color: "#fff", marginBottom: "1.5rem", fontWeight: 600 }}>
+            <p className="hide-on-print" style={{ textAlign: "center", color: "#fff", marginBottom: "1.5rem", fontWeight: 600 }}>
               📄 معاينة الصفحات الجاهزة للطباعة والتصدير ({forms.length} نماذج + ورقة الإجابات النموذجية)
             </p>
             
-            <div ref={printRef} style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
+            <div id="printable-exam" ref={printRef} style={{ display: "flex", flexDirection: "column", gap: "2.5rem" }}>
               {/* Question Models */}
               {forms.map(form => {
                 const modelLetter = modelLetters[(form.id - 1) % modelLetters.length];
@@ -215,17 +259,18 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                             </div>
                           ) : (
                             q.options && q.options.length > 0 && (
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", paddingRight: "1.25rem" }}>
+                              <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", paddingRight: "1.25rem", marginTop: "0.5rem" }}>
                                 {q.options.map((opt, oIdx) => {
-                                  const isVeryLong = q.options!.some(o => o.length > 40);
-                                  const isMedium = q.options!.some(o => o.length > 15);
+                                  // Adjust threshold to fit more options per line
+                                  const isVeryLong = q.options!.some(o => o.length > 75);
+                                  const isMedium = q.options!.some(o => o.length > 30);
                                   const width = isVeryLong ? "100%" : isMedium ? "calc(50% - 0.5rem)" : "calc(25% - 0.75rem)";
                                   return (
-                                    <div key={oIdx} style={{ width, fontSize: "14px", color: "#222", display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                                      <div style={{ width: "24px", height: "24px", borderRadius: "50%", border: "1px solid #000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", flexShrink: 0 }}>
+                                    <div key={oIdx} style={{ width, fontSize: "14px", color: "#222", display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+                                      <div style={{ width: "22px", height: "22px", borderRadius: "50%", border: "1px solid #000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", flexShrink: 0, marginTop: "2px" }}>
                                         {modelLetters[oIdx % modelLetters.length]}
                                       </div>
-                                      <div style={{ flex: 1, wordBreak: "break-word" }}>
+                                      <div style={{ flex: 1, wordBreak: "break-word", lineHeight: "1.5" }}>
                                         {opt.startsWith("data:image/") ? <img src={opt} style={{ maxHeight: "60px", maxWidth: "100%", display: "block" }} alt="خيار" /> : opt}
                                       </div>
                                     </div>
