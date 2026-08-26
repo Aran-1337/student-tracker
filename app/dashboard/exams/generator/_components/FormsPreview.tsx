@@ -224,14 +224,14 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                   }}>
                     <div className="print-inner-border" style={{ border: "2px dashed #000", padding: "13mm", minHeight: "calc(297mm - 10mm)", boxSizing: "border-box" }}>
                       {/* Header */}
-                      <div style={{ border: "2px solid #000", padding: "12px 16px", borderRadius: "8px", marginBottom: "1.5rem" }}>
+                      <div style={{ border: "2px solid #000", padding: "10px 14px", borderRadius: "8px", marginBottom: "1.25rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                          <div style={{ fontSize: "20px", fontWeight: "bold", color: "#000" }}>{bankTitle}</div>
-                          <div style={{ fontSize: "22px", fontWeight: "bold", background: "#000", color: "#fff", padding: "2px 14px", borderRadius: "6px" }}>
+                          <div style={{ fontSize: "17px", fontWeight: "bold", color: "#000" }}>{bankTitle}</div>
+                          <div style={{ fontSize: "18px", fontWeight: "bold", background: "#000", color: "#fff", padding: "2px 14px", borderRadius: "6px" }}>
                             نموذج ({modelLetter})
                           </div>
                         </div>
-                        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "10px", fontSize: "14px", borderTop: "1px solid #ccc", paddingTop: "8px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: "10px", fontSize: "13px", borderTop: "1px solid #ccc", paddingTop: "6px" }}>
                           <div>اسم الطالب: ................................................</div>
                           <div>الكود: ...............</div>
                           <div>الدرجة: ..... / .....</div>
@@ -239,17 +239,17 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                       </div>
                       
                       {/* Questions */}
-                      <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                       {form.questions.map((q, idx) => {
                         const showSectionHeader = q.section_name && (idx === 0 || form.questions[idx - 1].section_name !== q.section_name);
                         return (
                         <div key={q.id} style={{ breakInside: "avoid" }}>
                           {showSectionHeader && (
-                            <div style={{ background: "#f1f5f9", padding: "8px 12px", borderRadius: "6px", fontWeight: "bold", fontSize: "16px", marginBottom: "1rem", color: "#0f172a", borderRight: "4px solid #059669" }}>
+                            <div style={{ background: "#f1f5f9", padding: "6px 10px", borderRadius: "6px", fontWeight: "bold", fontSize: "14px", marginBottom: "0.8rem", color: "#0f172a", borderRight: "4px solid #059669" }}>
                               {q.section_name}
                             </div>
                           )}
-                          <div style={{ fontWeight: "bold", fontSize: "15px", marginBottom: "0.4rem", color: "#000" }}>
+                          <div style={{ fontWeight: "bold", fontSize: "14px", marginBottom: "0.4rem", color: "#000", whiteSpace: "pre-wrap", lineHeight: "1.6" }}>
                             س{idx + 1}: {q.content}
                           </div>
                           {q.image_base64 && (
@@ -272,8 +272,8 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                                   const isMedium = q.options!.some(o => o.length > 30);
                                   const width = isVeryLong ? "100%" : isMedium ? "calc(50% - 0.5rem)" : "calc(25% - 0.75rem)";
                                   return (
-                                    <div key={oIdx} style={{ width, fontSize: "14px", color: "#222", display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
-                                      <div style={{ width: "22px", height: "22px", borderRadius: "50%", border: "1px solid #000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: "bold", flexShrink: 0, marginTop: "2px" }}>
+                                    <div key={oIdx} style={{ width, fontSize: "13px", color: "#222", display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+                                      <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1px solid #000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "bold", flexShrink: 0, marginTop: "2px" }}>
                                         {modelLetters[oIdx % modelLetters.length]}
                                       </div>
                                       <div style={{ flex: 1, wordBreak: "break-word", lineHeight: "1.5" }}>

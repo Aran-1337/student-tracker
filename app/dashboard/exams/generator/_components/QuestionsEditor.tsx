@@ -316,7 +316,7 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion }: 
                     القسم: {q.section_name}
                   </div>
                 )}
-                <div style={{ fontWeight: "bold", marginBottom: "0.5rem" }}>
+                <div style={{ fontWeight: "bold", marginBottom: "0.5rem", whiteSpace: "pre-wrap" }}>
                   {idx + 1}. {q.content}
                 </div>
                 {q.image_base64 && (
