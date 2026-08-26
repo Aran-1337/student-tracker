@@ -58,77 +58,83 @@ export function RichTextEditor({ value, onChange, placeholder }: RichTextEditorP
   const toggleOrderedList = (e: React.MouseEvent) => { e.preventDefault(); editor.chain().focus().toggleOrderedList().run(); };
 
   return (
-    <div className="rich-text-editor flex flex-col w-full rounded-md border border-[var(--border-color)] overflow-hidden">
-      <div className="flex flex-wrap gap-1 p-2 bg-[rgba(255,255,255,0.02)] border-b border-[var(--border-color)]">
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", borderRadius: "8px", border: "1px solid var(--border-color)", overflow: "hidden", background: "rgba(255,255,255,0.02)" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", padding: "8px", borderBottom: "1px solid var(--border-color)", background: "rgba(0,0,0,0.2)" }}>
         <button
           onClick={toggleBold}
-          className={`p-1.5 rounded ${editor.isActive('bold') ? 'bg-[var(--color-teal)] text-white' : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.1)]'}`}
+          style={{ padding: "6px", borderRadius: "4px", cursor: "pointer", border: "none", background: editor.isActive('bold') ? "var(--color-teal)" : "transparent", color: editor.isActive('bold') ? "#fff" : "var(--text-secondary)" }}
           title="عريض"
         >
           <Bold size={16} />
         </button>
         <button
           onClick={toggleItalic}
-          className={`p-1.5 rounded ${editor.isActive('italic') ? 'bg-[var(--color-teal)] text-white' : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.1)]'}`}
+          style={{ padding: "6px", borderRadius: "4px", cursor: "pointer", border: "none", background: editor.isActive('italic') ? "var(--color-teal)" : "transparent", color: editor.isActive('italic') ? "#fff" : "var(--text-secondary)" }}
           title="مائل"
         >
           <Italic size={16} />
         </button>
         <button
           onClick={toggleUnderline}
-          className={`p-1.5 rounded ${editor.isActive('underline') ? 'bg-[var(--color-teal)] text-white' : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.1)]'}`}
+          style={{ padding: "6px", borderRadius: "4px", cursor: "pointer", border: "none", background: editor.isActive('underline') ? "var(--color-teal)" : "transparent", color: editor.isActive('underline') ? "#fff" : "var(--text-secondary)" }}
           title="تسطير"
         >
           <UnderlineIcon size={16} />
         </button>
         
-        <div className="w-[1px] h-6 bg-[var(--border-color)] mx-1 self-center" />
+        <div style={{ width: "1px", height: "24px", background: "var(--border-color)", margin: "0 4px", alignSelf: "center" }} />
         
         <button
           onClick={toggleAlignRight}
-          className={`p-1.5 rounded ${editor.isActive({ textAlign: 'right' }) ? 'bg-[var(--color-teal)] text-white' : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.1)]'}`}
+          style={{ padding: "6px", borderRadius: "4px", cursor: "pointer", border: "none", background: editor.isActive({ textAlign: 'right' }) ? "var(--color-teal)" : "transparent", color: editor.isActive({ textAlign: 'right' }) ? "#fff" : "var(--text-secondary)" }}
           title="محاذاة لليمين"
         >
           <AlignRight size={16} />
         </button>
         <button
           onClick={toggleAlignCenter}
-          className={`p-1.5 rounded ${editor.isActive({ textAlign: 'center' }) ? 'bg-[var(--color-teal)] text-white' : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.1)]'}`}
+          style={{ padding: "6px", borderRadius: "4px", cursor: "pointer", border: "none", background: editor.isActive({ textAlign: 'center' }) ? "var(--color-teal)" : "transparent", color: editor.isActive({ textAlign: 'center' }) ? "#fff" : "var(--text-secondary)" }}
           title="محاذاة للوسط"
         >
           <AlignCenter size={16} />
         </button>
         <button
           onClick={toggleAlignLeft}
-          className={`p-1.5 rounded ${editor.isActive({ textAlign: 'left' }) ? 'bg-[var(--color-teal)] text-white' : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.1)]'}`}
+          style={{ padding: "6px", borderRadius: "4px", cursor: "pointer", border: "none", background: editor.isActive({ textAlign: 'left' }) ? "var(--color-teal)" : "transparent", color: editor.isActive({ textAlign: 'left' }) ? "#fff" : "var(--text-secondary)" }}
           title="محاذاة لليسار"
         >
           <AlignLeft size={16} />
         </button>
 
-        <div className="w-[1px] h-6 bg-[var(--border-color)] mx-1 self-center" />
+        <div style={{ width: "1px", height: "24px", background: "var(--border-color)", margin: "0 4px", alignSelf: "center" }} />
 
         <button
           onClick={toggleBulletList}
-          className={`p-1.5 rounded ${editor.isActive('bulletList') ? 'bg-[var(--color-teal)] text-white' : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.1)]'}`}
+          style={{ padding: "6px", borderRadius: "4px", cursor: "pointer", border: "none", background: editor.isActive('bulletList') ? "var(--color-teal)" : "transparent", color: editor.isActive('bulletList') ? "#fff" : "var(--text-secondary)" }}
           title="قائمة نقطية"
         >
           <List size={16} />
         </button>
         <button
           onClick={toggleOrderedList}
-          className={`p-1.5 rounded ${editor.isActive('orderedList') ? 'bg-[var(--color-teal)] text-white' : 'text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.1)]'}`}
+          style={{ padding: "6px", borderRadius: "4px", cursor: "pointer", border: "none", background: editor.isActive('orderedList') ? "var(--color-teal)" : "transparent", color: editor.isActive('orderedList') ? "#fff" : "var(--text-secondary)" }}
           title="قائمة رقمية"
         >
           <ListOrdered size={16} />
         </button>
       </div>
       
-      <EditorContent editor={editor} />
+      <div style={{ padding: "12px", minHeight: "100px", color: "var(--text-primary)", outline: "none" }}>
+        <EditorContent editor={editor} />
+      </div>
       
       <style jsx global>{`
+        .ProseMirror {
+          outline: none !important;
+          min-height: 100px;
+        }
         .ProseMirror p {
-          margin: 0;
+          margin: 0 0 0.5rem 0;
           line-height: 1.6;
         }
         .ProseMirror ul {
