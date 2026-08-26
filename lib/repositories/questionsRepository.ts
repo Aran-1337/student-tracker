@@ -33,6 +33,18 @@ export const questionsRepository = {
     if (error) throw error;
   },
 
+  async updateBank(id: string, updates: Partial<QuestionBank>): Promise<QuestionBank> {
+    const { data, error } = await supabase
+      .from('question_banks')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  },
+
   async getQuestionsByBankId(bankId: string): Promise<Question[]> {
     const { data, error } = await supabase
       .from('questions')

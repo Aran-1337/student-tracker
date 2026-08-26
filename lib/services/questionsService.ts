@@ -29,6 +29,15 @@ export const questionsService = {
     }
   },
 
+  async updateBank(id: string, updates: Partial<QuestionBank>): Promise<QuestionBank> {
+    try {
+      return await questionsRepository.updateBank(id, updates);
+    } catch (error) {
+      console.error('Error updating question bank:', error);
+      throw error;
+    }
+  },
+
   async getQuestionsByBankId(bankId: string): Promise<Question[]> {
     try {
       return await questionsRepository.getQuestionsByBankId(bankId);

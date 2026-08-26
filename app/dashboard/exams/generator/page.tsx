@@ -8,7 +8,7 @@ import { QuestionsEditor } from "./_components/QuestionsEditor";
 import { FormsPreview } from "./_components/FormsPreview";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Edit3 } from "lucide-react";
 
 export default function GeneratorPage() {
   const [loading, setLoading] = useState(true);
@@ -83,6 +83,19 @@ export default function GeneratorPage() {
     }
   };
 
+  const handleEditBank = async (bank: QuestionBank) => {
+    const newTitle = prompt("أدخل الاسم الجديد لبنك الأسئلة:", bank.title);
+    if (!newTitle || newTitle.trim() === "" || newTitle === bank.title) return;
+    
+    try {
+      const updatedBank = await questionsService.updateBank(bank.id, { title: newTitle });
+      setBanks(prev => prev.map(b => b.id === bank.id ? updatedBank : b));
+      if (selectedBank?.id === bank.id) setSelectedBank(updatedBank);
+    } catch (e) {
+      alert("خطأ أثناء تعديل اسم بنك الأسئلة");
+    }
+  };
+
   const handleAddQuestion = async (q: Omit<Question, "id" | "bank_id" | "created_at">) => {
     if (!selectedBank) return;
     try {
@@ -152,13 +165,22 @@ export default function GeneratorPage() {
               }}
             >
               <div style={{ flex: 1, fontWeight: "bold" }}>{bank.title}</div>
-              <Button 
-                variant="secondary" 
-                style={{ padding: "4px 8px", height: "auto", color: "var(--color-danger)", border: "none" }}
-                onClick={(e) => { e.stopPropagation(); handleDeleteBank(bank.id); }}
-              >
-                <Trash2 size={16} />
-              </Button>
+              <div style={{ display: "flex", gap: "0.5rem" }}>
+                <Button 
+                  variant="secondary" 
+                  style={{ padding: "4px 8px", height: "auto", color: "var(--text-secondary)", border: "none" }}
+                  onClick={(e) => { e.stopPropagation(); handleEditBank(bank); }}
+                >
+                  <Edit3 size={16} />
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  style={{ padding: "4px 8px", height: "auto", color: "var(--color-danger)", border: "none" }}
+                  onClick={(e) => { e.stopPropagation(); handleDeleteBank(bank.id); }}
+                >
+                  <Trash2 size={16} />
+                </Button>
+              </div>
             </div>
           ))}
         </div>
