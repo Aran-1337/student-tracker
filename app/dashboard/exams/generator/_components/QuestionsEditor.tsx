@@ -8,6 +8,8 @@ import { Plus, Trash2, Save, Type, AlignLeft, CheckCircle2, Image as ImageIcon, 
 
 interface QuestionsEditorProps {
   questions: Question[];
+  onAddQuestion: (q: Omit<Question, "id" | "bank_id" | "created_at">) => void;
+  onDeleteQuestion: (id: string) => void;
   onUpdateQuestion: (id: string, updates: Partial<Question>) => void;
 }
 
