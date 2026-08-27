@@ -237,7 +237,7 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                     color: "#000",
                     position: "relative"
                   }}>
-                    <div className="print-inner-border" style={{ border: "2px dashed #000", padding: "13mm", minHeight: "calc(297mm - 10mm)", boxSizing: "border-box" }}>
+                    <div className="print-inner-border" style={{ border: "2px dashed #000", padding: "4mm", minHeight: "calc(297mm - 10mm)", boxSizing: "border-box" }}>
                       {/* Header */}
                       <div style={{ border: "2px solid #000", padding: "10px 14px", borderRadius: "8px", marginBottom: "1.25rem" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -324,7 +324,7 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                 direction: "rtl",
                 color: "#000"
               }}>
-                <div className="print-inner-border" style={{ border: "2px dashed #10b981", padding: "13mm", minHeight: "calc(297mm - 10mm)", boxSizing: "border-box" }}>
+                <div className="print-inner-border" style={{ border: "2px dashed #10b981", padding: "4mm", minHeight: "calc(297mm - 10mm)", boxSizing: "border-box" }}>
                   <div style={{ textAlign: "center", marginBottom: "1.5rem", borderBottom: "3px double #10b981", paddingBottom: "10px" }}>
                     <h2 style={{ fontSize: "22px", color: "#059669", margin: "0 0 5px 0", fontWeight: 800 }}>🔑 مفتاح الإجابات النموذجية لكل النماذج (خاص بالمدرس)</h2>
                     <div style={{ fontSize: "14px", color: "#475569" }}>{bankTitle}</div>
