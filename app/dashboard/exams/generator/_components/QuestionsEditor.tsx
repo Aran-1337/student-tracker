@@ -116,7 +116,24 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion, on
             value={sectionName} 
             onChange={(e) => setSectionName(e.target.value)} 
             placeholder="اتركه فارغاً إذا كنت لا ترغب بتقسيم الامتحان" 
+            list="section-names-list"
           />
+          <datalist id="section-names-list">
+            <option value="السؤال الأول: اختر الإجابة الصحيحة من بين البدائل" />
+            <option value="ضع علامة (✓) أمام العبارة الصحيحة وعلامة (✗) أمام الخاطئة" />
+            <option value="أكمل العبارات الآتية بما يناسبها" />
+            <option value="بم تفسر...؟ / اذكر السبب العلمي" />
+            <option value="ما النتائج المترتبة على...؟" />
+            <option value="ماذا يحدث إذا...؟" />
+            <option value="اكتب المفهوم العلمي الدال على كل عبارة" />
+            <option value="قارن بين كل مما يلي:" />
+            <option value="صوب ما تحته خط في العبارات الآتية" />
+            <option value="اقرأ القطعة التالية ثم أجب عن الأسئلة" />
+            <option value="ترجم إلى اللغة العربية / Translate into English" />
+            <option value="أوجد ناتج ما يلي مع توضيح خطوات الحل" />
+            <option value="برهن على صحة العبارة الآتية" />
+            <option value="اكتب مقالاً / اكتب موضوع تعبير عن:" />
+          </datalist>
         </div>
 
         <div>
