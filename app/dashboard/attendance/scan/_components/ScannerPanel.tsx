@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { CrossGroupConfirm, LastScan } from "../_hooks/useScanSession";
 
@@ -51,11 +51,37 @@ export function ScannerPanel({
         />
 
         {lastScan && (
-          <div className={`scan-feedback ${lastScan.success ? "scan-success" : "scan-error"}`}>
-            {lastScan.success
-              ? <><CheckCircle2 size={20} /> حضر: {lastScan.name}</>
-              : <><AlertCircle size={20} /> {lastScan.name}</>
-            }
+          <div
+            className={`scan-feedback ${lastScan.success ? "scan-success" : "scan-error"}`}
+            style={lastScan.wasAbsentPrevious ? { flexDirection: "column", gap: "0.4rem", padding: "0.85rem 1.25rem", textAlign: "center", minWidth: "280px" } : undefined}
+          >
+            {lastScan.success ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", justifyContent: "center" }}>
+                  <CheckCircle2 size={20} style={{ color: "#10b981", flexShrink: 0 }} />
+                  <span>حضر: {lastScan.name}</span>
+                </div>
+                {lastScan.wasAbsentPrevious && (
+                  <div style={{
+                    fontSize: "0.82rem",
+                    color: "#fbbf24",
+                    background: "rgba(245, 158, 11, 0.2)",
+                    border: "1px solid rgba(245, 158, 11, 0.45)",
+                    padding: "4px 10px",
+                    borderRadius: "8px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontWeight: 600,
+                  }}>
+                    <AlertTriangle size={16} style={{ flexShrink: 0, color: "#f59e0b" }} />
+                    <span>⚠️ تنبيه: الطالب كان غائباً في الحصة السابقة {lastScan.previousAbsentDate ? `(${lastScan.previousAbsentDate})` : ""}</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <><AlertCircle size={20} /> {lastScan.name}</>
+            )}
           </div>
         )}
 

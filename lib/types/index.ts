@@ -125,6 +125,8 @@ export interface ScannedEntry {
   studentId: string;
   studentName: string;
   time: string;
+  wasAbsentPrevious?: boolean;
+  previousAbsentDate?: string;
 }
 
 export interface Exam {

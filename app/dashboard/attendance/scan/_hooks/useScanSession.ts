@@ -11,11 +11,38 @@ import { GradesService } from "@/lib/services/gradesService";
 import { AttendanceService } from "@/lib/services/attendanceService";
 import { AttendanceQueue, OfflineCache } from "@/lib/offlineQueue";
 
-export interface LastScan { name: string; success: boolean; }
+export interface LastScan {
+  name: string;
+  success: boolean;
+  wasAbsentPrevious?: boolean;
+  previousAbsentDate?: string;
+}
 export interface CrossGroupConfirm { student: Student; originalGroupName: string; }
 
 const SCAN_COOLDOWN_MS = 3000;
 const DAYS_AR = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+
+async function checkPreviousSessionAbsent(studentId: string, currentDate: string): Promise<{ wasAbsent: boolean; date?: string }> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return { wasAbsent: false };
+  try {
+    const { data, error } = await supabase
+      .from("attendance_records")
+      .select("status, session_date")
+      .eq("student_id", studentId)
+      .lt("session_date", currentDate)
+      .order("session_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return { wasAbsent: false };
+    if (data.status === "absent") {
+      return { wasAbsent: true, date: data.session_date };
+    }
+    return { wasAbsent: false };
+  } catch {
+    return { wasAbsent: false };
+  }
+}
 
 function detectCurrentGroup(groups: Group[]): Group | null {
   const now = new Date();
@@ -73,9 +100,10 @@ export function useScanSession() {
     stateRef.current = { userId, selectedGroupId, scannerPaused, students, groups, scannedToday, sessionDate };
   }, [userId, selectedGroupId, scannerPaused, students, groups, scannedToday, sessionDate]);
 
-  const showLastScan = useCallback((name: string, success: boolean) => {
-    setLastScan({ name, success });
-    setTimeout(() => setLastScan(null), 2500);
+  const showLastScan = useCallback((name: string, success: boolean, wasAbsentPrevious?: boolean, previousAbsentDate?: string) => {
+    setLastScan({ name, success, wasAbsentPrevious, previousAbsentDate });
+    const duration = wasAbsentPrevious ? 4500 : 2500;
+    setTimeout(() => setLastScan(null), duration);
   }, []);
 
   // ── startScanner ──────────────────────────────────────────────
@@ -122,17 +150,22 @@ export function useScanSession() {
 
         try {
           const [syear, smonth] = sessionDate.split("-").map(Number);
-          await AttendanceService.upsertAttendanceRecord({
-            teacher_id: userId, student_id: student.id,
-            group_id: selectedGroupId, session_date: sessionDate,
-            month: smonth, year: syear, status: "present",
-          });
+          const [_, prevCheck] = await Promise.all([
+            AttendanceService.upsertAttendanceRecord({
+              teacher_id: userId, student_id: student.id,
+              group_id: student.group_id || selectedGroupId, session_date: sessionDate,
+              month: smonth, year: syear, status: "present",
+            }),
+            checkPreviousSessionAbsent(student.id, sessionDate),
+          ]);
           const entry: ScannedEntry = {
             studentId: student.id, studentName: student.name,
             time: new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }),
+            wasAbsentPrevious: prevCheck.wasAbsent,
+            previousAbsentDate: prevCheck.date,
           };
           setScannedToday(prev => prev.some(e => e.studentId === student.id) ? prev : [entry, ...prev]);
-          showLastScan(student.name, true);
+          showLastScan(student.name, true, prevCheck.wasAbsent, prevCheck.date);
         } catch (e: any) {
           showLastScan(`خطأ: ${e.message}`, false);
         } finally {
@@ -346,17 +379,22 @@ export function useScanSession() {
 
     try {
       const [syear, smonth] = sessionDate.split("-").map(Number);
-      await AttendanceService.upsertAttendanceRecord({
-        teacher_id: userId, student_id: student.id,
-        group_id: selectedGroupId, session_date: sessionDate,
-        month: smonth, year: syear, status: "present",
-      });
+      const [_, prevCheck] = await Promise.all([
+        AttendanceService.upsertAttendanceRecord({
+          teacher_id: userId, student_id: student.id,
+          group_id: student.group_id || selectedGroupId, session_date: sessionDate,
+          month: smonth, year: syear, status: "present",
+        }),
+        checkPreviousSessionAbsent(student.id, sessionDate),
+      ]);
       const entry: ScannedEntry = {
         studentId: student.id, studentName: student.name,
         time: new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }),
+        wasAbsentPrevious: prevCheck.wasAbsent,
+        previousAbsentDate: prevCheck.date,
       };
       setScannedToday(prev => prev.some(e => e.studentId === student.id) ? prev : [entry, ...prev]);
-      showLastScan(student.name, true);
+      showLastScan(student.name, true, prevCheck.wasAbsent, prevCheck.date);
     } catch (e: any) {
       showLastScan(`خطأ: ${e.message}`, false);
     } finally {
@@ -417,17 +455,22 @@ export function useScanSession() {
     if (!userId) return;
     try {
       const [syear, smonth] = sessionDate.split("-").map(Number);
-      await AttendanceService.upsertAttendanceRecord({
-        teacher_id: userId, student_id: st.id,
-        group_id: selectedGroupId, session_date: sessionDate,
-        month: smonth, year: syear, status: "present",
-      });
+      const [_, prevCheck] = await Promise.all([
+        AttendanceService.upsertAttendanceRecord({
+          teacher_id: userId, student_id: st.id,
+          group_id: st.group_id || selectedGroupId, session_date: sessionDate,
+          month: smonth, year: syear, status: "present",
+        }),
+        checkPreviousSessionAbsent(st.id, sessionDate),
+      ]);
       const entry: ScannedEntry = {
         studentId: st.id, studentName: st.name,
         time: new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }),
+        wasAbsentPrevious: prevCheck.wasAbsent,
+        previousAbsentDate: prevCheck.date,
       };
       setScannedToday(prev => prev.some(e => e.studentId === st.id) ? prev : [entry, ...prev]);
-      showLastScan(st.name, true);
+      showLastScan(st.name, true, prevCheck.wasAbsent, prevCheck.date);
     } catch (e: any) {
       showLastScan(`خطأ: ${e.message}`, false);
     }
@@ -442,7 +485,7 @@ export function useScanSession() {
   const handleRemoveScanned = useCallback(async (studentId: string) => {
     setScannedToday(prev => prev.filter(e => e.studentId !== studentId));
     scannedIdsRef.current.delete(studentId);
-    const { sessionDate, selectedGroupId, userId } = stateRef.current;
+    const { sessionDate, userId } = stateRef.current;
     if (!userId) return;
     try {
       const { data } = await supabase
@@ -450,7 +493,6 @@ export function useScanSession() {
         .select("id")
         .eq("student_id", studentId)
         .eq("session_date", sessionDate)
-        .eq("group_id", selectedGroupId)
         .single();
       if (data?.id) await AttendanceService.deleteAttendanceRecord(data.id);
     } catch {}

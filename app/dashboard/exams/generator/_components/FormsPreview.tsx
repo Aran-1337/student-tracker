@@ -257,6 +257,10 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                       <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                       {form.questions.map((q, idx) => {
                         const showSectionHeader = q.section_name && (idx === 0 || form.questions[idx - 1].section_name !== q.section_name);
+                        const isFullWidth = q.image_base64?.startsWith("layout:full|");
+                        const cleanImageSrc = q.image_base64?.replace(/^layout:(full|side)\|/, "") || q.image_base64;
+                        const hasSideImage = cleanImageSrc && !isFullWidth;
+
                         return (
                         <div key={q.id} style={{ breakInside: "avoid" }}>
                           {showSectionHeader && (
@@ -264,43 +268,93 @@ export function FormsPreview({ questions, bankTitle }: FormsPreviewProps) {
                               {q.section_name}
                             </div>
                           )}
-                          <div style={{ fontWeight: "bold", fontSize: "13px", marginBottom: "0.4rem", color: "#000", lineHeight: "1.6" }}>
-                            <span style={{ float: "right", marginLeft: "4px" }}>س{idx + 1}:</span>
-                            <div className="rich-text" dangerouslySetInnerHTML={{ __html: q.content }} style={{ display: "inline" }} />
-                          </div>
-                          {q.image_base64 && (
-                            <div style={{ margin: "0.75rem 0", maxWidth: "500px", border: "1px solid #cbd5e1", borderRadius: "6px", overflow: "hidden", padding: "4px", backgroundColor: "#fff" }}>
-                              <img src={q.image_base64} style={{ width: "100%", maxHeight: "250px", objectFit: "contain", display: "block" }} alt="مرفق" />
-                            </div>
-                          )}
-                          {q.question_type === "essay" ? (
-                            <div style={{ marginTop: "1rem", marginBottom: "1rem", border: "2px solid #94a3b8", borderRadius: "8px", padding: "0.5rem 1rem", backgroundColor: "#f8fafc" }}>
-                              {Array.from({ length: q.essay_lines || 3 }).map((_, i) => (
-                                <div key={i} style={{ borderBottom: "1px dashed #cbd5e1", height: "1.8rem", marginBottom: "0.2rem" }} />
-                              ))}
+
+                          {hasSideImage ? (
+                            /* 🖼️ COMPACT SIDE IMAGE LAYOUT (Image on Left, Question & Options on Right) */
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem" }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontWeight: "bold", fontSize: "13px", marginBottom: "0.4rem", color: "#000", lineHeight: "1.6" }}>
+                                  <span style={{ float: "right", marginLeft: "4px" }}>س{idx + 1}:</span>
+                                  <div className="rich-text" dangerouslySetInnerHTML={{ __html: q.content }} style={{ display: "inline" }} />
+                                </div>
+
+                                {q.question_type === "essay" ? (
+                                  <div style={{ marginTop: "0.5rem", marginBottom: "0.5rem", border: "1.5px solid #94a3b8", borderRadius: "6px", padding: "0.4rem 0.8rem", backgroundColor: "#f8fafc" }}>
+                                    {Array.from({ length: q.essay_lines || 3 }).map((_, i) => (
+                                      <div key={i} style={{ borderBottom: "1px dashed #cbd5e1", height: "1.6rem", marginBottom: "0.2rem" }} />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  q.options && q.options.length > 0 && (
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.6rem", paddingRight: "0.75rem", marginTop: "0.4rem" }}>
+                                      {q.options.map((opt, oIdx) => {
+                                        const getLen = (o: string) => o.startsWith("data:image/") ? 0 : o.length;
+                                        const isVeryLong = q.options!.some(o => getLen(o) > 40);
+                                        const width = isVeryLong ? "100%" : "calc(50% - 0.4rem)";
+                                        return (
+                                          <div key={oIdx} style={{ width, fontSize: "12px", color: "#222", display: "flex", alignItems: "flex-start", gap: "0.4rem" }}>
+                                            <div style={{ width: "19px", height: "19px", borderRadius: "50%", border: "1px solid #000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "bold", flexShrink: 0, marginTop: "2px" }}>
+                                              {modelLetters[oIdx % modelLetters.length]}
+                                            </div>
+                                            <div style={{ flex: 1, wordBreak: "break-word", lineHeight: "1.4" }}>
+                                              {opt.startsWith("data:image/") ? <img src={opt} style={{ maxHeight: "50px", maxWidth: "100%", display: "block" }} alt="خيار" /> : opt}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )
+                                )}
+                              </div>
+
+                              {/* Compact Image on Left */}
+                              <div style={{ flexShrink: 0, width: "140px", maxHeight: "125px", border: "1px solid #cbd5e1", borderRadius: "6px", overflow: "hidden", padding: "3px", backgroundColor: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <img src={cleanImageSrc} style={{ maxWidth: "100%", maxHeight: "118px", objectFit: "contain", display: "block" }} alt="مرفق" />
+                              </div>
                             </div>
                           ) : (
-                            q.options && q.options.length > 0 && (
-                              <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", paddingRight: "1.25rem", marginTop: "0.5rem" }}>
-                                {q.options.map((opt, oIdx) => {
-                                  // Ignore base64 images when calculating length so they can be placed side by side
-                                  const getLen = (o: string) => o.startsWith("data:image/") ? 0 : o.length;
-                                  const isVeryLong = q.options!.some(o => getLen(o) > 75);
-                                  const isMedium = q.options!.some(o => getLen(o) > 30);
-                                  const width = isVeryLong ? "100%" : isMedium ? "calc(50% - 0.5rem)" : "calc(25% - 0.75rem)";
-                                  return (
-                                    <div key={oIdx} style={{ width, fontSize: "12px", color: "#222", display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
-                                      <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1px solid #000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "bold", flexShrink: 0, marginTop: "2px" }}>
-                                        {modelLetters[oIdx % modelLetters.length]}
-                                      </div>
-                                      <div style={{ flex: 1, wordBreak: "break-word", lineHeight: "1.5" }}>
-                                        {opt.startsWith("data:image/") ? <img src={opt} style={{ maxHeight: "60px", maxWidth: "100%", display: "block" }} alt="خيار" /> : opt}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
+                            /* 📐 FULL WIDTH IMAGE LAYOUT */
+                            <div>
+                              <div style={{ fontWeight: "bold", fontSize: "13px", marginBottom: "0.4rem", color: "#000", lineHeight: "1.6" }}>
+                                <span style={{ float: "right", marginLeft: "4px" }}>س{idx + 1}:</span>
+                                <div className="rich-text" dangerouslySetInnerHTML={{ __html: q.content }} style={{ display: "inline" }} />
                               </div>
-                            )
+
+                              {cleanImageSrc && (
+                                <div style={{ margin: "0.6rem auto", maxWidth: "450px", border: "1px solid #cbd5e1", borderRadius: "6px", overflow: "hidden", padding: "4px", backgroundColor: "#fff", textAlign: "center" }}>
+                                  <img src={cleanImageSrc} style={{ width: "100%", maxHeight: "220px", objectFit: "contain", display: "block" }} alt="مرفق" />
+                                </div>
+                              )}
+
+                              {q.question_type === "essay" ? (
+                                <div style={{ marginTop: "0.75rem", marginBottom: "0.75rem", border: "2px solid #94a3b8", borderRadius: "8px", padding: "0.5rem 1rem", backgroundColor: "#f8fafc" }}>
+                                  {Array.from({ length: q.essay_lines || 3 }).map((_, i) => (
+                                    <div key={i} style={{ borderBottom: "1px dashed #cbd5e1", height: "1.8rem", marginBottom: "0.2rem" }} />
+                                  ))}
+                                </div>
+                              ) : (
+                                q.options && q.options.length > 0 && (
+                                  <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", paddingRight: "1.25rem", marginTop: "0.5rem" }}>
+                                    {q.options.map((opt, oIdx) => {
+                                      const getLen = (o: string) => o.startsWith("data:image/") ? 0 : o.length;
+                                      const isVeryLong = q.options!.some(o => getLen(o) > 75);
+                                      const isMedium = q.options!.some(o => getLen(o) > 30);
+                                      const width = isVeryLong ? "100%" : isMedium ? "calc(50% - 0.5rem)" : "calc(25% - 0.75rem)";
+                                      return (
+                                        <div key={oIdx} style={{ width, fontSize: "12px", color: "#222", display: "flex", alignItems: "flex-start", gap: "0.5rem" }}>
+                                          <div style={{ width: "20px", height: "20px", borderRadius: "50%", border: "1px solid #000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "bold", flexShrink: 0, marginTop: "2px" }}>
+                                            {modelLetters[oIdx % modelLetters.length]}
+                                          </div>
+                                          <div style={{ flex: 1, wordBreak: "break-word", lineHeight: "1.5" }}>
+                                            {opt.startsWith("data:image/") ? <img src={opt} style={{ maxHeight: "60px", maxWidth: "100%", display: "block" }} alt="خيار" /> : opt}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )
+                              )}
+                            </div>
                           )}
                         </div>
                         );

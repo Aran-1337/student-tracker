@@ -11,10 +11,9 @@ export const AttendanceRepository = {
       .from("attendance_records")
       .select("*")
       .eq("teacher_id", session.user.id)
-      .eq("group_id", groupId)
       .gte("session_date", startDate)
       .lte("session_date", endDate)
-      .limit(1000); // 1000 is enough for a single week for a single group
+      .limit(2000);
       
     if (error) throw error;
     return data || [];

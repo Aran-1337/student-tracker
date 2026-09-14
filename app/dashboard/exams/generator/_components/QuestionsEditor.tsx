@@ -25,12 +25,15 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion, on
 
   const [sectionName, setSectionName] = useState("");
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageLayout, setImageLayout] = useState<"side" | "full">("side");
 
   const handleAddOrUpdate = () => {
     if (!content.trim() && !imageBase64) return;
     
     const validOptions = options.filter(opt => opt.trim() !== "");
     
+    const finalImage = imageBase64 ? (imageLayout === "full" ? `layout:full|${imageBase64}` : imageBase64) : null;
+
     const questionData = {
       content,
       options: questionType === "mcq" && validOptions.length > 0 ? validOptions : null,
@@ -38,7 +41,7 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion, on
       question_type: questionType,
       essay_lines: questionType === "essay" ? essayLines : 0,
       section_name: sectionName.trim() || null,
-      image_base64: imageBase64
+      image_base64: finalImage
     };
 
     if (editingQuestionId) {
@@ -52,6 +55,7 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion, on
     setOptions(["", "", "", ""]);
     setCorrectAnswer("");
     setImageBase64(null);
+    setImageLayout("side");
     setSectionName("");
     // Keep the same questionType to make adding multiple of the same type easier
   };
@@ -62,7 +66,16 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion, on
     setQuestionType(q.question_type || "mcq");
     setEssayLines(q.essay_lines || 3);
     setSectionName(q.section_name || "");
-    setImageBase64(q.image_base64 || null);
+    
+    if (q.image_base64) {
+      const isFull = q.image_base64.startsWith("layout:full|");
+      setImageLayout(isFull ? "full" : "side");
+      const clean = q.image_base64.replace(/^layout:(full|side)\|/, "");
+      setImageBase64(clean);
+    } else {
+      setImageBase64(null);
+      setImageLayout("side");
+    }
     
     if (q.options && q.options.length > 0) {
       const paddedOptions = [...q.options];
@@ -163,8 +176,47 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion, on
             )}
           </div>
           {imageBase64 && (
-            <div style={{ marginTop: "1rem", maxWidth: "200px", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border-color)" }}>
-              <img src={imageBase64} alt="مرفق" style={{ width: "100%", height: "auto", display: "block" }} />
+            <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                <label style={{
+                  display: "flex", alignItems: "center", gap: "0.5rem",
+                  padding: "0.5rem 0.85rem", borderRadius: "8px", cursor: "pointer",
+                  border: imageLayout === "side" ? "1px solid var(--color-teal)" : "1px solid var(--border-color)",
+                  background: imageLayout === "side" ? "rgba(20, 184, 166, 0.12)" : "rgba(255,255,255,0.02)",
+                  color: imageLayout === "side" ? "var(--color-teal)" : "var(--text-secondary)",
+                  fontSize: "0.85rem", fontWeight: 600
+                }}>
+                  <input
+                    type="radio"
+                    name="imageLayout"
+                    checked={imageLayout === "side"}
+                    onChange={() => setImageLayout("side")}
+                    style={{ accentColor: "var(--color-teal)" }}
+                  />
+                  <span>🖼️ رسم توضيحي جانبي (صغير على اليسار - موفر للمساحة)</span>
+                </label>
+                <label style={{
+                  display: "flex", alignItems: "center", gap: "0.5rem",
+                  padding: "0.5rem 0.85rem", borderRadius: "8px", cursor: "pointer",
+                  border: imageLayout === "full" ? "1px solid var(--color-teal)" : "1px solid var(--border-color)",
+                  background: imageLayout === "full" ? "rgba(20, 184, 166, 0.12)" : "rgba(255,255,255,0.02)",
+                  color: imageLayout === "full" ? "var(--color-teal)" : "var(--text-secondary)",
+                  fontSize: "0.85rem", fontWeight: 600
+                }}>
+                  <input
+                    type="radio"
+                    name="imageLayout"
+                    checked={imageLayout === "full"}
+                    onChange={() => setImageLayout("full")}
+                    style={{ accentColor: "var(--color-teal)" }}
+                  />
+                  <span>📐 صورة عريضة / رئيسية (في المنتصف)</span>
+                </label>
+              </div>
+
+              <div style={{ maxWidth: imageLayout === "side" ? "160px" : "300px", borderRadius: "8px", overflow: "hidden", border: "1px solid var(--border-color)", padding: "4px", background: "rgba(255,255,255,0.02)" }}>
+                <img src={imageBase64} alt="مرفق" style={{ width: "100%", maxHeight: "150px", objectFit: "contain", display: "block" }} />
+              </div>
             </div>
           )}
         </div>
@@ -356,7 +408,7 @@ export function QuestionsEditor({ questions, onAddQuestion, onDeleteQuestion, on
                 </div>
                 {q.image_base64 && (
                   <div style={{ margin: "0.5rem 0", maxWidth: "150px", border: "1px solid var(--border-color)", borderRadius: "4px", overflow: "hidden" }}>
-                    <img src={q.image_base64} style={{ width: "100%", display: "block" }} alt="مرفق" />
+                    <img src={q.image_base64.replace(/^layout:(full|side)\|/, "")} style={{ width: "100%", maxHeight: "120px", objectFit: "contain", display: "block" }} alt="مرفق" />
                   </div>
                 )}
                 {q.question_type === "essay" ? (
