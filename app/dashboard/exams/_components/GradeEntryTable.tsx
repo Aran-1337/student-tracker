@@ -180,7 +180,7 @@ export function GradeEntryTable({ exam, students, groupName, onBack, showToast }
     if (score === undefined) { showToast("لم يتم رصد درجة هذا الطالب", "error"); return; }
     const pct = Math.round((score / exam.max_score) * 100);
     const status = score >= exam.max_score / 2 ? "ناجح ✅" : "يحتاج متابعة ⚠️";
-    const msg = `مرحباً ولي أمر الطالب/ة: ${student.name}\nنتيجة امتحان (${exam.title}):\n- الدرجة: ${score} من ${exam.max_score} (${pct}%)\n- الحالة: ${status}\nشكراً لتعاونكم.`;
+    const msg = `السلام عليكم ورحمة الله، مرحباً ولي أمر الطالب/ة: ${student.name}\nنتيجة امتحان (${exam.title}):\n- الدرجة: ${score} من ${exam.max_score} (${pct}%)\n- الحالة: ${status}\nشكراً لتعاونكم.`;
     let phone = student.parent_phone.replace(/\D/g, "");
     if (phone.startsWith("0")) phone = "2" + phone;
     if (!phone.startsWith("2")) phone = "20" + phone;

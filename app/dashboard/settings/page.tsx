@@ -72,7 +72,7 @@ export default function SettingsPage() {
           setName(teacher.name || "");
           setPhone(teacher.phone || "");
           setBooks(teacher.books || []);
-          setWhatsappTemplate(teacher.whatsapp_template || "مرحباً ولي أمر الطالب [اسم_الطالب]،\nنود إعلامكم بتقرير الطالب كالتالي:\nأيام الحضور: [الحضور]\nأيام الغياب: [الغياب]\nحالة الدفع: [حالة_الدفع]\nشكراً لتعاونكم.");
+          setWhatsappTemplate(teacher.whatsapp_template || "السلام عليكم ورحمة الله، مرحباً ولي أمر الطالب [اسم_الطالب]،\nنود إعلامكم بتقرير الطالب كالتالي:\nأيام الحضور: [الحضور]\nأيام الغياب: [الغياب]\nحالة الدفع: [حالة_الدفع]\nشكراً لتعاونكم.");
         }
 
         setGrades(gradesData);
