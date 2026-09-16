@@ -5,6 +5,8 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Toast } from "@/components/ui/Toast";
 import { RiSettings3Line } from "react-icons/ri";
 
+import Link from "next/link";
+import { CalendarCheck, TrendingUp, Users } from "lucide-react";
 import { useStudentReports } from "./_hooks/useStudentReports";
 import { exportStudentsReportPDF } from "./_utils/exportPDF";
 import ReportsHeader from "./_components/ReportsHeader";
@@ -49,6 +51,61 @@ export default function StudentReportsPage() {
 
   return (
     <div className="sr-page">
+      {/* ── Sub Navigation Tabs ── */}
+      <div style={{ display: "flex", gap: "0.5rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.75rem", marginBottom: "1.25rem", flexWrap: "wrap", alignItems: "center" }}>
+        <Link
+          href="/dashboard/reports/daily"
+          className="btn btn-secondary"
+          style={{
+            padding: "0.45rem 1rem",
+            borderRadius: "8px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            fontSize: "0.88rem",
+          }}
+        >
+          <CalendarCheck size={16} />
+          <span>التقرير اليومي والمتابعة</span>
+        </Link>
+
+        <Link
+          href="/dashboard/reports"
+          className="btn btn-secondary"
+          style={{
+            padding: "0.45rem 1rem",
+            borderRadius: "8px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            fontSize: "0.88rem",
+          }}
+        >
+          <TrendingUp size={16} />
+          <span>التقارير المالية الشاملة</span>
+        </Link>
+
+        <Link
+          href="/dashboard/reports/students"
+          className="btn"
+          style={{
+            background: "rgba(59, 130, 246, 0.15)",
+            color: "#3b82f6",
+            border: "1px solid rgba(59, 130, 246, 0.3)",
+            fontWeight: 600,
+            padding: "0.45rem 1rem",
+            borderRadius: "8px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            fontSize: "0.88rem",
+          }}
+        >
+          <Users size={16} />
+          <span>تقارير الطلاب والواتساب</span>
+        </Link>
+      </div>
+
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
       {showTemplateModal && (

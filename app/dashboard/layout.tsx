@@ -19,6 +19,7 @@ import {
   Menu,
   X,
   ClipboardCheck,
+  CalendarCheck,
   FileText,
   Award,
   FileQuestion,
@@ -233,6 +234,7 @@ export default function DashboardLayout({
     ...(hasAttendance ? [{ name: "الحضور والغياب", path: "/dashboard/attendance", icon: ClipboardCheck }] : []),
     ...(hasBills ? [{ name: "المصروفات والفواتير", path: "/dashboard/bills", icon: Receipt }] : []),
     ...(hasReports ? [
+      { name: "التقرير اليومي", path: "/dashboard/reports/daily", icon: CalendarCheck },
       { name: "التقارير المالية", path: "/dashboard/reports", icon: TrendingUp },
       { name: "تقارير الطلاب", path: "/dashboard/reports/students", icon: FileText }
     ] : []),

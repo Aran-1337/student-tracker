@@ -9,7 +9,8 @@ import { BillsService } from "@/lib/services/billsService";
 import { GroupsService } from "@/lib/services/groupsService";
 import { GradesService } from "@/lib/services/gradesService";
 import { SubTeachersService } from "@/lib/services/subTeachersService";
-import { AlertCircle, BarChart3, Filter } from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, BarChart3, Filter, CalendarCheck, TrendingUp, Users } from "lucide-react";
 
 import { ReportsSummaryCards } from "./_components/ReportsSummaryCards";
 import { InsightsStrip } from "./_components/InsightsStrip";
@@ -209,6 +210,61 @@ export default function ReportsPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+
+      {/* ── Sub Navigation Tabs ── */}
+      <div style={{ display: "flex", gap: "0.5rem", borderBottom: "1px solid var(--border-color)", paddingBottom: "0.75rem", marginBottom: "1.25rem", flexWrap: "wrap", alignItems: "center" }}>
+        <Link
+          href="/dashboard/reports/daily"
+          className="btn btn-secondary"
+          style={{
+            padding: "0.45rem 1rem",
+            borderRadius: "8px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            fontSize: "0.88rem",
+          }}
+        >
+          <CalendarCheck size={16} />
+          <span>التقرير اليومي والمتابعة</span>
+        </Link>
+
+        <Link
+          href="/dashboard/reports"
+          className="btn"
+          style={{
+            background: "rgba(20,184,166,0.15)",
+            color: "var(--color-teal)",
+            border: "1px solid rgba(20,184,166,0.3)",
+            fontWeight: 600,
+            padding: "0.45rem 1rem",
+            borderRadius: "8px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            fontSize: "0.88rem",
+          }}
+        >
+          <TrendingUp size={16} />
+          <span>التقارير المالية الشاملة</span>
+        </Link>
+
+        <Link
+          href="/dashboard/reports/students"
+          className="btn btn-secondary"
+          style={{
+            padding: "0.45rem 1rem",
+            borderRadius: "8px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            fontSize: "0.88rem",
+          }}
+        >
+          <Users size={16} />
+          <span>تقارير الطلاب والواتساب</span>
+        </Link>
+      </div>
 
       {/* ── Header ── */}
       <div style={{ marginBottom: "1.5rem" }}>
