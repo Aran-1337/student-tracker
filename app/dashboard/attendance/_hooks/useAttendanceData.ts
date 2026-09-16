@@ -165,55 +165,6 @@ export function useAttendanceData() {
         }
       }
 
-      const oneHourMs = 60 * 60 * 1000;
-      const nowMs = Date.now();
-      const recordsToInsert: Omit<AttendanceRecord, "id" | "created_at">[] = [];
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-      for (const date of allDates) {
-        const dateRecords = mergedWeek.filter(r => r.session_date === date && r.created_at);
-        if (dateRecords.length === 0) continue;
-        
-        const earliestTime = Math.min(...dateRecords.map(r => new Date(r.created_at!).getTime()));
-        if (nowMs - earliestTime > oneHourMs) {
-          for (const student of students) {
-            if (student.group_id !== selectedGroupId) continue;
-            if (!uuidRegex.test(student.id)) continue;
-            
-            if (student.created_at) {
-              const studentCreatedDate = student.created_at.split("T")[0];
-              if (date < studentCreatedDate) continue;
-            }
-
-            const hasRecord = mergedWeek.some(r => r.student_id === student.id && r.session_date === date);
-            if (!hasRecord) {
-              const [y, m] = date.split('-');
-              const absentRecord = {
-                teacher_id: userId,
-                student_id: student.id,
-                group_id: student.group_id,
-                session_date: date,
-                month: parseInt(m, 10),
-                year: parseInt(y, 10),
-                status: "absent",
-              };
-              recordsToInsert.push(absentRecord as any);
-              mergedWeek.push({
-                ...absentRecord,
-                id: `auto-${student.id}-${date}`,
-                created_at: new Date().toISOString(),
-              } as AttendanceRecord);
-            }
-          }
-        }
-      }
-
-      if (recordsToInsert.length > 0 && navigator.onLine) {
-        try {
-          await AttendanceService.addAttendanceRecords(recordsToInsert);
-        } catch (e) {}
-      }
-
       setAttendance(mergedWeek);
       setMonthlyAttendance(mergedMonth);
       setMonthlyDates(allMonthlyDates);

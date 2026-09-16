@@ -52,7 +52,7 @@ function TableHeaders({ allDates, today, saving, isPastWeek, onMarkAll, onMarkAl
                   <button className="session-action-btn session-action-check" onClick={() => onMarkAll(dateStr)} disabled={saving || isLocked} title={isFuture ? "تسجيل حضور مسبق غير مسموح" : isPastWeek ? "الأسبوع منتهي لا يمكن التعديل" : "تحضير الكل"}>
                     <CheckSquare size={11} />
                   </button>
-                  <button className="session-action-btn session-action-clear" onClick={() => onMarkAllAbsent(dateStr)} disabled={saving || isLocked} title={isFuture ? "تسجيل حضور مسبق غير مسموح" : isPastWeek ? "الأسبوع منتهي لا يمكن التعديل" : "تسجيل غياب الكل"}>
+                  <button className="session-action-btn session-action-clear" onClick={() => onMarkAllAbsent(dateStr)} disabled={saving || isLocked} title={isFuture ? "تسجيل حضور مسبق غير مسموح" : isPastWeek ? "الأسبوع منتهي لا يمكن التعديل" : "تغييب الطلاب غير الحاضرين"}>
                     <XSquare size={11} />
                   </button>
                   <button className="session-action-btn session-action-clear" onClick={() => onClearSession(dateStr)} disabled={saving || isLocked} title={isFuture ? "تسجيل حضور مسبق غير مسموح" : isPastWeek ? "الأسبوع منتهي لا يمكن التعديل" : "إلغاء الحصة (حذف السجل)"}>
